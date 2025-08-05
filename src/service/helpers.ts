@@ -15,7 +15,7 @@ import {
   populateBundle,
 } from "@morpho-org/bundler-sdk-viem";
 
-import { withSimplePermit } from "@morpho-org/morpho-test";
+// import { withSimplePermit } from "@morpho-org/morpho-test";
 import {
   type SimulationState,
   isBlueOperation,
@@ -51,7 +51,7 @@ export const setupBundle = async (
   let { operations } = populateBundle(inputOperations, startData, {
     ...options,
     withSimplePermit: new Set([
-      ...withSimplePermit[startData.chainId],
+      // ...withSimplePermit[startData.chainId],
       ...(options?.withSimplePermit ?? []),
     ]),
     publicAllocatorOptions: {

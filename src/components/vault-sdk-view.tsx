@@ -1,18 +1,54 @@
 import { useState } from "react";
-import { useWalletClient } from "wagmi";
-import { usePopulatedSimulationState } from "../hooks/usePopulatedSimulationState";
+import { useWalletClient, useAccount } from "wagmi";
 import { useGetUserSDKVaultPositions } from "../hooks/useGetUserSDKVaultPosition";
 import { Address, formatUnits, parseEther } from "viem";
-import { depositUsingBundler, withdrawUsingBundler } from "../service/actions";
-import { Vault } from "@morpho-org/blue-sdk";
+//import { depositUsingBundler, withdrawUsingBundler } from "../service/actions";
+//import { Vault } from "@morpho-org/blue-sdk";
+import { BrowserProvider, Contract } from "ethers";
+import { JsonRpcProvider } from "ethers";
+import vaultAbi from "../abis/Vault.json";
 import { useTokenBalance } from "../hooks/useTokenBalance";
+import erc20Abi from "../abis/erc20.json";
+import { useGetVaultTransactionsQuery } from "../graphql/__generated__/GetVaultTransactions.query.generated";
+import { useGetVaultDisplayQuery } from "../graphql/__generated__/GetVaultDisplay.query.generated";
+
+export function TransactionHistory() {
+  const { data, loading, error } = useGetVaultTransactionsQuery({
+    // Poll every 10 seconds to refresh after new transactions
+    pollInterval: 10000,
+    // Always fetch fresh data from network
+    fetchPolicy: "network-only",
+  });
+  const txs = data?.transactions?.items ?? [];
+  const { address: userAddress } = useAccount();
+  const userTxs = userAddress
+    ? txs.filter(tx => tx.user?.address.toLowerCase() === userAddress.toLowerCase())
+    : [];
+
+  if (loading) return <p>Loading history…</p>;
+  if (error)   return <p>Error: {error.message}</p>;
+  if (!userAddress) return <p>Connect your wallet to see your transactions.</p>;
+  if (userTxs.length === 0) return <p>No transactions for your wallet.</p>;
+
+  return (
+    <div className="space-y-2">
+      {userTxs.map((tx) => (
+        <div key={tx.hash} className="flex justify-between">
+          <span>{new Date(Number(tx.timestamp) * 1000).toLocaleString()}</span>
+          <span className="font-mono truncate">{tx.hash}</span>
+          <span>{tx.type}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
   const [testResults, setTestResults] = useState<string[]>([]);
   const [isFullWithdraw, setIsFullWithdraw] = useState(false);
   const [inputs, setInputs] = useState({
-    amountToDeposit: "10",
-    amountToWithdraw: "5",
+    amountToDeposit: "0.1",
+    amountToWithdraw: "0.1",
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,12 +60,6 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
   };
 
   const client = useWalletClient();
-
-  const {
-    simulationState,
-    isPending: simulationIsPending,
-    error: simulationError,
-  } = usePopulatedSimulationState(vaultAddress);
 
   const {
     position,
@@ -45,6 +75,25 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
     position?.underlyingAddress || "0x0000000000000000000000000000000000000000"
   );
 
+  // Fetch vault metrics (TVL, APY, price)
+  const { data: vaultData } = useGetVaultDisplayQuery({
+    skip: !vaultAddress,
+    fetchPolicy: "cache-and-network",
+  });
+
+  const netApy            = vaultData?.vaultByAddress.state?.netApy ?? 0;
+  const priceUsd          = vaultData?.vaultByAddress.asset.priceUsd ?? 0;
+
+  // Compute current underlying amount from position
+  const underlyingWei = position
+    ? (position.depositedAssets * position.shareToUnderlying) / BigInt(1e18)
+    : BigInt(0);
+  const underlyingAmount = Number(underlyingWei) / 1e18;
+
+  const currentValueUsd   = underlyingAmount * priceUsd;
+  const annualEarningsUsd = currentValueUsd * netApy;
+  const monthlyEarningsUsd = annualEarningsUsd / 12;
+
   const runDeposit = async () => {
     // Clear previous results first
     setTestResults([]);
@@ -54,38 +103,63 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
       return;
     }
 
-    if (simulationIsPending || !simulationState) {
-      setTestResults((prev) => [
-        ...prev,
-        "Simulation state is still loading, please try again shortly.",
-      ]);
-      return;
-    }
-
-    if (simulationError) {
-      setTestResults((prev) => [
-        ...prev,
-        `Error loading simulation state: ${simulationError}`,
-      ]);
-      return;
-    }
-
     try {
       // Convert input values to BigInt using parseEther.
       const depositAmountWei = parseEther(inputs.amountToDeposit);
-      const vault = await Vault.fetch(vaultAddress as Address, client.data);
-      // Use the populated simulationState directly
-      await depositUsingBundler(
-        vault,
-        client.data,
-        simulationState,
-        depositAmountWei
-      );
+      // 1) Get an ethers.js signer from the user’s wallet
+      const provider = new BrowserProvider(window.ethereum as any);
+      const signer   = await provider.getSigner();
+      const userAddr = await signer.getAddress();
 
-      setTestResults((prev) => [
-        ...prev,
-        "Deposit via Bundler action executed successfully",
-      ]);
+      // 2) Instantiate the vault contract with your ABI
+      const vaultContract = new Contract(
+        vaultAddress,
+        vaultAbi,
+        signer
+      );
+      // 0) Get your underlying token address
+      const underlyingAddress = position?.underlyingAddress;
+      if (!underlyingAddress) throw new Error("No underlying token");
+
+      // 1) Instantiate ERC-20 contract and approve
+      const tokenContract = new Contract(
+        underlyingAddress,
+        erc20Abi,
+        signer
+      );
+      const approveTx = await tokenContract.approve(
+        vaultAddress,
+        depositAmountWei,
+        { gasLimit: 100_000 }
+      );
+      await approveTx.wait();
+      // 2) Call the ERC-4626 deposit function
+      const tx = await vaultContract.deposit(
+        depositAmountWei,
+        userAddr,         // receiver
+        { gasLimit: 250_000 }
+      );
+      // Manual polling for transaction receipt, with retry and backoff to avoid rate limits
+      const rpcProvider = new JsonRpcProvider("https://mainnet.base.org");
+      let receipt = null;
+      for (let i = 0; i < 10; i++) {
+        try {
+          const tmp = await rpcProvider.getTransactionReceipt(tx.hash);
+          if (tmp && tmp.blockNumber) {
+            receipt = tmp;
+            break;
+          }
+        } catch (pollError) {
+          console.warn("Receipt poll error, retrying", pollError);
+        }
+        // Wait 6 seconds before next attempt
+        await new Promise((res) => setTimeout(res, 6000));
+      }
+      if (receipt) {
+        setTestResults((prev) => [...prev, "Deposit confirmed on chain"]);
+      } else {
+        setTestResults((prev) => [...prev, `Transaction submitted: ${tx.hash}`]);
+      }
     } catch (error: unknown) {
       console.error("Error during deposit action:", error);
       setTestResults((prev) => [
@@ -103,28 +177,22 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
       return;
     }
 
-    if (simulationIsPending || !simulationState) {
-      setTestResults((prev) => [
-        ...prev,
-        "Simulation state is still loading, please try again shortly.",
-      ]);
-      return;
-    }
-
-    if (simulationError) {
-      setTestResults((prev) => [
-        ...prev,
-        `Error loading simulation state: ${simulationError}`,
-      ]);
-      return;
-    }
-
     try {
-      const vault = await Vault.fetch(vaultAddress, client.data);
+      // 1) Get an ethers.js signer from the user’s wallet
+      const provider = new BrowserProvider(window.ethereum as any);
+      const signer   = await provider.getSigner();
+      const userAddr = await signer.getAddress();
 
+      // 2) Instantiate the vault contract with your ABI
+      const vaultContract = new Contract(
+        vaultAddress,
+        vaultAbi,
+        signer
+      );
+
+      // 3) Determine the number of shares to withdraw
       let sharesToWithdraw: bigint;
       if (isFullWithdraw) {
-        // For full withdraw, use the user's entire vault token balance
         if (!position) {
           throw new Error("Position data not available");
         }
@@ -135,21 +203,32 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
           amountToWithdraw: formatUnits(position.depositedAssets, 18),
         }));
       } else {
-        // For partial withdraw, convert the input amount to shares
+        // Convert the user-entered underlying amount to shares via totalAssets/totalSupply ratio
         const amountToWithdraw = parseEther(inputs.amountToWithdraw);
-        sharesToWithdraw = vault.toShares(amountToWithdraw);
+
+        // Fetch total assets and total shares from the vault
+        const [totalAssets, totalShares] = await Promise.all([
+          vaultContract.totalAssets(),
+          vaultContract.totalSupply()
+        ]);
+
+        // Compute shares proportionally: shares = amount * totalShares / totalAssets
+        sharesToWithdraw = (amountToWithdraw * totalShares) / totalAssets;
       }
 
-      await withdrawUsingBundler(
-        vault,
-        client.data,
-        simulationState,
-        sharesToWithdraw
+      // 4) Call the ERC-4626 withdraw function (shares, recipient, owner)
+      const tx = await vaultContract.withdraw(
+        sharesToWithdraw,
+        userAddr,  // recipient of underlying
+        userAddr,  // owner of shares
+        { gasLimit: 250_000 }
       );
+      await tx.wait();
 
+      // 5) Log success
       setTestResults((prev) => [
         ...prev,
-        "Withdraw via Bundler action executed successfully",
+        "Withdraw executed on-chain successfully",
       ]);
     } catch (error: unknown) {
       console.error("Error during withdraw action:", error);
@@ -204,6 +283,13 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                           18
                         )}{" "}
                         {position.underlyingSymbol}
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-gray-700">
+                      <div className="text-sm text-gray-400 mb-1">Projected Earnings</div>
+                      <div className="font-medium space-y-1">
+                        <div>Monthly: ${monthlyEarningsUsd.toFixed(2)}</div>
+                        <div>Annual:  ${annualEarningsUsd.toFixed(2)}</div>
                       </div>
                     </div>
                   </div>
@@ -327,6 +413,12 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Transaction History Section */}
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4">Transaction History</h2>
+          <TransactionHistory />
         </div>
       </div>
     </div>

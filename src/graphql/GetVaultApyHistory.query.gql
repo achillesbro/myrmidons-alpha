@@ -1,0 +1,23 @@
+# src/graphql/GetVaultApyHistory.query.gql
+query GetVaultApyHistory(
+  $address: String!
+  $chainId: Int!
+  $startTimestamp: Int
+  $endTimestamp: Int
+  $interval: TimeseriesInterval!
+) {
+  vaultByAddress(address: $address, chainId: $chainId) {
+    historicalState {
+      netApy(
+        options: {
+          startTimestamp: $startTimestamp
+          endTimestamp: $endTimestamp
+          interval: $interval
+        }
+      ) {
+        x # Unix timestamp
+        y # APY value as decimal (e.g. 0.035)
+      }
+    }
+  }
+}

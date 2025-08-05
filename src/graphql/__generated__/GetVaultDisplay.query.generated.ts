@@ -46,6 +46,10 @@ export type GetVaultDisplayQuery = {
     } | null;
     state: {
       __typename?: "VaultState";
+      apy: number;
+      netApy: number | null;
+      weeklyNetApy: number | null;
+      monthlyNetApy: number | null;
       allocation: Array<{
         __typename?: "VaultAllocation";
         supplyAssets: Types.Scalars["BigInt"]["output"];
@@ -82,8 +86,8 @@ export type GetVaultDisplayQuery = {
 export const GetVaultDisplayDocument = gql`
   query GetVaultDisplay {
     vaultByAddress(
-      address: "0x2371e134e3455e0593363cBF89d3b6cf53740618"
-      chainId: 1
+      address: "0xDDD64e2EF73b0741BdB1e2813a1115FD150aef36"
+      chainId: 8453
     ) {
       whitelisted
       name
@@ -133,6 +137,10 @@ export const GetVaultDisplayDocument = gql`
             }
           }
         }
+        apy
+        netApy
+        weeklyNetApy
+        monthlyNetApy
       }
       allocators {
         address

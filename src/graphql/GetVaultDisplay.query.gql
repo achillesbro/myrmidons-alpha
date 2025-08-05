@@ -1,7 +1,7 @@
 query GetVaultDisplay {
   vaultByAddress(
-    address: "0x2371e134e3455e0593363cBF89d3b6cf53740618"
-    chainId: 1
+    address: "0xDDD64e2EF73b0741BdB1e2813a1115FD150aef36"
+    chainId: 8453
   ) {
     whitelisted
     name
@@ -51,6 +51,10 @@ query GetVaultDisplay {
           }
         }
       }
+      apy
+      netApy
+      weeklyNetApy
+      monthlyNetApy
     }
     allocators {
       address

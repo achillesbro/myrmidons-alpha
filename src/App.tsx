@@ -5,7 +5,7 @@ import {
   ConnectButton,
 } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
-import { mainnet, anvil } from "wagmi/chains";
+import { mainnet, anvil, base } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "wagmi";
 import { useEffect, useState } from "react";
@@ -21,7 +21,7 @@ import { apolloClient } from "./service/apollo.client";
 import { VaultAPIView } from "./components/vault-api-view";
 import { VaultSdkView } from "./components/vault-sdk-view";
 
-const DEFAULT_VAULT: Address = "0x2371e134e3455e0593363cBF89d3b6cf53740618";
+const DEFAULT_VAULT: Address = "0xDDD64e2EF73b0741BdB1e2813a1115FD150aef36";
 
 const TestInterface = () => {
   const [activeTab, setActiveTab] = useState<"SDK" | "API">("SDK");
@@ -132,7 +132,7 @@ const TestInterface = () => {
 const config = getDefaultConfig({
   appName: "Test Wagmi Interface",
   projectId: "841b6ddde2826ce0acf2d1b1f81f8582",
-  chains: [mainnet, anvil],
+  chains: [mainnet, anvil, base],
   wallets: [
     {
       groupName: "Popular",
@@ -142,6 +142,7 @@ const config = getDefaultConfig({
   transports: {
     [mainnet.id]: http(),
     [anvil.id]: http("http://127.0.0.1:8545"),
+    [base.id]: http("https://mainnet.base.org"),
   },
 });
 

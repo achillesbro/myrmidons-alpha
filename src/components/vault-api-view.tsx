@@ -1,13 +1,13 @@
-import { Address, formatUnits } from "viem";
+import { formatUnits } from "viem";
 import { useGetVaultDisplayQuery } from "../graphql/__generated__/GetVaultDisplay.query.generated";
 
-export function VaultAPIView({ vaultAddress }: { vaultAddress: Address }) {
+export function VaultAPIView() {
   const { data, loading, error } = useGetVaultDisplayQuery({
     variables: {
       //@ts-expect-error vaultAddress is a string
-      address: vaultAddress as `0x${string}`,
+      address: 0xDDD64e2EF73b0741BdB1e2813a1115FD150aef36,
       //@ts-expect-error chainId is a number
-      chainId: 1, // mainnet
+      chainId: 8453, // mainnet
     },
     fetchPolicy: "cache-and-network",
   });
@@ -355,6 +355,26 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress: Address }) {
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Vault Metrics */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* TVL */}
+        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
+          <h3 className="text-lg font-semibold mb-4">TVL</h3>
+          <p className="font-medium">
+            {vault.liquidity?.usd
+              ? `$${vault.liquidity.usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+              : "N/A"}
+          </p>
+        </div>
+        {/* APY Metrics */}
+        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700 space-y-4">
+          <h3 className="text-lg font-semibold">APY Metrics</h3>
+          <p>Current APY: {vault.state?.netApy ? `${(vault.state.netApy * 100).toFixed(2)}%` : "N/A"}</p>
+          <p>7-Day APY: {vault.state?.weeklyNetApy ? `${(vault.state.weeklyNetApy * 100).toFixed(2)}%` : "N/A"}</p>
+          <p>30-Day APY: {vault.state?.monthlyNetApy ? `${(vault.state.monthlyNetApy * 100).toFixed(2)}%` : "N/A"}</p>
         </div>
       </div>
 
