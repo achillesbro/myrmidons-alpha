@@ -1,5 +1,14 @@
 import { formatUnits } from "viem";
 import { useGetVaultDisplayQuery } from "../graphql/__generated__/GetVaultDisplay.query.generated";
+import { useGetVaultApyHistoryQuery } from "../graphql/__generated__/GetVaultApyHistory.query.generated";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 export function VaultAPIView() {
   const { data, loading, error } = useGetVaultDisplayQuery({
@@ -10,6 +19,23 @@ export function VaultAPIView() {
       chainId: 8453, // mainnet
     },
     fetchPolicy: "cache-and-network",
+  });
+
+  // Prepare vault and timestamps for historical APY query, before any early returns
+  const vault = data?.vaultByAddress;
+  const creationTs = vault?.creationTimestamp
+    ? Number(vault.creationTimestamp)
+    : 0;
+  const nowTs = Math.floor(Date.now() / 1000);
+  const { data: histData, loading: histLoading } = useGetVaultApyHistoryQuery({
+    variables: {
+      address: vault?.address ?? "",
+      chainId: vault?.chain?.id ?? 0,
+      startTimestamp: creationTs,
+      endTimestamp: nowTs,
+      interval: "DAY" as any,
+    },
+    skip: !vault,
   });
 
   if (loading) {
@@ -82,7 +108,6 @@ export function VaultAPIView() {
     );
   }
 
-  const vault = data?.vaultByAddress;
   if (!vault) {
     return (
       <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
@@ -90,6 +115,18 @@ export function VaultAPIView() {
       </div>
     );
   }
+
+  // Safely extract netApy data points
+  const netApyPoints = histData?.vaultByAddress.historicalState.netApy ?? [];
+
+  // Filter out any null values, map to the chart format, and sort by date ascending
+  const chartData = netApyPoints
+    .filter((point): point is { x: number; y: number } => point.y != null)
+    .map((point) => ({
+      date: new Date(point.x * 1000),
+      apy: point.y * 100, // convert decimal to percentage
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
 
   // Optional: Convert timestamps to human-readable date
   const creationDate = vault.creationTimestamp
@@ -377,6 +414,34 @@ export function VaultAPIView() {
           <p>30-Day APY: {vault.state?.monthlyNetApy ? `${(vault.state.monthlyNetApy * 100).toFixed(2)}%` : "N/A"}</p>
         </div>
       </div>
+
+      {/* APY History Chart */}
+      <h3 className="text-lg font-semibold mt-8 mb-4">APY History (All-Time)</h3>
+      {histLoading ? (
+        <p>Loading chart…</p>
+      ) : (
+        <div style={{ width: "100%", height: 300 }}>
+          <ResponsiveContainer>
+            <LineChart data={chartData}>
+              <XAxis 
+                dataKey="date" 
+                tickFormatter={(d) => (d as Date).toLocaleDateString()} 
+              />
+              <YAxis unit="%" />
+              <Tooltip 
+                labelFormatter={(label) => (label as Date).toLocaleDateString()} 
+                formatter={(value) => `${(value as number).toFixed(2)}%`} 
+              />
+              <Line 
+                type="monotone" 
+                dataKey="apy" 
+                stroke="#8884d8" 
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Chain Info & Allocators */}
       <div className="grid grid-cols-2 gap-6">
