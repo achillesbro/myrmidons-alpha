@@ -1,4 +1,4 @@
-import { formatUnits } from "viem";
+import { formatUnits, erc20Abi } from "viem";
 import { useGetVaultDisplayQuery } from "../graphql/__generated__/GetVaultDisplay.query.generated";
 import { useGetVaultApyHistoryQuery } from "../graphql/__generated__/GetVaultApyHistory.query.generated";
 import {
@@ -14,7 +14,10 @@ import vaultAbi from "../abis/Vault.json";
 import { useVaultCurrentApyOnchain } from "../hooks/useVaultCurrentApyOnchain";
 import { useState, useEffect } from "react";
 import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";
-import { AllocationList } from "./AllocationList";
+// Inline AllocationList component for on-chain allocations
+
+import { getWhypeUsd } from "../lib/prices";
+
 
 export function VaultAPIView() {
   // If using HyperEVM (chainId 999), fetch vault data on-chain instead of via GraphQL
@@ -25,9 +28,55 @@ export function VaultAPIView() {
     totalSupply: bigint;
     name: string;
     symbol: string;
+    underlyingAddress: `0x${string}`;
+    underlyingDecimals: number;
   } | null>(null);
   const [onchainLoading, setOnchainLoading] = useState(true);
   const [onchainError, setOnchainError] = useState<Error | null>(null);
+
+  const [usdPrice, setUsdPrice] = useState<number | null>(null);
+  const [priceLoading, setPriceLoading] = useState<boolean>(true);
+
+  // Performance fee state
+  const [feeWad, setFeeWad] = useState<bigint | null>(null);
+  const [feeRecipient, setFeeRecipient] = useState<`0x${string}` | null>(null);
+  const [feeLoading, setFeeLoading] = useState<boolean>(true);
+  const [feeError, setFeeError] = useState<Error | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      try {
+        setFeeLoading(true);
+        setFeeError(null);
+        const client = hyperPublicClient;
+        const [fee, recip] = await Promise.all([
+          client.readContract({
+            address: VAULT_ADDRESS as `0x${string}`,
+            abi: vaultAbi,
+            functionName: "fee",
+          }),
+          client.readContract({
+            address: VAULT_ADDRESS as `0x${string}`,
+            abi: vaultAbi,
+            functionName: "feeRecipient",
+          }),
+        ]);
+        if (cancelled) return;
+        setFeeWad(fee as bigint);
+        setFeeRecipient(recip as `0x${string}`);
+      } catch (e) {
+        if (!cancelled) setFeeError(e as Error);
+      } finally {
+        if (!cancelled) setFeeLoading(false);
+      }
+    }
+    run();
+    const id = setInterval(run, 5 * 60_000); // refresh every 5 minutes
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [VAULT_ADDRESS]);
 
   useEffect(() => {
     if (!onchainData) {
@@ -53,14 +102,48 @@ export function VaultAPIView() {
           abi: vaultAbi,
           functionName: "symbol",
         }),
+        client.readContract({
+          address: VAULT_ADDRESS as `0x${string}`,
+          abi: vaultAbi,
+          functionName: "asset",
+        }),
       ])
-        .then(([assets, supply, name, symbol]: [bigint, bigint, string, string]) => {
-          setOnchainData({ totalAssets: assets, totalSupply: supply, name, symbol });
+        .then(async ([assets, supply, name, symbol, asset]: [bigint, bigint, string, string, `0x${string}`]) => {
+          const decimals = await client.readContract({
+            address: asset,
+            abi: erc20Abi,
+            functionName: "decimals",
+          });
+          setOnchainData({
+            totalAssets: assets,
+            totalSupply: supply,
+            name,
+            symbol,
+            underlyingAddress: asset,
+            underlyingDecimals: Number(decimals),
+          });
         })
         .catch((e: unknown) => setOnchainError(e as Error))
         .finally(() => setOnchainLoading(false));
     }
   }, [onchainData]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      if (!onchainData?.underlyingAddress) return;
+      try {
+        setPriceLoading(true);
+        const p = await getWhypeUsd({ token: onchainData.underlyingAddress });
+        if (!cancelled) setUsdPrice(p ?? null);
+      } finally {
+        if (!cancelled) setPriceLoading(false);
+      }
+    }
+    run();
+    const id = setInterval(run, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [onchainData?.underlyingAddress]);
 
   const { data, loading, error } = useGetVaultDisplayQuery({
     variables: {
@@ -90,38 +173,137 @@ export function VaultAPIView() {
     skip: !vault,
   });
 
+  // Always call APY hook so it's available for skeleton and metrics
+  const { apy, loading: apyLoading, error: apyError } = useVaultCurrentApyOnchain(
+    VAULT_ADDRESS as `0x${string}`
+  );
+
   // HyperEVM on-chain path
   if (onchainLoading) {
-    return <p>Loading HyperEVM vault data…</p>;
+    return (
+      <div className="space-y-6">
+        {/* Top: two columns (Info / About) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6 animate-pulse">
+            <div className="h-6 bg-[#E1E1D6] rounded w-1/3 mb-3"></div>
+            <div className="h-4 bg-[#E1E1D6] rounded w-2/3"></div>
+          </div>
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6 animate-pulse">
+            <div className="h-6 bg-[#E1E1D6] rounded w-1/4 mb-3"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-[#E1E1D6] rounded"></div>
+              <div className="h-4 bg-[#E1E1D6] rounded w-5/6"></div>
+              <div className="h-4 bg-[#E1E1D6] rounded w-4/6"></div>
+            </div>
+          </div>
+        </div>
+        {/* Metrics: 4 cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4 animate-pulse">
+            <div className="h-3 bg-[#E1E1D6] rounded w-1/3 mb-2"></div>
+            <div className="h-6 bg-[#E1E1D6] rounded w-1/2"></div>
+            </div>
+          ))}
+        </div>
+        {/* Allocations skeleton */}
+        <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6 animate-pulse">
+          <div className="h-5 bg-[#E1E1D6] rounded w-1/5 mb-3"></div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-8 bg-[#E1E1D6] rounded mb-2"></div>
+          ))}
+        </div>
+      </div>
+    );
   }
   if (onchainError) {
     return <p>Error loading on-chain vault: {onchainError.message}</p>;
   }
   if (onchainData) {
-    // Compute basic metrics
-    const tvl = Number(onchainData.totalAssets) / 1e18;
-    const supply = Number(onchainData.totalSupply) / 1e18;
-    return (
-      <div className="space-y-4 p-6 bg-[#1E1E1E] border border-gray-700 rounded-lg">
-        <h2 className="text-xl font-semibold">HyperEVM Vault Metrics</h2>
-        <p className="text-gray-400 text-sm">
-          Name: <span className="font-medium">{onchainData.name}</span>
-        </p>
-        <p className="text-gray-400 text-sm">
-          Symbol: <span className="font-medium">{onchainData.symbol}</span>
-        </p>
-        <p>Total Assets (underlying): {tvl.toFixed(4)}</p>
-        <p>Total Shares (supply): {supply.toFixed(4)}</p>
+    // Compute TVL in USD using underlying decimals and live USD price
+    const tvlUnits = Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals));
+    const tvlUsd = typeof usdPrice === "number" ? tvlUnits * usdPrice : undefined;
 
-        {/* Current APY (on-chain) */}
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold mb-3">Current APY</h3>
-          <OnchainCurrentApy vaultAddress={VAULT_ADDRESS as `0x${string}`} />
+    return (
+      <div className="space-y-6">
+        {/* Top: two columns (Info / About) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left: Vault name & address */}
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
+            <h2 className="text-2xl font-semibold text-[#00295B]">{onchainData.name}</h2>
+            <p className="text-[#101720]/70 text-sm mt-1">
+              Vault Address:&nbsp;
+              <span className="font-mono break-all">{VAULT_ADDRESS}</span>
+            </p>
+          </div>
+          {/* Right: About */}
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
+            <h3 className="text-lg font-semibold mb-2 text-[#00295B]">About</h3>
+            <p className="text-[#101720]/80 text-sm">
+              This vault allocates liquidity across selected Morpho markets on HyperEVM to capture supply yield while maintaining liquidity and risk constraints.
+            </p>
+          </div>
         </div>
 
-        {/* Allocations (on-chain for HyperEVM) */}
-        <div className="mt-6">
-          <h3 className="text-lg font-semibold mb-3">Allocations</h3>
+        {/* Metrics: TVL / Underlying / Yield / Performance Fee */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
+            <p className="text-[#101720]/70 text-xs">TVL (USD)</p>
+            <p className="text-xl font-semibold mt-1 text-[#101720]">
+              {priceLoading ? (
+                "Loading…"
+              ) : tvlUsd !== undefined ? (
+                `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+              ) : (
+                "N/A"
+              )}
+            </p>
+          </div>
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
+            <p className="text-[#101720]/70 text-xs">Underlying Price</p>
+            <p className="text-xl font-semibold mt-1 text-[#101720]">
+              {priceLoading ? "Loading…" : usdPrice != null ? `$${usdPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : "N/A"}
+            </p>
+          </div>
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
+            <p className="text-[#101720]/70 text-xs">Yield</p>
+            <p className="text-xl font-semibold mt-1 text-[#101720]">
+              {apyLoading ? (
+                "Computing…"
+              ) : apyError ? (
+                "Error"
+              ) : apy != null ? (
+                `${(apy * 100).toFixed(2)}%`
+              ) : (
+                "N/A"
+              )}
+            </p>
+          </div>
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
+            <p className="text-[#101720]/70 text-xs">Performance Fee</p>
+            <p className="text-xl font-semibold mt-1 text-[#101720]">
+              {feeLoading ? (
+                "Loading…"
+              ) : feeWad != null ? (
+                `${(Number(formatUnits(feeWad, 18)) * 100).toFixed(2)}%`
+              ) : feeError ? (
+                "Error"
+              ) : (
+                "N/A"
+              )}
+            </p>
+            <p className="text-[#101720]/60 text-xs mt-1">
+              Recipient: {feeRecipient ? `${feeRecipient.slice(0, 6)}…${feeRecipient.slice(-4)}` : "N/A"}
+            </p>
+          </div>
+        </div>
+
+        {/* Allocations */}
+        <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-[#00295B]">Allocations</h3>
+            <span className="text-xs text-[#101720]/70">Share • USD • Supply APY</span>
+          </div>
           <OnchainAllocations vaultAddress={VAULT_ADDRESS as `0x${string}`} />
         </div>
       </div>
@@ -228,49 +410,49 @@ export function VaultAPIView() {
       {/* Top Row: Basic Vault Info & Metadata */}
       <div className="grid grid-cols-2 gap-6">
         {/* Vault Info Card */}
-        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-          <h2 className="text-xl font-semibold mb-6 flex items-center">
+        <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+          <h2 className="text-xl font-semibold mb-6 flex items-center text-[#00295B]">
             <span className="mr-2">📋</span> Vault Info
           </h2>
           <div className="space-y-4">
             <div className="bg-[#121212] border border-gray-700 rounded-md p-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-gray-400 text-sm">Name</p>
+                  <p className="text-[#101720]/70 text-sm">Name</p>
                   <p className="font-medium">{vault.name}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Symbol</p>
+                  <p className="text-[#101720]/70 text-sm">Symbol</p>
                   <p className="font-medium">{vault.symbol}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Address</p>
+                  <p className="text-[#101720]/70 text-sm">Address</p>
                   <p className="font-medium break-all">{vault.address}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Whitelisted</p>
+                  <p className="text-[#101720]/70 text-sm">Whitelisted</p>
                   <p className="font-medium">
                     {vault.whitelisted ? "Yes" : "No"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Creator</p>
+                  <p className="text-[#101720]/70 text-sm">Creator</p>
                   <p className="font-medium break-all">
                     {vault.creatorAddress}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Factory</p>
+                  <p className="text-[#101720]/70 text-sm">Factory</p>
                   <p className="font-medium break-all">
                     {vault.factory?.address}
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Creation Block</p>
+                  <p className="text-[#101720]/70 text-sm">Creation Block</p>
                   <p className="font-medium">{vault.creationBlockNumber}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Creation Timestamp</p>
+                  <p className="text-[#101720]/70 text-sm">Creation Timestamp</p>
                   <p className="font-medium">{creationDate}</p>
                 </div>
               </div>
@@ -279,17 +461,17 @@ export function VaultAPIView() {
         </div>
 
         {/* Metadata Card */}
-        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-          <h2 className="text-xl font-semibold mb-6 flex items-center">
+        <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+          <h2 className="text-xl font-semibold mb-6 flex items-center text-[#00295B]">
             <span className="mr-2">ℹ️</span> Metadata
           </h2>
-          <div className="bg-[#121212] border border-gray-700 rounded-md p-4 space-y-4">
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4 space-y-4">
             <div>
-              <p className="text-gray-400 text-sm">Description</p>
+              <p className="text-[#101720]/70 text-sm">Description</p>
               <p className="font-medium">{vault.metadata?.description}</p>
             </div>
             <div>
-              <p className="text-gray-400 text-sm">Vault Image</p>
+              <p className="text-[#101720]/70 text-sm">Vault Image</p>
               {vault.metadata?.image ? (
                 <img
                   src={vault.metadata.image}
@@ -297,17 +479,17 @@ export function VaultAPIView() {
                   className="max-w-[80px] mt-2 rounded"
                 />
               ) : (
-                <p className="text-gray-500">No image provided</p>
+                <p className="text-[#101720]/60">No image provided</p>
               )}
             </div>
             {vault.metadata?.curators && vault.metadata.curators.length > 0 && (
               <div>
-                <p className="text-gray-400 text-sm mb-2">Curators</p>
+                <p className="text-[#101720]/70 text-sm mb-2">Curators</p>
                 <ul className="space-y-2">
                   {vault.metadata.curators.map((curator, idx) => (
                     <li
                       key={idx}
-                      className="flex items-center space-x-2 bg-[#1E1E1E] p-2 rounded"
+                    className="flex items-center space-x-2 bg-[#FFFFF5] p-2 rounded"
                     >
                       {curator.image && (
                         <img
@@ -329,19 +511,19 @@ export function VaultAPIView() {
       {/* Second Row: Liquidity & Asset Info */}
       <div className="grid grid-cols-2 gap-6">
         {/* Liquidity Card */}
-        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-          <h2 className="text-xl font-semibold mb-6 flex items-center">
+        <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+          <h2 className="text-xl font-semibold mb-6 flex items-center text-[#00295B]">
             <span className="mr-2">💧</span> Liquidity
           </h2>
-          <div className="bg-[#121212] border border-gray-700 rounded-md p-4 space-y-4">
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4 space-y-4">
             <div>
-              <p className="text-gray-400 text-sm">Underlying</p>
+              <p className="text-[#101720]/70 text-sm">Underlying</p>
               <p className="font-medium break-all">
                 {vault.liquidity?.underlying}
               </p>
             </div>
             <div>
-              <p className="text-gray-400 text-sm">USD</p>
+              <p className="text-[#101720]/70 text-sm">USD</p>
               <p className="font-medium">
                 {vault.liquidity?.usd
                   ? `$${vault.liquidity.usd.toLocaleString(undefined, {
@@ -355,7 +537,7 @@ export function VaultAPIView() {
           {/* ALLOCATIONS */}
           {vault.state?.allocation && vault.state.allocation.length > 0 ? (
             <div className="mt-6">
-              <h3 className="text-lg font-semibold mb-4">Allocations</h3>
+              <h3 className="text-lg font-semibold mb-4 text-[#00295B]">Allocations</h3>
               <div className="space-y-4">
                 {[...vault.state.allocation]
                   .sort(
@@ -371,18 +553,18 @@ export function VaultAPIView() {
                     return (
                       <div
                         key={idx}
-                        className="bg-[#121212] border border-gray-700 rounded-md p-4"
+                        className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4"
                       >
                         {/* Market row */}
                         <div className="flex justify-between mb-2">
                           <div>
-                            <p className="text-gray-400 text-sm">Collateral</p>
+                            <p className="text-[#101720]/70 text-sm">Collateral</p>
                             <p className="font-medium">
                               {collateralAsset?.symbol ?? "N/A"}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-gray-400 text-sm">Market Key</p>
+                            <p className="text-[#101720]/70 text-sm">Market Key</p>
                             <p className="font-medium break-all">
                               {market.uniqueKey}
                             </p>
@@ -392,14 +574,14 @@ export function VaultAPIView() {
                         {/* Amount & Value row */}
                         <div className="flex justify-between mt-2">
                           <div>
-                            <p className="text-gray-400 text-sm">Amount</p>
+                            <p className="text-[#101720]/70 text-sm">Amount</p>
                             <p className="font-medium">
                               {formatUnits(BigInt(supplyAssets), decimals)}{" "}
                               {vault.asset.symbol}
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-gray-400 text-sm">Value (USD)</p>
+                            <p className="text-[#101720]/70 text-sm">Value (USD)</p>
                             <p className="font-medium">
                               {supplyAssetsUsd
                                 ? `$${supplyAssetsUsd.toLocaleString(
@@ -418,34 +600,34 @@ export function VaultAPIView() {
               </div>
             </div>
           ) : (
-            <div className="mt-4 text-gray-500">No allocations found.</div>
+            <div className="mt-4 text-[#101720]/60">No allocations found.</div>
           )}
         </div>
 
         {/* Asset Info Card */}
-        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-          <h2 className="text-xl font-semibold mb-6 flex items-center">
+        <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+          <h2 className="text-xl font-semibold mb-6 flex items-center text-[#00295B]">
             <span className="mr-2">🪙</span> Asset Details
           </h2>
-          <div className="bg-[#121212] border border-gray-700 rounded-md p-4 space-y-4">
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4 space-y-4">
             <div>
-              <p className="text-gray-400 text-sm">Name</p>
+              <p className="text-[#101720]/70 text-sm">Name</p>
               <p className="font-medium">{vault.asset.name}</p>
             </div>
             <div>
-              <p className="text-gray-400 text-sm">Symbol</p>
+              <p className="text-[#101720]/70 text-sm">Symbol</p>
               <p className="font-medium">{vault.asset.symbol}</p>
             </div>
             <div>
-              <p className="text-gray-400 text-sm">Address</p>
+              <p className="text-[#101720]/70 text-sm">Address</p>
               <p className="font-medium break-all">{vault.asset.address}</p>
             </div>
             <div>
-              <p className="text-gray-400 text-sm">Decimals</p>
+              <p className="text-[#101720]/70 text-sm">Decimals</p>
               <p className="font-medium">{vault.asset.decimals}</p>
             </div>
             <div>
-              <p className="text-gray-400 text-sm">Price (USD)</p>
+              <p className="text-[#101720]/70 text-sm">Price (USD)</p>
               <p className="font-medium">
                 {vault.asset.priceUsd
                   ? `$${vault.asset.priceUsd.toLocaleString(undefined, {
@@ -456,12 +638,12 @@ export function VaultAPIView() {
             </div>
             {vault.asset.tags && vault.asset.tags.length > 0 && (
               <div>
-                <p className="text-gray-400 text-sm">Tags</p>
+                <p className="text-[#101720]/70 text-sm">Tags</p>
                 <div className="flex space-x-2 mt-1">
                   {vault.asset.tags.map((tag, idx) => (
                     <span
                       key={idx}
-                      className="bg-blue-600 px-2 py-1 rounded text-xs"
+                      className="bg-[#00295B] text-[#FFFFF5] px-2 py-1 rounded text-xs"
                     >
                       {tag}
                     </span>
@@ -470,7 +652,7 @@ export function VaultAPIView() {
               </div>
             )}
             <div>
-              <p className="text-gray-400 text-sm">Logo</p>
+                <p className="text-[#101720]/70 text-sm">Logo</p>
               {vault.asset.logoURI ? (
                 <img
                   src={vault.asset.logoURI}
@@ -478,7 +660,7 @@ export function VaultAPIView() {
                   className="w-8 h-8 mt-2 rounded"
                 />
               ) : (
-                <p className="text-gray-500">No logo URI provided</p>
+                <p className="text-[#101720]/60">No logo URI provided</p>
               )}
             </div>
           </div>
@@ -488,8 +670,8 @@ export function VaultAPIView() {
       {/* Vault Metrics */}
       <div className="grid grid-cols-2 gap-6">
         {/* TVL */}
-        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-          <h3 className="text-lg font-semibold mb-4">TVL</h3>
+        <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+          <h3 className="text-lg font-semibold mb-4 text-[#00295B]">TVL</h3>
           <p className="font-medium">
             {vault.liquidity?.usd
               ? `$${vault.liquidity.usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
@@ -497,16 +679,24 @@ export function VaultAPIView() {
           </p>
         </div>
         {/* APY Metrics */}
-        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700 space-y-4">
-          <h3 className="text-lg font-semibold">APY Metrics</h3>
+        <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6] space-y-4">
+          <h3 className="text-lg font-semibold text-[#00295B]">APY Metrics</h3>
           <p>Current APY: {vault.state?.netApy ? `${(vault.state.netApy * 100).toFixed(2)}%` : "N/A"}</p>
           <p>7-Day APY: {vault.state?.weeklyNetApy ? `${(vault.state.weeklyNetApy * 100).toFixed(2)}%` : "N/A"}</p>
           <p>30-Day APY: {vault.state?.monthlyNetApy ? `${(vault.state.monthlyNetApy * 100).toFixed(2)}%` : "N/A"}</p>
         </div>
       </div>
 
+      {/* About (hardcoded) */}
+      <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+        <h2 className="text-xl font-semibold mb-3 text-[#00295B]">About</h2>
+        <p className="text-[#101720]/80 text-sm">
+          This vault allocates liquidity across selected Morpho markets to capture supply yield while maintaining liquidity and risk constraints.
+        </p>
+      </div>
+
       {/* APY History Chart */}
-      <h3 className="text-lg font-semibold mt-8 mb-4">APY History (All-Time)</h3>
+      <h3 className="text-lg font-semibold mt-8 mb-4 text-[#00295B]">APY History (All-Time)</h3>
       {histLoading ? (
         <p>Loading chart…</p>
       ) : (
@@ -525,7 +715,7 @@ export function VaultAPIView() {
               <Line 
                 type="monotone" 
                 dataKey="apy" 
-                stroke="#8884d8" 
+                stroke="#00295B" 
                 dot={false}
               />
             </LineChart>
@@ -536,38 +726,38 @@ export function VaultAPIView() {
       {/* Chain Info & Allocators */}
       <div className="grid grid-cols-2 gap-6">
         {/* Chain Info Card */}
-        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-          <h2 className="text-xl font-semibold mb-6 flex items-center">
+        <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+          <h2 className="text-xl font-semibold mb-6 flex items-center text-[#00295B]">
             <span className="mr-2">⛓</span> Chain
           </h2>
-          <div className="bg-[#121212] border border-gray-700 rounded-md p-4 space-y-4">
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4 space-y-4">
             <div>
-              <p className="text-gray-400 text-sm">Chain ID</p>
+              <p className="text-[#101720]/70 text-sm">Chain ID</p>
               <p className="font-medium">{vault.chain?.id}</p>
             </div>
             <div>
-              <p className="text-gray-400 text-sm">Network</p>
+              <p className="text-[#101720]/70 text-sm">Network</p>
               <p className="font-medium">{vault.chain?.network}</p>
             </div>
           </div>
         </div>
 
         {/* Allocators Card */}
-        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-          <h2 className="text-xl font-semibold mb-6 flex items-center">
+        <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+          <h2 className="text-xl font-semibold mb-6 flex items-center text-[#00295B]">
             <span className="mr-2">👷‍♂️</span> Allocators
           </h2>
-          <div className="bg-[#121212] border border-gray-700 rounded-md p-4">
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
             {vault.allocators && vault.allocators.length > 0 ? (
               <ul className="space-y-2">
                 {vault.allocators.map((allocator, idx) => (
-                  <li key={idx} className="bg-[#1E1E1E] p-2 rounded break-all">
+                  <li key={idx} className="bg-[#FFFFF5] p-2 rounded break-all">
                     {allocator.address}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-gray-500">No allocators found</p>
+              <p className="text-[#101720]/60">No allocators found</p>
             )}
           </div>
         </div>
@@ -576,27 +766,123 @@ export function VaultAPIView() {
   );
 }
 
+// Inline AllocationList component for on-chain allocations
+type AllocationRow = {
+  id: `0x${string}`;
+  label: string;
+  assets: bigint;
+  pct: number; // 0..100
+  usd?: number | null;
+  supplyApy?: number | null; // decimal (0..1)
+  decimals?: number; // token decimals for amount formatting
+};
+
+function AllocationList({
+  items,
+  totalAssets,
+  trueIdle,
+  hiddenDust,
+  decimals = 18,
+}: {
+  items: AllocationRow[];
+  totalAssets: bigint;
+  trueIdle?: bigint | null;
+  hiddenDust?: bigint | null;
+  decimals?: number;
+}) {
+
+  const clampPct = (n: number) => Math.max(0, Math.min(100, n));
+
+  const formatBig = (v?: bigint | null) =>
+    v != null ? Number(formatUnits(v, decimals)).toLocaleString(undefined, { maximumFractionDigits: 4 }) : null;
+  const pctOf = (v?: bigint | null) =>
+    v != null && totalAssets !== 0n
+      ? Math.max(0, Math.min(100, Number((v * 10000n) / totalAssets) / 100)).toFixed(2)
+      : null;
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-12 text-xs text-[#101720]/70 pb-2 border-b border-[#E5E2D6]">
+        <div className="col-span-5">Market</div>
+        <div className="col-span-3 text-right">Share</div>
+        <div className="col-span-2 text-right">USD</div>
+        <div className="col-span-2 text-right">Supply APY</div>
+      </div>
+
+      {items.map((it) => (
+        <div key={it.id} className="grid grid-cols-12 items-center py-2 border-b border-[#EDE9D7]">
+          <div className="col-span-5 truncate text-[#101720]">{it.label}</div>
+          <div className="col-span-3 text-right text-[#101720]">
+            {clampPct(it.pct).toFixed(2)}%
+          </div>
+          <div className="col-span-2 text-right text-[#101720]">
+            {it.usd != null
+              ? `$${it.usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+              : "N/A"}
+          </div>
+          <div className="col-span-2 text-right text-[#101720]">
+            {it.supplyApy != null
+              ? `${(it.supplyApy * 100).toFixed(2)}%`
+              : "N/A"}
+          </div>
+        </div>
+      ))}
+
+      {/* Hidden dust row (filtered allocations) */}
+      {hiddenDust != null && hiddenDust > 0n && (
+        <div className="grid grid-cols-12 items-center py-2">
+          <div className="col-span-5 font-medium">Other (dust)</div>
+          <div className="col-span-3 text-right text-[#101720]">
+            {pctOf(hiddenDust) ? `${pctOf(hiddenDust)}%` : "—"}
+          </div>
+          <div className="col-span-2 text-right">—</div>
+          <div className="col-span-2 text-right">—</div>
+        </div>
+      )}
+
+      {/* True idle row (unallocated underlying) */}
+      {trueIdle != null && trueIdle > 0n && (
+        <div className="grid grid-cols-12 items-center py-2">
+          <div className="col-span-5 font-medium">Idle</div>
+          <div className="col-span-3 text-right text-[#101720]">
+            {pctOf(trueIdle) ? `${pctOf(trueIdle)}%` : "—"}
+          </div>
+          <div className="col-span-2 text-right">—</div>
+          <div className="col-span-2 text-right">—</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OnchainAllocations({ vaultAddress }: { vaultAddress: `0x${string}` }) {
-  const { items, totalAssets, loading, error } = useVaultAllocationsOnchain(vaultAddress);
+  const { items, totalAssets, trueIdle, hiddenDust, loading, error } = useVaultAllocationsOnchain(vaultAddress);
 
-  if (loading) return <p className="text-sm text-gray-400">Loading allocations…</p>;
+  if (loading) return <p className="text-sm text-[#101720]/70">Loading allocations…</p>;
   if (error) return <p className="text-sm text-red-500">Error: {error}</p>;
-  if (!items || totalAssets === null) return <p className="text-sm text-gray-400">No allocation data.</p>;
+  if (!items || totalAssets === null) return <p className="text-sm text-[#101720]/70">No allocation data.</p>;
 
-  return <AllocationList items={items} totalAssets={totalAssets} />;
+  return (
+    <AllocationList
+      items={items}
+      totalAssets={totalAssets}
+      trueIdle={trueIdle ?? null}
+      hiddenDust={hiddenDust ?? null}
+    />
+  );
 }
 
 function OnchainCurrentApy({ vaultAddress }: { vaultAddress: `0x${string}` }) {
   const { apy, loading, error } = useVaultCurrentApyOnchain(vaultAddress);
 
-  if (loading) return <p className="text-sm text-gray-400">Computing APY…</p>;
+  if (loading) return <p className="text-sm text-[#101720]/70">Computing APY…</p>;
   if (error) return <p className="text-sm text-red-500">Error: {error}</p>;
-  if (apy == null) return <p className="text-sm text-gray-400">No APY data.</p>;
+  if (apy == null) return <p className="text-sm text-[#101720]/70">No APY data.</p>;
 
   return (
-    <div className="bg-[#121212] border border-gray-700 rounded-md p-3">
-      <div className="text-2xl font-semibold">{(apy * 100).toFixed(2)}%</div>
-      <div className="text-xs text-gray-400 mt-1">Blended supply APY (on-chain)</div>
+    <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-3">
+      <div className="text-2xl font-semibold text-[#101720]">{(apy * 100).toFixed(2)}%</div>
+      <div className="text-xs text-[#101720]/70 mt-1">Blended supply APY (on-chain)</div>
     </div>
   );
 }

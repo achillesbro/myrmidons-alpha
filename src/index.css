@@ -1,13 +1,23 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;500;700&family=Montserrat:wght@600;700;800&display=swap');
 @import "tailwindcss";
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: Lato, Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #010101;
+  /* Myrmidons Strategies brand palette */
+  --bg: #FFFFF5;           /* Creamy */
+  --heading: #00295B;      /* Obsidian Navy */
+  --text: #101720;         /* Midnight Blue */
+  --border: #E5E2D6;
+  --border-muted: #EDE9D7;
+  --skeleton: #E1E1D6;
+  --accent: #00295B;
+
+  color-scheme: light;
+  color: var(--text);
+  background-color: var(--bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -15,13 +25,13 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+ a {
+   font-weight: 500;
+   color: var(--accent);
+   text-decoration: inherit;
+ }
+ a:hover {
+   opacity: 0.85;
 }
 
 body {
@@ -29,27 +39,46 @@ body {
   min-width: 100vw;
   width: 100% !important;
   min-height: 100vh;
-  background-color: #cf0808;
+  background-color: var(--bg);
+  color: var(--text);
 }
 
 h1 {
+  font-family: Montserrat, Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   font-size: 3.2em;
   line-height: 1.1;
+  color: var(--heading);
+}
+h2, h3 {
+  font-family: Montserrat, Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  color: var(--heading);
 }
 
 button {
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: transparent;
+  color: inherit;
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: border-color 0.25s, background-color 0.25s, color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  border-color: var(--accent);
+  background-color: rgba(0, 41, 91, 0.06); /* subtle accent tint */
+}
+/* Selected / active button states: ensure light text on accent backgrounds */
+button:active,
+button[aria-pressed="true"],
+button[aria-selected="true"],
+button[data-state="active"],
+button[data-state="open"] {
+  background-color: var(--text);   /* #101720 */
+  border-color: var(--text);
+  color: var(--bg) !important;     /* #FFFFF5 */
 }
 button:focus,
 button:focus-visible {
@@ -58,13 +87,43 @@ button:focus-visible {
 
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    color: var(--text);
+    background-color: var(--bg);
   }
   a:hover {
-    color: #747bff;
+    opacity: 0.85;
   }
   button {
-    background-color: #f9f9f9;
+    background-color: transparent;
+  }
+}
+
+/* --- Global overrides to neutralize legacy dark utilities --- */
+@layer utilities {
+  /* Map dark backgrounds to brand background */
+  .bg-\[\#121212\],
+  .bg-\[\#1E1E1E\],
+  .bg-black {
+    background-color: var(--bg) !important;
+  }
+
+  /* Lighten skeleton bars */
+  .bg-gray-700 {
+    background-color: var(--skeleton) !important;
+  }
+
+  /* Borders to match light scheme */
+  .border-gray-700,
+  .border-gray-800 {
+    border-color: var(--border) !important;
+  }
+
+  /* Remap gray text utilities to brand body tone with readable opacity */
+  .text-gray-300,
+  .text-gray-400,
+  .text-gray-500,
+  .text-gray-600,
+  .text-gray-700 {
+    color: var(--text) !important; /* #101720 */
   }
 }

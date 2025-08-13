@@ -4,7 +4,6 @@ import { useGetUserSDKVaultPositions } from "../hooks/useGetUserSDKVaultPosition
 import { Address, formatUnits, parseEther } from "viem";
 import { hyperPublicClient } from "../viem/clients";
 import { useHyperTxHistory } from "../hooks/useHyperTxHistory";
-import { hyperEVM } from "../chains/hyperEVM";
 //import { depositUsingBundler, withdrawUsingBundler } from "../service/actions";
 //import { Vault } from "@morpho-org/blue-sdk";
 import { BrowserProvider, Contract } from "ethers";
@@ -62,17 +61,17 @@ export function TransactionHistory({ vaultAddress }: { vaultAddress: Address }) 
   });
 
   // ----- Render -----
-  if (!userAddress) return <p className="text-sm text-gray-400">Connect wallet to see history</p>;
+  if (!userAddress) return <p className="text-sm text-[#101720]/70">Connect wallet to see history</p>;
 
   if (chainId === 999) {
     if (fromBlock === null || hyperLoading) return <p>Loading history…</p>;
     if (hyperError) return <p className="text-sm text-red-500">Error: {hyperError}</p>;
     const rows = hyperData ?? [];
-    if (rows.length === 0) return <p className="text-sm text-gray-400">No transactions for your wallet.</p>;
+    if (rows.length === 0) return <p className="text-sm text-[#101720]/70">No transactions for your wallet.</p>;
     return (
       <div className="space-y-2">
         {rows.map((tx) => (
-          <div key={`${tx.hash}-${tx.logIndex}`} className="bg-[#121212] border border-gray-700 rounded-md p-2 text-sm flex justify-between">
+          <div key={`${tx.hash}-${tx.logIndex}`} className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-2 text-sm flex justify-between">
             <span>{new Date(tx.timestamp * 1000).toLocaleString()}</span>
             <span className="font-mono truncate">{tx.hash}</span>
             <span>{tx.type}</span>
@@ -87,12 +86,12 @@ export function TransactionHistory({ vaultAddress }: { vaultAddress: Address }) 
   if (subgraphError) return <p className="text-sm text-red-500">Error: {subgraphError.message}</p>;
   const items = subgraphData?.transactions?.items ?? [];
   const filtered = items.filter((t) => t.user?.address?.toLowerCase?.() === userAddress.toLowerCase());
-  if (filtered.length === 0) return <p className="text-sm text-gray-400">No transactions for your wallet.</p>;
+  if (filtered.length === 0) return <p className="text-sm text-[#101720]/70">No transactions for your wallet.</p>;
 
   return (
     <div className="space-y-2">
       {filtered.map((t) => (
-        <div key={t.hash} className="bg-[#121212] border border-gray-700 rounded-md p-2 text-sm flex justify-between">
+        <div key={t.hash} className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-2 text-sm flex justify-between">
           <span>{new Date(Number(t.timestamp) * 1000).toLocaleString()}</span>
           <span className="font-mono truncate">{t.hash}</span>
           <span>{t.type}</span>
@@ -381,36 +380,36 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
         {/* Add a nested grid for the three cards */}
         <div className="grid grid-cols-3 gap-8">
           {/* Current Position Card */}
-          <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-            <h2 className="text-xl font-semibold mb-6 flex items-center">
+          <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+            <h2 className="text-xl font-semibold text-[#00295B] mb-6 flex items-center">
               <span className="mr-2">▲</span> Current Position
             </h2>
             {!client.data?.account ? (
-              <div className="text-gray-500 text-sm">
+              <div className="text-[#101720]/60 text-sm">
                 Please connect your wallet
               </div>
             ) : chainId === 999 ? (
               posLoading ? (
-                <div className="text-gray-500 text-sm">Loading position...</div>
+                <div className="text-[#101720]/60 text-sm">Loading position...</div>
               ) : posError ? (
                 <div className="text-red-500 text-sm">{posError}</div>
               ) : onchainPosition ? (
                 <div className="space-y-4">
-                  <div className="bg-[#121212] border border-gray-700 rounded-md p-3">
+                  <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-3">
                     <div className="space-y-4">
                       <div>
-                        <div className="text-sm text-gray-400 mb-1">
+                        <div className="text-sm text-[#101720]/70 mb-1">
                           Vault Token Balance
                         </div>
-                        <div className="font-medium">
+                        <div className="font-medium text-[#101720]">
                           {formatUnits(onchainPosition.shares, 18)} Vault&nbsp;Shares
                         </div>
                       </div>
-                      <div className="pt-4 border-t border-gray-700">
-                        <div className="text-sm text-gray-400 mb-1">
+                      <div className="pt-4 border-t border-[#E5E2D6]">
+                        <div className="text-sm text-[#101720]/70 mb-1">
                           Underlying Equivalent
                         </div>
-                        <div className="font-medium">
+                        <div className="font-medium text-[#101720]">
                           {formatUnits(onchainPosition.assets, 18)} WHYPE
                         </div>
                       </div>
@@ -418,32 +417,32 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                   </div>
                 </div>
               ) : (
-                <div className="text-gray-500 text-sm">
+                <div className="text-[#101720]/60 text-sm">
                   No position data available
                 </div>
               )
             ) : positionLoading ? (
-              <div className="text-gray-500 text-sm">Loading position...</div>
+              <div className="text-[#101720]/60 text-sm">Loading position...</div>
             ) : positionError ? (
               <div className="text-red-500 text-sm">{positionError}</div>
             ) : position ? (
               <div className="space-y-4">
-                <div className="bg-[#121212] border border-gray-700 rounded-md p-3">
+                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-3">
                   <div className="space-y-4">
                     <div>
-                      <div className="text-sm text-gray-400 mb-1">
+                      <div className="text-sm text-[#101720]/70 mb-1">
                         Vault Token Balance
                       </div>
-                      <div className="font-medium">
+                      <div className="font-medium text-[#101720]">
                         {formatUnits(position.depositedAssets, 18)}{" "}
                         {position.vaultSymbol}
                       </div>
                     </div>
-                    <div className="pt-4 border-t border-gray-700">
-                      <div className="text-sm text-gray-400 mb-1">
+                    <div className="pt-4 border-t border-[#E5E2D6]">
+                      <div className="text-sm text-[#101720]/70 mb-1">
                         Underlying Equivalent
                       </div>
-                      <div className="font-medium">
+                      <div className="font-medium text-[#101720]">
                         {formatUnits(
                           (position.depositedAssets *
                             position.shareToUnderlying) /
@@ -453,9 +452,9 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                         {position.underlyingSymbol}
                       </div>
                     </div>
-                    <div className="pt-4 border-t border-gray-700">
-                      <div className="text-sm text-gray-400 mb-1">Projected Earnings</div>
-                      <div className="font-medium space-y-1">
+                    <div className="pt-4 border-t border-[#E5E2D6]">
+                      <div className="text-sm text-[#101720]/70 mb-1">Projected Earnings</div>
+                      <div className="font-medium text-[#101720] space-y-1">
                         <div>Monthly: ${monthlyEarningsUsd.toFixed(2)}</div>
                         <div>Annual:  ${annualEarningsUsd.toFixed(2)}</div>
                       </div>
@@ -464,18 +463,18 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                 </div>
               </div>
             ) : (
-              <div className="text-gray-500 text-sm">
+              <div className="text-[#101720]/60 text-sm">
                 No position data available
               </div>
             )}
           </div>
 
           {/* Deposit Card */}
-          <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-            <h2 className="text-xl font-semibold mb-6">Deposit</h2>
+          <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+            <h2 className="text-xl font-semibold text-[#00295B] mb-6">Deposit</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2 text-gray-300">
+                <label className="block text-sm font-medium mb-2 text-[#101720]/80">
                   Deposit Amount (native units)
                 </label>
                 <input
@@ -483,7 +482,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                   name="amountToDeposit"
                   value={inputs.amountToDeposit}
                   onChange={handleInputChange}
-                  className="w-full bg-[#121212] border-[0.5px] border-gray-300 rounded p-2.5 text-sm"
+                  className="w-full bg-[#FFFFF5] border-[0.5px] border-[#E5E2D6] rounded p-2.5 text-sm text-[#101720]"
                 />
               </div>
 
@@ -494,7 +493,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                 Deposit
               </button>
 
-              <div className="text-sm text-gray-400 mt-2">
+              <div className="text-sm text-[#101720]/70 mt-2">
                 {!client.data?.account ? (
                   "Connect wallet to see balance"
                 ) : chainId === 999 ? (
@@ -526,8 +525,8 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
           </div>
 
           {/* Withdraw Card */}
-          <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-            <h2 className="text-xl font-semibold mb-6">Withdraw</h2>
+          <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+            <h2 className="text-xl font-semibold text-[#00295B] mb-6">Withdraw</h2>
             <div className="space-y-4">
               <div className="flex items-center mb-4">
                 <input
@@ -537,13 +536,13 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                   onChange={(e) => setIsFullWithdraw(e.target.checked)}
                   className="mr-2"
                 />
-                <label htmlFor="fullWithdraw" className="text-sm text-gray-300">
+                <label htmlFor="fullWithdraw" className="text-sm text-[#101720]/80">
                   Full Withdraw
                 </label>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2 text-gray-300">
+                <label className="block text-sm font-medium mb-2 text-[#101720]/80">
                   Withdraw Amount (native units)
                 </label>
                 <input
@@ -556,7 +555,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                   }
                   onChange={handleInputChange}
                   disabled={isFullWithdraw}
-                  className={`w-full bg-[#121212] border-[0.5px] border-gray-300 rounded p-2.5 text-sm ${
+                  className={`w-full bg-[#FFFFF5] border-[0.5px] border-[#E5E2D6] rounded p-2.5 text-sm text-[#101720] ${
                     isFullWithdraw ? "opacity-50 cursor-not-allowed" : ""
                   }`}
                 />
@@ -573,20 +572,20 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
         </div>
 
         {/* Test Results Section */}
-        <div className="bg-[#1E1E1E] rounded-lg p-6 border-[1.5px] border-gray-700">
-          <h2 className="text-xl font-semibold mb-4">Test Results</h2>
+        <div className="bg-[#FFFFF5] rounded-lg p-6 border-[1.5px] border-[#E5E2D6]">
+          <h2 className="text-xl font-semibold text-[#00295B] mb-4">Test Results</h2>
           <div className="space-y-2 max-h-[200px] overflow-y-auto">
             {testResults.length > 0 ? (
               testResults.map((result, index) => (
                 <div
                   key={index}
-                  className="bg-[#121212] border border-gray-700 rounded-md p-2 text-sm"
+                  className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-2 text-sm"
                 >
                   {result}
                 </div>
               ))
             ) : (
-              <div className="text-gray-500 text-sm">
+              <div className="text-[#101720]/60 text-sm">
                 No results to display yet.
               </div>
             )}
@@ -595,7 +594,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
 
         {/* Transaction History Section */}
         <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">Transaction History</h2>
+          <h2 className="text-xl font-semibold text-[#00295B] mb-4">Transaction History</h2>
           <TransactionHistory vaultAddress={vaultAddress} />
         </div>
       </div>
