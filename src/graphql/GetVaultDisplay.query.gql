@@ -1,7 +1,7 @@
 query GetVaultDisplay {
   vaultByAddress(
-    address: "0xDDD64e2EF73b0741BdB1e2813a1115FD150aef36"
-    chainId: 8453
+    address: "0xDCd35A430895cc8961ea0F5B42348609114a9d0c"
+    chainId: 999
   ) {
     whitelisted
     name

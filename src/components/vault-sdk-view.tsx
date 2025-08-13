@@ -1,42 +1,101 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWalletClient, useAccount } from "wagmi";
 import { useGetUserSDKVaultPositions } from "../hooks/useGetUserSDKVaultPosition";
 import { Address, formatUnits, parseEther } from "viem";
+import { hyperPublicClient } from "../viem/clients";
+import { useHyperTxHistory } from "../hooks/useHyperTxHistory";
+import { hyperEVM } from "../chains/hyperEVM";
 //import { depositUsingBundler, withdrawUsingBundler } from "../service/actions";
 //import { Vault } from "@morpho-org/blue-sdk";
 import { BrowserProvider, Contract } from "ethers";
 import { JsonRpcProvider } from "ethers";
 import vaultAbi from "../abis/Vault.json";
 import { useTokenBalance } from "../hooks/useTokenBalance";
-import erc20Abi from "../abis/erc20.json";
+// Minimal ERC-20 ABI for balanceOf()
+const erc20Abi = [
+  "function balanceOf(address owner) view returns (uint256)"
+];
 import { useGetVaultTransactionsQuery } from "../graphql/__generated__/GetVaultTransactions.query.generated";
 import { useGetVaultDisplayQuery } from "../graphql/__generated__/GetVaultDisplay.query.generated";
 
-export function TransactionHistory() {
-  const { data, loading, error } = useGetVaultTransactionsQuery({
-    // Poll every 10 seconds to refresh after new transactions
-    pollInterval: 10000,
-    // Always fetch fresh data from network
-    fetchPolicy: "network-only",
-  });
-  const txs = data?.transactions?.items ?? [];
+export function TransactionHistory({ vaultAddress }: { vaultAddress: Address }) {
   const { address: userAddress } = useAccount();
-  const userTxs = userAddress
-    ? txs.filter(tx => tx.user?.address.toLowerCase() === userAddress.toLowerCase())
-    : [];
+  const client = useWalletClient();
+  const chainId = client.data?.chain?.id;
 
-  if (loading) return <p>Loading history…</p>;
-  if (error)   return <p>Error: {error.message}</p>;
-  if (!userAddress) return <p>Connect your wallet to see your transactions.</p>;
-  if (userTxs.length === 0) return <p>No transactions for your wallet.</p>;
+  // Compute a capped fromBlock for HyperEVM (avoid scanning from genesis)
+  const [fromBlock, setFromBlock] = useState<bigint | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function computeFromBlock() {
+      if (chainId === 999) {
+        try {
+          const pc = hyperPublicClient;
+          const head = await pc.getBlockNumber();
+          const LOOKBACK = 10_000n; // last N blocks only
+          const start = head > LOOKBACK ? head - LOOKBACK : 0n;
+          if (!cancelled) setFromBlock(start);
+        } catch {
+          if (!cancelled) setFromBlock(0n);
+        }
+      } else {
+        if (!cancelled) setFromBlock(null);
+      }
+    }
+    computeFromBlock();
+    return () => { cancelled = true; };
+  }, [chainId]);
+
+  // ✅ Call BOTH hooks every render (consistent order)
+  const { data: subgraphData, loading: subgraphLoading, error: subgraphError } =
+    useGetVaultTransactionsQuery({
+      pollInterval: 10000,
+      fetchPolicy: "network-only",
+      skip: chainId === 999, // skip fetching, but hook still called
+    });
+
+  const { data: hyperData, loading: hyperLoading, error: hyperError } = useHyperTxHistory({
+    vaultAddress,
+    userAddress: userAddress as Address | undefined,
+    fromBlock: fromBlock ?? 0n,
+    enabled: chainId === 999 && fromBlock !== null, // 🔑
+  });
+
+  // ----- Render -----
+  if (!userAddress) return <p className="text-sm text-gray-400">Connect wallet to see history</p>;
+
+  if (chainId === 999) {
+    if (fromBlock === null || hyperLoading) return <p>Loading history…</p>;
+    if (hyperError) return <p className="text-sm text-red-500">Error: {hyperError}</p>;
+    const rows = hyperData ?? [];
+    if (rows.length === 0) return <p className="text-sm text-gray-400">No transactions for your wallet.</p>;
+    return (
+      <div className="space-y-2">
+        {rows.map((tx) => (
+          <div key={`${tx.hash}-${tx.logIndex}`} className="bg-[#121212] border border-gray-700 rounded-md p-2 text-sm flex justify-between">
+            <span>{new Date(tx.timestamp * 1000).toLocaleString()}</span>
+            <span className="font-mono truncate">{tx.hash}</span>
+            <span>{tx.type}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Non-HyperEVM: subgraph path
+  if (subgraphLoading) return <p>Loading history…</p>;
+  if (subgraphError) return <p className="text-sm text-red-500">Error: {subgraphError.message}</p>;
+  const items = subgraphData?.transactions?.items ?? [];
+  const filtered = items.filter((t) => t.user?.address?.toLowerCase?.() === userAddress.toLowerCase());
+  if (filtered.length === 0) return <p className="text-sm text-gray-400">No transactions for your wallet.</p>;
 
   return (
     <div className="space-y-2">
-      {userTxs.map((tx) => (
-        <div key={tx.hash} className="flex justify-between">
-          <span>{new Date(Number(tx.timestamp) * 1000).toLocaleString()}</span>
-          <span className="font-mono truncate">{tx.hash}</span>
-          <span>{tx.type}</span>
+      {filtered.map((t) => (
+        <div key={t.hash} className="bg-[#121212] border border-gray-700 rounded-md p-2 text-sm flex justify-between">
+          <span>{new Date(Number(t.timestamp) * 1000).toLocaleString()}</span>
+          <span className="font-mono truncate">{t.hash}</span>
+          <span>{t.type}</span>
         </div>
       ))}
     </div>
@@ -60,6 +119,63 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
   };
 
   const client = useWalletClient();
+  const { address: userAddress } = useAccount();
+  const chainId = client.data?.chain?.id;
+
+  // On-chain position for HyperEVM (chain 999)
+  const [onchainPosition, setOnchainPosition] = useState<{ shares: bigint; assets: bigint } | null>(null);
+  const [posLoading, setPosLoading] = useState(false);
+  const [posError, setPosError] = useState<string | null>(null);
+
+  // On-chain token balance for HyperEVM (chain 999)
+  const [onchainBalance, setOnchainBalance] = useState<bigint | null>(null);
+  const [balLoading, setBalLoading] = useState(false);
+  const [balError, setBalError] = useState<string | null>(null);
+  useEffect(() => {
+    if (chainId === 999 && userAddress) {
+      setBalLoading(true);
+      const provider = new BrowserProvider(window.ethereum as any);
+      const vaultContract = new Contract(vaultAddress, vaultAbi, provider);
+      vaultContract
+        .asset()
+        .then((underlyingAddr: string) => {
+          const tokenContract = new Contract(underlyingAddr, erc20Abi, provider);
+          return tokenContract.balanceOf(userAddress);
+        })
+        .then((bal: bigint) => {
+          setOnchainBalance(bal);
+          setBalLoading(false);
+        })
+        .catch((e: any) => {
+          setBalError(e.message);
+          setBalLoading(false);
+        });
+    }
+  }, [chainId, userAddress, vaultAddress]);
+
+  useEffect(() => {
+    if (chainId === 999 && userAddress) {
+      setPosLoading(true);
+      const provider = new BrowserProvider(window.ethereum as any);
+      const vaultContract = new Contract(
+        vaultAddress,
+        vaultAbi,
+        provider
+      );
+      vaultContract
+        .balanceOf(userAddress)
+        .then((shares: bigint) =>
+          vaultContract.convertToAssets(shares).then((assets: bigint) => {
+            setOnchainPosition({ shares, assets });
+            setPosLoading(false);
+          })
+        )
+        .catch((e: any) => {
+          setPosError(e.message);
+          setPosLoading(false);
+        });
+    }
+  }, [chainId, userAddress, vaultAddress]);
 
   const {
     position,
@@ -117,9 +233,28 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
         vaultAbi,
         signer
       );
-      // 0) Get your underlying token address
-      const underlyingAddress = position?.underlyingAddress;
-      if (!underlyingAddress) throw new Error("No underlying token");
+      // 0) Determine the underlying token address
+      let underlyingAddress: string;
+      if (chainId === 999) {
+        // On HyperEVM, read directly from contract
+        underlyingAddress = await vaultContract.asset();
+      } else {
+        // On supported chains, use the SDK-provided position
+        underlyingAddress = position?.underlyingAddress as string;
+      }
+      if (!underlyingAddress) {
+        throw new Error("No underlying token");
+      }
+
+      // 0.5) Check vault deposit cap
+      const cap: bigint = await vaultContract.maxDeposit(userAddr);
+      if (depositAmountWei > cap) {
+        setTestResults((prev) => [
+          ...prev,
+          `Vault not open for deposits (current cap: ${cap.toString()})`,
+        ]);
+        return;
+      }
 
       // 1) Instantiate ERC-20 contract and approve
       const tokenContract = new Contract(
@@ -254,6 +389,39 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
               <div className="text-gray-500 text-sm">
                 Please connect your wallet
               </div>
+            ) : chainId === 999 ? (
+              posLoading ? (
+                <div className="text-gray-500 text-sm">Loading position...</div>
+              ) : posError ? (
+                <div className="text-red-500 text-sm">{posError}</div>
+              ) : onchainPosition ? (
+                <div className="space-y-4">
+                  <div className="bg-[#121212] border border-gray-700 rounded-md p-3">
+                    <div className="space-y-4">
+                      <div>
+                        <div className="text-sm text-gray-400 mb-1">
+                          Vault Token Balance
+                        </div>
+                        <div className="font-medium">
+                          {formatUnits(onchainPosition.shares, 18)} Vault&nbsp;Shares
+                        </div>
+                      </div>
+                      <div className="pt-4 border-t border-gray-700">
+                        <div className="text-sm text-gray-400 mb-1">
+                          Underlying Equivalent
+                        </div>
+                        <div className="font-medium">
+                          {formatUnits(onchainPosition.assets, 18)} WHYPE
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm">
+                  No position data available
+                </div>
+              )
             ) : positionLoading ? (
               <div className="text-gray-500 text-sm">Loading position...</div>
             ) : positionError ? (
@@ -329,6 +497,16 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
               <div className="text-sm text-gray-400 mt-2">
                 {!client.data?.account ? (
                   "Connect wallet to see balance"
+                ) : chainId === 999 ? (
+                  balLoading ? (
+                    "Loading balance..."
+                  ) : balError ? (
+                    <span className="text-red-400">{balError}</span>
+                  ) : onchainBalance !== null ? (
+                    <>Balance: {formatUnits(onchainBalance, 18)} WHYPE</>
+                  ) : (
+                    "No balance data"
+                  )
                 ) : tokenBalanceLoading ? (
                   "Loading balance..."
                 ) : tokenBalanceError ? (
@@ -418,7 +596,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
         {/* Transaction History Section */}
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-4">Transaction History</h2>
-          <TransactionHistory />
+          <TransactionHistory vaultAddress={vaultAddress} />
         </div>
       </div>
     </div>

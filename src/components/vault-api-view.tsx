@@ -9,15 +9,67 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { hyperPublicClient } from "../viem/clients";
+import vaultAbi from "../abis/Vault.json";
+import { useVaultCurrentApyOnchain } from "../hooks/useVaultCurrentApyOnchain";
+import { useState, useEffect } from "react";
+import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";
+import { AllocationList } from "./AllocationList";
 
 export function VaultAPIView() {
+  // If using HyperEVM (chainId 999), fetch vault data on-chain instead of via GraphQL
+  const HYPER_CHAIN_ID = 999;
+  const VAULT_ADDRESS = "0xDCd35A430895cc8961ea0F5B42348609114a9d0c";
+  const [onchainData, setOnchainData] = useState<{
+    totalAssets: bigint;
+    totalSupply: bigint;
+    name: string;
+    symbol: string;
+  } | null>(null);
+  const [onchainLoading, setOnchainLoading] = useState(true);
+  const [onchainError, setOnchainError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    if (!onchainData) {
+      const client = hyperPublicClient;
+      Promise.all([
+        client.readContract({
+          address: VAULT_ADDRESS as `0x${string}`,
+          abi: vaultAbi,
+          functionName: "totalAssets",
+        }),
+        client.readContract({
+          address: VAULT_ADDRESS as `0x${string}`,
+          abi: vaultAbi,
+          functionName: "totalSupply",
+        }),
+        client.readContract({
+          address: VAULT_ADDRESS as `0x${string}`,
+          abi: vaultAbi,
+          functionName: "name",
+        }),
+        client.readContract({
+          address: VAULT_ADDRESS as `0x${string}`,
+          abi: vaultAbi,
+          functionName: "symbol",
+        }),
+      ])
+        .then(([assets, supply, name, symbol]: [bigint, bigint, string, string]) => {
+          setOnchainData({ totalAssets: assets, totalSupply: supply, name, symbol });
+        })
+        .catch((e: unknown) => setOnchainError(e as Error))
+        .finally(() => setOnchainLoading(false));
+    }
+  }, [onchainData]);
+
   const { data, loading, error } = useGetVaultDisplayQuery({
     variables: {
       //@ts-expect-error vaultAddress is a string
-      address: 0xDDD64e2EF73b0741BdB1e2813a1115FD150aef36,
+      address: VAULT_ADDRESS,
       //@ts-expect-error chainId is a number
-      chainId: 8453, // mainnet
+      chainId: HYPER_CHAIN_ID,
     },
+    skip: true,
     fetchPolicy: "cache-and-network",
   });
 
@@ -37,6 +89,44 @@ export function VaultAPIView() {
     },
     skip: !vault,
   });
+
+  // HyperEVM on-chain path
+  if (onchainLoading) {
+    return <p>Loading HyperEVM vault data…</p>;
+  }
+  if (onchainError) {
+    return <p>Error loading on-chain vault: {onchainError.message}</p>;
+  }
+  if (onchainData) {
+    // Compute basic metrics
+    const tvl = Number(onchainData.totalAssets) / 1e18;
+    const supply = Number(onchainData.totalSupply) / 1e18;
+    return (
+      <div className="space-y-4 p-6 bg-[#1E1E1E] border border-gray-700 rounded-lg">
+        <h2 className="text-xl font-semibold">HyperEVM Vault Metrics</h2>
+        <p className="text-gray-400 text-sm">
+          Name: <span className="font-medium">{onchainData.name}</span>
+        </p>
+        <p className="text-gray-400 text-sm">
+          Symbol: <span className="font-medium">{onchainData.symbol}</span>
+        </p>
+        <p>Total Assets (underlying): {tvl.toFixed(4)}</p>
+        <p>Total Shares (supply): {supply.toFixed(4)}</p>
+
+        {/* Current APY (on-chain) */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-3">Current APY</h3>
+          <OnchainCurrentApy vaultAddress={VAULT_ADDRESS as `0x${string}`} />
+        </div>
+
+        {/* Allocations (on-chain for HyperEVM) */}
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-3">Allocations</h3>
+          <OnchainAllocations vaultAddress={VAULT_ADDRESS as `0x${string}`} />
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -482,6 +572,31 @@ export function VaultAPIView() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function OnchainAllocations({ vaultAddress }: { vaultAddress: `0x${string}` }) {
+  const { items, totalAssets, loading, error } = useVaultAllocationsOnchain(vaultAddress);
+
+  if (loading) return <p className="text-sm text-gray-400">Loading allocations…</p>;
+  if (error) return <p className="text-sm text-red-500">Error: {error}</p>;
+  if (!items || totalAssets === null) return <p className="text-sm text-gray-400">No allocation data.</p>;
+
+  return <AllocationList items={items} totalAssets={totalAssets} />;
+}
+
+function OnchainCurrentApy({ vaultAddress }: { vaultAddress: `0x${string}` }) {
+  const { apy, loading, error } = useVaultCurrentApyOnchain(vaultAddress);
+
+  if (loading) return <p className="text-sm text-gray-400">Computing APY…</p>;
+  if (error) return <p className="text-sm text-red-500">Error: {error}</p>;
+  if (apy == null) return <p className="text-sm text-gray-400">No APY data.</p>;
+
+  return (
+    <div className="bg-[#121212] border border-gray-700 rounded-md p-3">
+      <div className="text-2xl font-semibold">{(apy * 100).toFixed(2)}%</div>
+      <div className="text-xs text-gray-400 mt-1">Blended supply APY (on-chain)</div>
     </div>
   );
 }
