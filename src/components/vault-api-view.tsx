@@ -16,10 +16,56 @@ import { useState, useEffect } from "react";
 import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";
 // Inline AllocationList component for on-chain allocations
 
-import { getWhypeUsd } from "../lib/prices";
+// Simple error boundary to isolate rendering errors in the API View
+import React from "react";
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; err?: Error }>{
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, err: error };
+  }
+  componentDidCatch(error: Error) {
+    // no-op: could log to a service later
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-[#FFFFF5] border border-red-200 rounded-md p-4 text-[#101720]">
+          <div className="text-red-600 font-semibold mb-1">Something went wrong.</div>
+          <div className="text-sm text-red-700/80">Try refreshing the page. If the problem persists, please report this issue.</div>
+        </div>
+      );
+    }
+    return this.props.children as React.ReactElement;
+  }
+}
+
+import { getWhypeUsd } from "../lib/prices"; // keeping current util; tooltips/UX polish below
 
 
 export function VaultAPIView() {
+  // UX: last refresh timestamp for data shown on this page
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [, setTimeAgoTick] = useState<number>(0);
+  useEffect(() => {
+    if (lastUpdated == null) return;
+    const id = setInterval(() => setTimeAgoTick((x) => x + 1), 1000);
+    return () => clearInterval(id);
+  }, [lastUpdated]);
+
+  const renderTimeAgo = () => {
+    if (!lastUpdated) return null;
+    const seconds = Math.max(0, Math.floor((Date.now() - lastUpdated) / 1000));
+    const parts = seconds < 60
+      ? `${seconds}s`
+      : seconds < 3600
+        ? `${Math.floor(seconds / 60)}m`
+        : `${Math.floor(seconds / 3600)}h`;
+    return <span className="text-xs text-[#101720]/60">Last updated {parts} ago</span>;
+  };
   // If using HyperEVM (chainId 999), fetch vault data on-chain instead of via GraphQL
   const HYPER_CHAIN_ID = 999;
   const VAULT_ADDRESS = "0xDCd35A430895cc8961ea0F5B42348609114a9d0c";
@@ -68,6 +114,7 @@ export function VaultAPIView() {
         if (!cancelled) setFeeError(e as Error);
       } finally {
         if (!cancelled) setFeeLoading(false);
+        if (!cancelled) setLastUpdated(Date.now());
       }
     }
     run();
@@ -81,39 +128,42 @@ export function VaultAPIView() {
   useEffect(() => {
     if (!onchainData) {
       const client = hyperPublicClient;
-      Promise.all([
-        client.readContract({
-          address: VAULT_ADDRESS as `0x${string}`,
-          abi: vaultAbi,
-          functionName: "totalAssets",
-        }),
-        client.readContract({
-          address: VAULT_ADDRESS as `0x${string}`,
-          abi: vaultAbi,
-          functionName: "totalSupply",
-        }),
-        client.readContract({
-          address: VAULT_ADDRESS as `0x${string}`,
-          abi: vaultAbi,
-          functionName: "name",
-        }),
-        client.readContract({
-          address: VAULT_ADDRESS as `0x${string}`,
-          abi: vaultAbi,
-          functionName: "symbol",
-        }),
-        client.readContract({
-          address: VAULT_ADDRESS as `0x${string}`,
-          abi: vaultAbi,
-          functionName: "asset",
-        }),
-      ])
-        .then(async ([assets, supply, name, symbol, asset]: [bigint, bigint, string, string, `0x${string}`]) => {
-          const decimals = await client.readContract({
+      (async () => {
+        try {
+          const [assets, supply, name, symbol, asset] = await Promise.all([
+            client.readContract({
+              address: VAULT_ADDRESS as `0x${string}`,
+              abi: vaultAbi,
+              functionName: "totalAssets",
+            }) as Promise<bigint>,
+            client.readContract({
+              address: VAULT_ADDRESS as `0x${string}`,
+              abi: vaultAbi,
+              functionName: "totalSupply",
+            }) as Promise<bigint>,
+            client.readContract({
+              address: VAULT_ADDRESS as `0x${string}`,
+              abi: vaultAbi,
+              functionName: "name",
+            }) as Promise<string>,
+            client.readContract({
+              address: VAULT_ADDRESS as `0x${string}`,
+              abi: vaultAbi,
+              functionName: "symbol",
+            }) as Promise<string>,
+            client.readContract({
+              address: VAULT_ADDRESS as `0x${string}`,
+              abi: vaultAbi,
+              functionName: "asset",
+            }) as Promise<`0x${string}`>,
+          ]);
+
+          const decimals = (await client.readContract({
             address: asset,
             abi: erc20Abi,
             functionName: "decimals",
-          });
+          })) as number;
+
           setOnchainData({
             totalAssets: assets,
             totalSupply: supply,
@@ -122,9 +172,13 @@ export function VaultAPIView() {
             underlyingAddress: asset,
             underlyingDecimals: Number(decimals),
           });
-        })
-        .catch((e: unknown) => setOnchainError(e as Error))
-        .finally(() => setOnchainLoading(false));
+        } catch (e) {
+          setOnchainError(e as Error);
+        } finally {
+          setOnchainLoading(false);
+          setLastUpdated(Date.now());
+        }
+      })();
     }
   }, [onchainData]);
 
@@ -136,6 +190,7 @@ export function VaultAPIView() {
         setPriceLoading(true);
         const p = await getWhypeUsd({ token: onchainData.underlyingAddress });
         if (!cancelled) setUsdPrice(p ?? null);
+        if (!cancelled) setLastUpdated(Date.now());
       } finally {
         if (!cancelled) setPriceLoading(false);
       }
@@ -177,6 +232,11 @@ export function VaultAPIView() {
   const { apy, loading: apyLoading, error: apyError } = useVaultCurrentApyOnchain(
     VAULT_ADDRESS as `0x${string}`
   );
+  useEffect(() => {
+    if (!apyLoading) {
+      setLastUpdated(Date.now());
+    }
+  }, [apyLoading]);
 
   // HyperEVM on-chain path
   if (onchainLoading) {
@@ -225,7 +285,8 @@ export function VaultAPIView() {
     const tvlUsd = typeof usdPrice === "number" ? tvlUnits * usdPrice : undefined;
 
     return (
-      <div className="space-y-6">
+      <ErrorBoundary>
+        <div className="space-y-6">
         {/* Top: two columns (Info / About) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Left: Vault name & address */}
@@ -246,6 +307,10 @@ export function VaultAPIView() {
         </div>
 
         {/* Metrics: TVL / Underlying / Yield / Performance Fee */}
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium text-[#00295B]">Metrics</div>
+          {renderTimeAgo()}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
             <p className="text-[#101720]/70 text-xs">TVL (USD)</p>
@@ -260,9 +325,21 @@ export function VaultAPIView() {
             </p>
           </div>
           <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
-            <p className="text-[#101720]/70 text-xs">Underlying Price</p>
+            <p className="text-[#101720]/70 text-xs">Share Price</p>
             <p className="text-xl font-semibold mt-1 text-[#101720]">
-              {priceLoading ? "Loading…" : usdPrice != null ? `$${usdPrice.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : "N/A"}
+              {(() => {
+                // Compute share price as (totalAssets / totalSupply) * underlyingPriceUSD
+                const totalAssets = onchainData.totalAssets;
+                const totalSupply = onchainData.totalSupply;
+                const underlyingPriceUSD = usdPrice ?? 0;
+                const sharePriceUSD =
+                  totalAssets === 0n || totalSupply === 0n
+                    ? 0
+                    : (Number(totalAssets) / Number(totalSupply)) * underlyingPriceUSD;
+                return priceLoading
+                  ? "Loading…"
+                  : `$${sharePriceUSD.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
+              })()}
             </p>
           </div>
           <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
@@ -278,6 +355,7 @@ export function VaultAPIView() {
                 "N/A"
               )}
             </p>
+            <p className="text-[#101720]/60 text-xs mt-1">Blended APY by allocation</p>
           </div>
           <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
             <p className="text-[#101720]/70 text-xs">Performance Fee</p>
@@ -293,7 +371,18 @@ export function VaultAPIView() {
               )}
             </p>
             <p className="text-[#101720]/60 text-xs mt-1">
-              Recipient: {feeRecipient ? `${feeRecipient.slice(0, 6)}…${feeRecipient.slice(-4)}` : "N/A"}
+              Recipient: {feeRecipient ? (
+                <a
+                  href={`https://purrsec.com/address/${feeRecipient}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  {`${feeRecipient.slice(0, 6)}…${feeRecipient.slice(-4)}`}
+                </a>
+              ) : (
+                "N/A"
+              )}
             </p>
           </div>
         </div>
@@ -304,9 +393,13 @@ export function VaultAPIView() {
             <h3 className="text-lg font-semibold text-[#00295B]">Allocations</h3>
             <span className="text-xs text-[#101720]/70">Share • USD • Supply APY</span>
           </div>
-          <OnchainAllocations vaultAddress={VAULT_ADDRESS as `0x${string}`} />
+          <OnchainAllocations
+            vaultAddress={VAULT_ADDRESS as `0x${string}`}
+            onSettled={(ts) => setLastUpdated(ts)}
+          />
         </div>
       </div>
+      </ErrorBoundary>
     );
   }
 
@@ -775,26 +868,21 @@ type AllocationRow = {
   usd?: number | null;
   supplyApy?: number | null; // decimal (0..1)
   decimals?: number; // token decimals for amount formatting
+  logo?: string | null;
 };
 
 function AllocationList({
   items,
   totalAssets,
-  trueIdle,
   hiddenDust,
   decimals = 18,
 }: {
   items: AllocationRow[];
   totalAssets: bigint;
-  trueIdle?: bigint | null;
   hiddenDust?: bigint | null;
   decimals?: number;
 }) {
-
   const clampPct = (n: number) => Math.max(0, Math.min(100, n));
-
-  const formatBig = (v?: bigint | null) =>
-    v != null ? Number(formatUnits(v, decimals)).toLocaleString(undefined, { maximumFractionDigits: 4 }) : null;
   const pctOf = (v?: bigint | null) =>
     v != null && totalAssets !== 0n
       ? Math.max(0, Math.min(100, Number((v * 10000n) / totalAssets) / 100)).toFixed(2)
@@ -811,7 +899,17 @@ function AllocationList({
 
       {items.map((it) => (
         <div key={it.id} className="grid grid-cols-12 items-center py-2 border-b border-[#EDE9D7]">
-          <div className="col-span-5 truncate text-[#101720]">{it.label}</div>
+          <div className="col-span-5 flex items-center space-x-2 text-[#101720] truncate">
+            {it.logo && (
+              <img
+                src={it.logo}
+                alt={it.label}
+                className="w-5 h-5 rounded-full border border-[#E5E2D6] object-contain"
+                onError={(e) => (e.currentTarget.style.display = 'none')}
+              />
+            )}
+            <span className="truncate">{it.label}</span>
+          </div>
           <div className="col-span-3 text-right text-[#101720]">
             {clampPct(it.pct).toFixed(2)}%
           </div>
@@ -839,24 +937,18 @@ function AllocationList({
           <div className="col-span-2 text-right">—</div>
         </div>
       )}
-
-      {/* True idle row (unallocated underlying) */}
-      {trueIdle != null && trueIdle > 0n && (
-        <div className="grid grid-cols-12 items-center py-2">
-          <div className="col-span-5 font-medium">Idle</div>
-          <div className="col-span-3 text-right text-[#101720]">
-            {pctOf(trueIdle) ? `${pctOf(trueIdle)}%` : "—"}
-          </div>
-          <div className="col-span-2 text-right">—</div>
-          <div className="col-span-2 text-right">—</div>
-        </div>
-      )}
     </div>
   );
 }
 
-function OnchainAllocations({ vaultAddress }: { vaultAddress: `0x${string}` }) {
+function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${string}`; onSettled?: (ts: number) => void }) {
   const { items, totalAssets, trueIdle, hiddenDust, loading, error } = useVaultAllocationsOnchain(vaultAddress);
+
+  useEffect(() => {
+    if (!loading) {
+      onSettled?.(Date.now());
+    }
+  }, [loading, onSettled]);
 
   if (loading) return <p className="text-sm text-[#101720]/70">Loading allocations…</p>;
   if (error) return <p className="text-sm text-red-500">Error: {error}</p>;
@@ -866,23 +958,8 @@ function OnchainAllocations({ vaultAddress }: { vaultAddress: `0x${string}` }) {
     <AllocationList
       items={items}
       totalAssets={totalAssets}
-      trueIdle={trueIdle ?? null}
       hiddenDust={hiddenDust ?? null}
     />
   );
 }
 
-function OnchainCurrentApy({ vaultAddress }: { vaultAddress: `0x${string}` }) {
-  const { apy, loading, error } = useVaultCurrentApyOnchain(vaultAddress);
-
-  if (loading) return <p className="text-sm text-[#101720]/70">Computing APY…</p>;
-  if (error) return <p className="text-sm text-red-500">Error: {error}</p>;
-  if (apy == null) return <p className="text-sm text-[#101720]/70">No APY data.</p>;
-
-  return (
-    <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-3">
-      <div className="text-2xl font-semibold text-[#101720]">{(apy * 100).toFixed(2)}%</div>
-      <div className="text-xs text-[#101720]/70 mt-1">Blended supply APY (on-chain)</div>
-    </div>
-  );
-}

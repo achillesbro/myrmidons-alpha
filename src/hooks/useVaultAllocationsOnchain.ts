@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { erc20Abi, formatUnits, type Address } from "viem";
 import { hyperPublicClient } from "../viem/clients";
 import { MARKET_LABELS } from "../constants/hyper";
+import { TOKEN_METADATA } from "../constants/hyper";
 import { getUsdPrice } from "../lib/prices";
 
 const vaultAbi = [
@@ -95,6 +96,7 @@ export type AllocationItem = {
   pct: number;              // percentage (legacy calc)
   usd?: number | null;      // USD value if available
   supplyApy?: number | null;// decimal, e.g. 0.045 for 4.5%
+  logo?: string | null;     // NEW
 };
 
 export function useVaultAllocationsOnchain(vaultAddress: Address) {
@@ -279,10 +281,11 @@ export function useVaultAllocationsOnchain(vaultAddress: Address) {
           itemsEnriched.push({
             id,
             assets,
-            label: MARKET_LABELS[id] ?? id,
+            label: TOKEN_METADATA[id]?.label ?? MARKET_LABELS[id] ?? `${id.slice(0, 6)}…${id.slice(-4)}`,
             pct: 0, // will set below using legacy calc
             usd,
-            supplyApy,
+            supplyApy: supplyApy ?? 0,
+            logo: TOKEN_METADATA[id]?.logo ?? null,
           });
         }
 
@@ -300,9 +303,24 @@ export function useVaultAllocationsOnchain(vaultAddress: Address) {
 
         const withPct = itemsEnriched.map((r) => ({ ...r, pct: pctOf(r.assets) }));
 
+        // Debug allocation rows to inspect "Idle" entries
+        for (const row of withPct) {
+          console.log("ALLOC ROW:", {
+            id: row.id,
+            label: row.label,
+            assets: row.assets.toString(),
+            pct: row.pct,
+            usd: row.usd,
+            supplyApy: row.supplyApy,
+          });
+        }
+
         // Dust threshold based on share of total (no USD dependency)
         const DUST_PCT = 0.01; // 0.01%
-        const filtered = withPct.filter((r) => r.pct >= DUST_PCT);
+        const filtered = withPct.filter((r) => {
+          const isDust = r.pct < DUST_PCT || r.assets === 0n;
+          return !isDust && r.label !== "Idle";
+        });
 
         // Sort by USD desc if available, else by assets desc
         filtered.sort((a, b) => {

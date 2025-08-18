@@ -1,10 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;500;700&family=Montserrat:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500&family=Spectral:wght@200;300&display=swap');
 @import "tailwindcss";
 
 :root {
-  font-family: Lato, Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: Spectral, Georgia, 'Times New Roman', serif;
   line-height: 1.5;
-  font-weight: 400;
+  font-weight: 300; /* default body weight: light */
 
   /* Myrmidons Strategies brand palette */
   --bg: #FFFFF5;           /* Creamy */
@@ -44,13 +44,15 @@ body {
 }
 
 h1 {
-  font-family: Montserrat, Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: Cinzel, 'Times New Roman', serif;
+  font-weight: 500;
   font-size: 3.2em;
   line-height: 1.1;
   color: var(--heading);
 }
 h2, h3 {
-  font-family: Montserrat, Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: Cinzel, 'Times New Roman', serif;
+  font-weight: 500;
   color: var(--heading);
 }
 
@@ -84,6 +86,11 @@ button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+
+/* Utilities to force heading/body fonts when needed */
+.font-heading { font-family: Cinzel, 'Times New Roman', serif; font-weight: 500; }
+.font-body { font-family: Spectral, Georgia, 'Times New Roman', serif; font-weight: 300; }
+.font-extra-light { font-weight: 200; } /* Spectral 200 */
 
 @media (prefers-color-scheme: light) {
   :root {

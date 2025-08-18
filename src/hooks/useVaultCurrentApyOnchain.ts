@@ -132,79 +132,78 @@ export function useVaultCurrentApyOnchain(vaultAddress: Address) {
         let blended = 0; // JS number in decimal (e.g., 0.045 = 4.5%)
         for (let i = 0; i < marketIds.length; i++) {
           const id = marketIds[i];
-          const w = weights[i].w;
+          const w = weights[i]?.w ?? 0;
+          if (w === 0) {
+            blended += 0;
+            continue;
+          }
 
-          const [params, mkt] = (await Promise.all([
-            hyperPublicClient.readContract({
-              address: morphoAddr,
-              abi: morphoAbi,
-              functionName: "idToMarketParams",
-              args: [id],
-            }),
-            hyperPublicClient.readContract({
-              address: morphoAddr,
-              abi: morphoAbi,
-              functionName: "market",
-              args: [id],
-            }),
-          ])) as [MarketParamsTuple, MarketTuple];
+          try {
+            const [params, mkt] = await Promise.all([
+              hyperPublicClient.readContract({
+                address: morphoAddr,
+                abi: morphoAbi,
+                functionName: "idToMarketParams",
+                args: [id],
+              }),
+              hyperPublicClient.readContract({
+                address: morphoAddr,
+                abi: morphoAbi,
+                functionName: "market",
+                args: [id],
+              }),
+            ]) as [MarketParamsTuple, MarketTuple];
 
-          // Unpack tuples (Index-based per viem)
-          const loanToken = params[0] as Address;
-          const collateralToken = params[1] as Address;
-          const oracle = params[2] as Address;
-          const irm = params[3] as Address;
-          const lltv = params[4];
+            const loanToken = params[0] as Address;
+            const collateralToken = params[1] as Address;
+            const oracle = params[2] as Address;
+            const irm = params[3] as Address;
+            const lltv = params[4];
 
-          const totalSupplyAssets = mkt[0];
-          const totalSupplyShares = mkt[1];
-          const totalBorrowAssets = mkt[2];
-          const totalBorrowShares = mkt[3];
-          const lastUpdate = mkt[4];
-          const fee = mkt[5];
+            const totalSupplyAssets = mkt[0];
+            const totalSupplyShares = mkt[1];
+            const totalBorrowAssets = mkt[2];
+            const totalBorrowShares = mkt[3];
+            const lastUpdate = mkt[4];
+            const fee = mkt[5];
 
-          // 2a) utilization (WAD)
-          const supply = totalSupplyAssets;
-          const borrow = totalBorrowAssets;
-          const utilWad =
-            supply === 0n ? 0n : (borrow * WAD) / supply; // in [0, 1e18]
+            const supply = totalSupplyAssets;
+            const borrow = totalBorrowAssets;
+            const utilWad = supply === 0n ? 0n : (borrow * WAD) / supply;
 
-          // 2b) borrow rate per second (WAD) from IRM
-          const ratePerSecWad = (await hyperPublicClient.readContract({
-            address: irm,
-            abi: irmAbi,
-            functionName: "borrowRateView",
-            args: [
-              {
-                loanToken,
-                collateralToken,
-                oracle,
-                irm,
-                lltv,
-              },
-              {
-                totalSupplyAssets,
-                totalSupplyShares,
-                totalBorrowAssets,
-                totalBorrowShares,
-                lastUpdate,
-                fee,
-              },
-            ],
-          })) as bigint;
+            const ratePerSecWad = await hyperPublicClient.readContract({
+              address: irm,
+              abi: irmAbi,
+              functionName: "borrowRateView",
+              args: [
+                {
+                  loanToken,
+                  collateralToken,
+                  oracle,
+                  irm,
+                  lltv,
+                },
+                {
+                  totalSupplyAssets,
+                  totalSupplyShares,
+                  totalBorrowAssets,
+                  totalBorrowShares,
+                  lastUpdate,
+                  fee,
+                },
+              ],
+            }) as bigint;
 
-          // 2c) supplyRatePerSecond = borrowRate * utilization * (1 - fee)
-          // all in WAD math
-          const oneMinusFee = WAD - fee; // fee is WAD
-          const supplyRatePerSecWad =
-            (((ratePerSecWad * utilWad) / WAD) * oneMinusFee) / WAD;
+            const oneMinusFee = WAD - fee;
+            const supplyRatePerSecWad = (((ratePerSecWad * utilWad) / WAD) * oneMinusFee) / WAD;
+            const rSec = Number(supplyRatePerSecWad) / Number(WAD);
+            const apyMarket = Math.expm1(rSec * SECONDS_PER_YEAR);
 
-          // 2d) Convert per-second rate to APY (continuous comp approximation)
-          const rSec = Number(supplyRatePerSecWad) / Number(WAD); // decimal per second
-          const apyMarket = Math.expm1(rSec * SECONDS_PER_YEAR); // e^(r*t)-1
-
-          // 2e) Blend by vault weight in this market
-          blended += w * apyMarket;
+            blended += w * apyMarket;
+          } catch {
+            // If market data fails (e.g., no IRM, idle), treat APY as 0
+            blended += 0;
+          }
         }
 
         if (!cancelled) {
