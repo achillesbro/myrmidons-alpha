@@ -5,12 +5,12 @@ import {
   ConnectButton,
 } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
-import { mainnet, anvil, base } from "wagmi/chains";
+//import { mainnet } from "wagmi/chains";
 import { hyperEVM } from "./chains/hyperEVM";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "wagmi";
 import { useEffect, useState } from "react";
-import { Address, getAddress, Hex, isAddress, isHex } from "viem";
+import { Address, getAddress, Hex, isAddress } from "viem";
 import {
   metaMaskWallet,
   okxWallet,
@@ -21,11 +21,40 @@ import { ApolloProvider } from "@apollo/client";
 import { apolloClient } from "./service/apollo.client";
 import { VaultAPIView } from "./components/vault-api-view";
 import { VaultSdkView } from "./components/vault-sdk-view";
+import { AboutView } from "./components/about-view";
+import { SiteFooter } from "./components/site-footer";
 
 const DEFAULT_VAULT: Address = "0xDCd35A430895cc8961ea0F5B42348609114a9d0c";
 
+const TABS = ["USERPOSITION", "VAULTINFO", "ABOUT"] as const;
+type Tab = typeof TABS[number];
+const TAB_PARAM = "tab";
+const STORAGE_KEY = "myrmidons_activeTab";
+
+function normalizeTabParam(value: string | null): Tab | null {
+  if (!value) return null;
+  const v = value.toUpperCase();
+  // Back-compat
+  if (v === "SDK") return "USERPOSITION";
+  if (v === "API") return "VAULTINFO";
+  return (TABS as readonly string[]).includes(v) ? (v as Tab) : null;
+}
+
+function getInitialTab(): Tab {
+  try {
+    const url = new URL(window.location.href);
+    const fromUrl = normalizeTabParam(url.searchParams.get(TAB_PARAM));
+    if (fromUrl) return fromUrl;
+    const fromStorage = localStorage.getItem(STORAGE_KEY);
+    const storageTab = normalizeTabParam(fromStorage);
+    return storageTab ?? "USERPOSITION";
+  } catch {
+    return "USERPOSITION";
+  }
+}
+
 const TestInterface = () => {
-  const [activeTab, setActiveTab] = useState<"SDK" | "API">("SDK");
+  const [activeTab, setActiveTab] = useState<Tab>(() => getInitialTab());
   // `vaultAddressInput` is whatever the user types in -- any length string as long as it's Hex
   const [vaultAddressInput, setVaultAddressInput] =
     useState<Hex>(DEFAULT_VAULT);
@@ -41,6 +70,30 @@ const TestInterface = () => {
       }
     }
   }, [vaultAddressInput]);
+
+  // Persist + deep-link (URL ?tab=...)
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, activeTab);
+      const url = new URL(window.location.href);
+      url.searchParams.set(TAB_PARAM, activeTab.toLowerCase());
+      // replaceState so we don’t spam history on every click
+      window.history.replaceState(null, "", url.toString());
+    } catch {
+      /* noop */
+    }
+  }, [activeTab]);
+
+  // Optional: keep in sync if user uses back/forward with external links
+  useEffect(() => {
+    const onPop = () => {
+      const url = new URL(window.location.href);
+      const tab = normalizeTabParam(url.searchParams.get(TAB_PARAM));
+      if (tab && tab !== activeTab) setActiveTab(tab);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [activeTab]);
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
@@ -61,10 +114,10 @@ const TestInterface = () => {
             {/* Tab Navigation */}
             <div className="flex space-x-4 mb-6">
               <button
-                aria-pressed={activeTab === "SDK"}
-                onClick={() => setActiveTab("SDK")}
+                aria-pressed={activeTab === "USERPOSITION"}
+                onClick={() => setActiveTab("USERPOSITION")}
                 className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center border ${
-                  activeTab === "SDK"
+                  activeTab === "USERPOSITION"
                     ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
                     : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
                 }`}
@@ -72,26 +125,40 @@ const TestInterface = () => {
                 User Position
               </button>
               <button
-                aria-pressed={activeTab === "API"}
-                onClick={() => setActiveTab("API")}
+                aria-pressed={activeTab === "VAULTINFO"}
+                onClick={() => setActiveTab("VAULTINFO")}
                 className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center border ${
-                  activeTab === "API"
+                  activeTab === "VAULTINFO"
                     ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
                     : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
                 }`}
               >
                 Vault Information
               </button>
+              <button
+                aria-pressed={activeTab === "ABOUT"}
+                onClick={() => setActiveTab("ABOUT")}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center border ${
+                  activeTab === "ABOUT"
+                    ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
+                    : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
+                }`}
+              >
+                About
+              </button>
             </div>
 
-            {activeTab === "SDK" ? (
+            {activeTab === "USERPOSITION" ? (
               <VaultSdkView vaultAddress={vaultAddress} />
-            ) : (
+            ) : activeTab === "VAULTINFO" ? (
               <VaultAPIView vaultAddress={vaultAddress} />
+            ) : (
+              <AboutView />
             )}
           </div>
         </div>
       </div>
+      <SiteFooter />
     </div>
   );
 };
@@ -100,7 +167,9 @@ const TestInterface = () => {
 const config = getDefaultConfig({
   appName: "Test Wagmi Interface",
   projectId: "841b6ddde2826ce0acf2d1b1f81f8582",
-  chains: [mainnet, anvil, base, hyperEVM],
+  chains: [
+    //mainnet, 
+    hyperEVM],
   wallets: [
     {
       groupName: "Popular",
@@ -108,9 +177,7 @@ const config = getDefaultConfig({
     },
   ],
   transports: {
-    [mainnet.id]: http(),
-    [anvil.id]: http("http://127.0.0.1:8545"),
-    [base.id]: http("https://mainnet.base.org"),
+    //[mainnet.id]: http(),
     [hyperEVM.id]: http("https://rpc.hyperliquid.xyz/evm"),
   },
 });

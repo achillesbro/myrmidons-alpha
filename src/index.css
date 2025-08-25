@@ -43,6 +43,15 @@ body {
   color: var(--text);
 }
 
+html {
+  background-color: var(--bg);
+}
+
+#root, #__next {
+  min-height: 100%;
+  background-color: var(--bg);
+}
+
 h1 {
   font-family: Cinzel, 'Times New Roman', serif;
   font-weight: 500;
@@ -132,5 +141,17 @@ button:focus-visible {
   .text-gray-600,
   .text-gray-700 {
     color: var(--text) !important; /* #101720 */
+  }
+
+    /* Additional common dark backgrounds */
+  .bg-neutral-900,
+  .bg-zinc-900,
+  .bg-gray-900,
+  .bg-slate-900,
+  .bg-neutral-800,
+  .bg-zinc-800,
+  .bg-gray-800,
+  .bg-slate-800 {
+    background-color: var(--bg) !important;
   }
 }
