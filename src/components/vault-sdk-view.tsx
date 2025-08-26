@@ -1,3 +1,21 @@
+/**
+ * DEPRECATED: The SDK View has been merged into Vault API View (deposit/withdraw + position + PnL).
+ * This file is retained temporarily for reference and will be removed in a future cleanup.
+ */
+import {
+  fmtToken,
+  fmtUsdSimple,
+  fmtDateTime,
+  truncHash,
+  Skeleton,
+  friendlyError,
+  APPROVAL_PREF_KEY,
+  NET_FLOW_STORE_KEY,
+  Toasts,
+  ConfirmDialog,
+  type Toast,
+  type ToastKind,
+} from "./vault-shared";
 import { useState, useEffect, useRef } from "react";
 import { useWalletClient, useAccount } from "wagmi";
 import { useGetUserSDKVaultPositions } from "../hooks/useGetUserSDKVaultPosition";
@@ -19,162 +37,8 @@ const erc20Abi = [
 ];
 import { useGetVaultTransactionsQuery } from "../graphql/__generated__/GetVaultTransactions.query.generated";
 import { useGetVaultDisplayQuery } from "../graphql/__generated__/GetVaultDisplay.query.generated";
-import { getWhypeUsd } from "../lib/prices";
+import { getUsdt0Usd } from "../lib/prices";
 
-// ---- Lightweight Toasts & Confirm Dialog ----
-type ToastKind = "info" | "success" | "error";
-type Toast = { id: number; kind: ToastKind; text: string; href?: string };
-
-function Toasts({
-  toasts,
-  onDismiss,
-}: {
-  toasts: Toast[];
-  onDismiss: (id: number) => void;
-}) {
-  return (
-    <div className="fixed top-4 right-4 space-y-2 z-50">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={[
-            "rounded-md shadow px-4 py-3 border",
-            t.kind === "success"
-              ? "bg-[#DFF5E4] border-[#A4E3B2] text-[#0A3D2E]"
-              : t.kind === "error"
-              ? "bg-[#FDE8E7] border-[#F5B5B1] text-[#7A1F1A]"
-              : "bg-[#FFFFF5] border-[#E5E2D6] text-[#101720]",
-          ].join(" ")}
-        >
-          {t.href ? (
-            <a
-             href={t.href}
-            target="_blank"
-            rel="noreferrer noopener"
-            className="underline hover:opacity-80"
-            >
-            {t.text}
-          </a>
-        ) : (
-          t.text
-        )}
-          <button
-            className="ml-3 text-sm underline"
-            onClick={() => onDismiss(t.id)}
-            aria-label="Dismiss"
-          >
-            Close
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ConfirmDialog({
-  open,
-  title,
-  body,
-  onCancel,
-  onConfirm,
-  confirmLabel = "Confirm",
-}: {
-  open: boolean;
-  title: string;
-  body: React.ReactNode;
-  onCancel: () => void;
-  onConfirm: () => void;
-  confirmLabel?: string;
-}) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/30" onClick={onCancel} />
-      <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6 w-[420px] z-50">
-        <h3 className="text-lg font-semibold text-[#00295B] mb-2">{title}</h3>
-        <div className="text-[#101720] mb-4">{body}</div>
-        <div className="flex justify-end gap-3">
-          <button
-            className="px-4 py-2 rounded-md bg-[#FFFFF5] border border-[#E5E2D6] text-[#101720]"
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-          <button
-            className="px-4 py-2 rounded-md bg-[#00295B] text-[#FFFFF5]"
-            onClick={onConfirm}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-// ---- Formatting helpers ----
-const fmtToken = (wei: bigint, decimals = 18, digits = 2) => {
-  const n = Number(formatUnits(wei, decimals));
-  return n.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: digits,
-  });
-};
-const fmtUsd = (n: number, digits = 2) =>
-  Number(n).toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: digits,
-  });
-
-// Date & hash helpers
-const pad2 = (n: number) => String(n).padStart(2, "0");
-const fmtDateTime = (unixSeconds: number) => {
-  const d = new Date(unixSeconds * 1000);
-  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-};
-const truncHash = (h: string) => (h && h.length > 12 ? `${h.slice(0, 6)}…${h.slice(-4)}` : h);
-
-// CSV escaping helper
-const csvEscape = (s: string) => `"${String(s).replace(/"/g, '""')}"`;
-
-// ---- Lightweight Skeleton Loader ----
-const Skeleton = ({ className = "" }: { className?: string }) => (
-  <div className={`animate-pulse bg-[#EDEBE3] rounded ${className}`} />
-);
-
-// ---- Error normalization helper (user-friendly messages) ----
-function friendlyError(err: unknown): string {
-  const msg = String((err as any)?.message || "").toLowerCase();
-  const code = (err as any)?.code ?? (err as any)?.info?.error?.code;
-
-  if (code === 4001 || (err as any)?.code === "ACTION_REJECTED" || msg.includes("user rejected")) {
-    return "Error: user rejected transaction";
-  }
-  if (msg.includes("exceeds max deposit")) return "Error: exceeds vault max deposit";
-  if (msg.includes("exceeds max withdraw")) return "Error: exceeds vault max withdraw";
-  if (msg.includes("exceeds max redeem")) return "Error: exceeds vault max redeem";
-  if (msg.includes("insufficient funds")) return "Error: insufficient funds for gas or amount";
-  if (msg.includes("cap") && msg.includes("0")) return "Error: vault is closed for deposits (cap = 0)";
-  if (msg.includes("rate limited") || msg.includes("429")) return "Error: network rate-limited, please retry";
-  if (msg.includes("missing revert data") || msg.includes("call_exception")) return "Error: transaction simulation failed";
-  return `Error: ${String((err as any)?.message || err)}`;
-}
-
-// ---- Keys (match TransactionHistory) ----
-const AMOUNTS_STORE_KEY = (chainId?: number, v?: string, u?: string) =>
-  `txAmounts:${chainId ?? 0}:${(v ?? "").toLowerCase()}:${(u ?? "").toLowerCase()}`;
-const HISTORY_STORE_KEY = (chainId?: number, v?: string, u?: string) =>
-  `txHistory:${chainId ?? 0}:${(v ?? "").toLowerCase()}:${(u ?? "").toLowerCase()}`;
-const STATUS_STORE_KEY = (chainId?: number, v?: string, u?: string) =>
-  `txStatus:${chainId ?? 0}:${(v ?? "").toLowerCase()}:${(u ?? "").toLowerCase()}`;
-
-
-// Approval preference (persisted)
-const APPROVAL_PREF_KEY = (chainId?: number, v?: string, token?: string) =>
-  `approvalPref:${chainId ?? 0}:${(v ?? "").toLowerCase()}:${(token ?? "").toLowerCase()}`;
 const MAX_UINT256 = (2n ** 256n) - 1n;
 
 // Shared tx row type and de-dupe helper (module scope)
@@ -195,16 +59,18 @@ export const mergeDedupe = (rows: TxRow[]): TxRow[] => {
   return Object.values(byHash).sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
 };
 
-export function TransactionHistory({ vaultAddress }: { vaultAddress: Address }) {
+export function TransactionHistory({ vaultAddress, assetDecimals, underlyingSym }: { vaultAddress: Address; assetDecimals: number; underlyingSym: string }) {
   const { address: userAddress } = useAccount();
   const client = useWalletClient();
   const chainId = client.data?.chain?.id;
 
-  const VAULT_DECIMALS = 18; // HyperEVM vault & WHYPE use 18
+  // const VAULT_DECIMALS = 18; // HyperEVM vault uses 18
   const AMOUNTS_STORE_KEY = (chainId?: number, v?: string, u?: string) =>
     `txAmounts:${chainId ?? 0}:${(v ?? "").toLowerCase()}:${(u ?? "").toLowerCase()}`;
   const HISTORY_STORE_KEY = (chainId?: number, v?: string, u?: string) =>
     `txHistory:${chainId ?? 0}:${(v ?? "").toLowerCase()}:${(u ?? "").toLowerCase()}`;
+  const STATUS_STORE_KEY = (chainId?: number, v?: string, u?: string) =>
+    `txStatus:${chainId ?? 0}:${(v ?? "").toLowerCase()}:${(u ?? "").toLowerCase()}`;
 
   // Compute a capped fromBlock for HyperEVM (avoid scanning from genesis)
   const [fromBlock, setFromBlock] = useState<bigint | null>(null);
@@ -376,7 +242,7 @@ export function TransactionHistory({ vaultAddress }: { vaultAddress: Address }) 
         <div className="grid grid-cols-4 gap-2 text-xs font-medium text-[#101720]/70 px-2">
           <div>Date</div>
           <div>Type</div>
-          <div className="text-right">Amount (WHYPE)</div>
+          <div className="text-right">Amount ({underlyingSym})</div>
           <div className="text-right">Tx</div>
         </div>
         <div className="space-y-2 mt-1">
@@ -398,7 +264,7 @@ export function TransactionHistory({ vaultAddress }: { vaultAddress: Address }) 
         <div className="grid grid-cols-4 gap-2 text-xs font-medium text-[#101720]/70 px-2">
           <div>Date</div>
           <div>Type</div>
-          <div className="text-right">Amount (WHYPE)</div>
+          <div className="text-right">Amount ({underlyingSym})</div>
           <div className="text-right">Tx</div>
         </div>
         <div className="space-y-2 mt-1">
@@ -407,7 +273,7 @@ export function TransactionHistory({ vaultAddress }: { vaultAddress: Address }) 
             const amt = amounts[k] ? BigInt(amounts[k]) : null;
             const isWithdraw = (tx.type ?? "").toLowerCase().includes("withdraw");
             const typeLabel = isWithdraw ? "Withdrawal" : "Deposit";
-            const amountLabel = amt != null ? `${isWithdraw ? "-" : ""}${fmtToken(amt, VAULT_DECIMALS)}` : "—";
+            const amountLabel = amt != null ? `${isWithdraw ? "-" : ""}${fmtToken(amt, assetDecimals)}` : "—";
             return (
               <div key={k} className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-2 text-sm grid grid-cols-4 gap-2 items-center">
                 <span>{fmtDateTime(tx.timestamp)}</span>
@@ -500,8 +366,6 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
       setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
     }
   };
-  const dismissToast = (id: number) =>
-    setToasts((t) => t.filter((x) => x.id !== id));
 
   type ConfirmState =
     | { open: false }
@@ -518,9 +382,6 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
   // In-flight flags
   const [submitting, setSubmitting] = useState<"deposit" | "withdraw" | null>(null);
 
-  // Force-refresh key for TransactionHistory after success
-  const [historyBump, setHistoryBump] = useState(0);
-  const bumpHistory = () => setHistoryBump((n) => n + 1);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -613,9 +474,21 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
   const [posLoading, setPosLoading] = useState(false);
   const [posError, setPosError] = useState<string | null>(null);
 
-  // Live USD price for WHYPE (HyperEVM)
+  // Live USD price for USDT0 (HyperEVM)
   const [usdPrice, setUsdPrice] = useState<number | null>(null);
   const [priceLoading, setPriceLoading] = useState(false);
+
+  // Net flow (localStorage tracked)
+  const [netFlowWei, setNetFlowWei] = useState<bigint>(0n);
+  useEffect(() => {
+    const userAddr = client.data?.account?.address;
+    if (!userAddr) { setNetFlowWei(0n); return; }
+    try {
+      const k = NET_FLOW_STORE_KEY(chainId, vaultAddress, userAddr);
+      const raw = localStorage.getItem(k);
+      setNetFlowWei(raw ? BigInt(raw) : 0n);
+    } catch { setNetFlowWei(0n); }
+  }, [chainId, vaultAddress, client.data?.account?.address]);
   
   // On-chain token balance for HyperEVM (chain 999)
   const [onchainBalance, setOnchainBalance] = useState<bigint | null>(null);
@@ -710,7 +583,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
       }
       try {
         setPriceLoading(true);
-        const p = await getWhypeUsd({ token: underlyingAddress });
+        const p = await getUsdt0Usd({ token: underlyingAddress });
         if (!cancelled) setUsdPrice(p ?? null);
       } catch {
         if (!cancelled) setUsdPrice(null);
@@ -751,7 +624,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
     })();
 
     return () => { cancel = true; };
-  }, [chainId, userAddress, underlyingAddress, vaultAddress, historyBump]);
+  }, [chainId, userAddress, underlyingAddress, vaultAddress]);
 
     useEffect(() => {
     // Clear any pending timer
@@ -957,69 +830,8 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
 
   // ---------- Preview & Limits helpers ----------
   const assetDecimals = underlyingDecimals ?? 18;
-  const underlyingSym = chainId === 999 ? "WHYPE" : (position?.underlyingSymbol ?? "Asset");
+  const underlyingSym = chainId === 999 ? "USDT0" : (position?.underlyingSymbol ?? "Asset");
 
-  // CSV Export function for transaction history
-  const exportHistoryCsv = () => {
-    try {
-      if (!client.data?.account) { pushToast("error", "Connect wallet"); return; }
-      const userAddr = client.data.account.address;
-      const histKey = HISTORY_STORE_KEY(chainId, vaultAddress, userAddr);
-      const amtKey  = AMOUNTS_STORE_KEY(chainId, vaultAddress, userAddr);
-      const rowsRaw = localStorage.getItem(histKey) || "[]";
-      const amtsRaw = localStorage.getItem(amtKey) || "{}";
-      const rows: TxRow[] = JSON.parse(rowsRaw);
-      const amts: Record<string, string> = JSON.parse(amtsRaw);
-      if (!Array.isArray(rows) || rows.length === 0) { pushToast("info", "No transactions to export", 3000); return; }
-
-      // Build header
-      const header = ["Date", "Type", `Amount (${underlyingSym})`, "Tx Hash"]; // Amount in underlying units; withdrawals negative
-
-      // Build CSV lines sorted newest first
-      const sorted = mergeDedupe(rows);
-      let st: Record<string, string> = {};
-      try { st = JSON.parse(localStorage.getItem(STATUS_STORE_KEY(chainId, vaultAddress, userAddr)) || "{}"); } catch {}
-      const filtered = sorted.filter((r) => st[`${r.hash}-${r.logIndex}`] !== "reverted");
-      const lines = [header.join(",")];
-      for (const r of filtered) {
-        const key = `${r.hash}-${r.logIndex}`;
-        const amtStr = amts[key];
-        let amtOut = "";
-        if (amtStr != null) {
-          try {
-            const amt = BigInt(amtStr);
-            const isWithdraw = (r.type || "").toLowerCase().includes("withdraw");
-            const num = Number(formatUnits(amt, assetDecimals));
-            amtOut = (isWithdraw ? -num : num).toString();
-          } catch { amtOut = ""; }
-        }
-        const dateLabel = fmtDateTime(r.timestamp);
-        const typeLabel = (r.type || "").toLowerCase().includes("withdraw") ? "Withdrawal" : "Deposit";
-        lines.push([
-          csvEscape(dateLabel),
-          csvEscape(typeLabel),
-          csvEscape(amtOut),
-          csvEscape(r.hash),
-        ].join(","));
-      }
-
-      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const ts = new Date();
-      const fname = `history_${userAddr}_${ts.getFullYear()}-${String(ts.getMonth()+1).padStart(2,'0')}-${String(ts.getDate()).padStart(2,'0')}_${String(ts.getHours()).padStart(2,'0')}${String(ts.getMinutes()).padStart(2,'0')}${String(ts.getSeconds()).padStart(2,'0')}.csv`;
-      a.href = url;
-      a.download = fname;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      pushToast("success", "CSV downloaded", 3000);
-    } catch (e) {
-      console.error(e);
-      pushToast("error", "Failed to export CSV");
-    }
-  };
 
   const parseAmount = (s: string | undefined, decimals: number): bigint | null => {
     const v = (s ?? "").trim();
@@ -1041,9 +853,13 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
   const userUnderlyingUnits = onchainPosition ? Number(formatUnits(onchainPosition.assets, assetDecimals)) : 0;
   const userHoldingsUsd: number | undefined = typeof usdPrice === "number" ? userUnderlyingUnits * usdPrice : undefined;
 
-  // USD formatting for Current Position box: use plain "$" (not "US$")
-  const fmtUsdSimple = (v: number) =>
-    `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  // PnL lightweight card values
+  const investedUnits = Number(formatUnits(netFlowWei, assetDecimals));
+  const investedUsd: number | undefined = typeof usdPrice === "number" ? investedUnits * usdPrice : undefined;
+  const pnlUnits = onchainPosition ? Number(formatUnits(onchainPosition.assets - netFlowWei, assetDecimals)) : 0;
+  const pnlUsd: number | undefined = typeof usdPrice === "number" ? pnlUnits * usdPrice : undefined;
+  const roiPct: number | undefined = investedUsd && investedUsd !== 0 ? ((pnlUsd ?? 0) / investedUsd) * 100 : undefined;
+
 
   let depositDisabled = false; let depositReason: string | null = null;
   if (!client.data?.account) { depositDisabled = true; depositReason = "Connect wallet"; }
@@ -1148,6 +964,14 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
           await tx.wait();
         }
         pushToast("success", "Deposit successful");
+        // Update net flow (deposits add underlying)
+        try {
+          const kFlow = NET_FLOW_STORE_KEY(chainId, vaultAddress, userAddr);
+          const current = (() => { try { return BigInt(localStorage.getItem(kFlow) || "0"); } catch { return 0n; } })();
+          const next = current + depositAmountWei;
+          setNetFlowWei(next);
+          try { localStorage.setItem(kFlow, next.toString()); } catch {}
+        } catch {}
         // Optimistically refresh on-chain balance & position
         try {
           // refresh balance
@@ -1161,17 +985,6 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
           const shares: bigint = await vc2.balanceOf(userAddr);
           const assets: bigint = await vc2.convertToAssets(shares);
           setOnchainPosition({ shares, assets });
-          // Optimistically append to history (HyperEVM only)
-          if (chainId === 999) {
-            const kHist = HISTORY_STORE_KEY(chainId, vaultAddress, userAddr);
-            const now = Math.floor(Date.now() / 1000);
-            const row = { hash: String(tx.hash), logIndex: 0, timestamp: now, type: "Deposit" };
-            let arr: any[] = [];
-            try { arr = JSON.parse(localStorage.getItem(kHist) || "[]"); } catch {}
-            const dedup = mergeDedupe([...arr, row]);
-            try { localStorage.setItem(kHist, JSON.stringify(dedup)); } catch {}
-            bumpHistory();
-          }
         } catch {}
       } catch (waitErr) {
         // If waiting fails (e.g., temporary RPC issues), keep the submitted line
@@ -1203,6 +1016,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
       );
 
       let tx;
+      let withdrawnAssetsWei: bigint = 0n;
       if (isFullWithdraw) {
         // Use withdraw(assets) with min(maxWithdraw, available assets)
         let assetsAvail: bigint | null = null;
@@ -1212,6 +1026,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
         const assetsToWithdraw = (assetsAvail != null) ? (cap < assetsAvail ? cap : assetsAvail) : 0n;
         if (assetsToWithdraw <= 0n) throw new Error("Nothing to withdraw");
         try { setInputs((prev) => ({ ...prev, amountToWithdraw: formatUnits(assetsToWithdraw, assetDecimals) })); } catch {}
+        withdrawnAssetsWei = assetsToWithdraw;
         tx = await vaultContract.withdraw(
           assetsToWithdraw,
           userAddr,
@@ -1220,6 +1035,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
         );
       } else {
         const assetsToWithdraw = parseUnits(inputs.amountToWithdraw, assetDecimals);
+        withdrawnAssetsWei = assetsToWithdraw;
         tx = await vaultContract.withdraw(
           assetsToWithdraw,
           userAddr,
@@ -1242,6 +1058,14 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
           await tx.wait();
         }
         pushToast("success", "Withdraw successful");
+        // Update net flow (withdrawals subtract underlying)
+        try {
+          const kFlow = NET_FLOW_STORE_KEY(chainId, vaultAddress, userAddr);
+          const current = (() => { try { return BigInt(localStorage.getItem(kFlow) || "0"); } catch { return 0n; } })();
+          const next = current - withdrawnAssetsWei;
+          setNetFlowWei(next);
+          try { localStorage.setItem(kFlow, next.toString()); } catch {}
+        } catch {}
         // Refresh position & balance (HyperEVM path)
         try {
           const provider2 = new BrowserProvider(window.ethereum as any);
@@ -1253,16 +1077,6 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
           const shares: bigint = await vc2.balanceOf(userAddr);
           const assets: bigint = await vc2.convertToAssets(shares);
           setOnchainPosition({ shares, assets });
-          if (chainId === 999) {
-            const kHist = HISTORY_STORE_KEY(chainId, vaultAddress, userAddr);
-            const now = Math.floor(Date.now() / 1000);
-            const row = { hash: String(tx.hash), logIndex: 0, timestamp: now, type: isFullWithdraw ? "WithdrawAll" : "Withdraw" };
-            let arr: any[] = [];
-            try { arr = JSON.parse(localStorage.getItem(kHist) || "[]"); } catch {}
-            const dedup = mergeDedupe([...arr, row]);
-            try { localStorage.setItem(kHist, JSON.stringify(dedup)); } catch {}
-            bumpHistory();
-          }
         } catch {}
       } catch (waitErr) {
         // keep submitted message if wait fails
@@ -1306,26 +1120,41 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                 <div className="text-red-500 text-sm">{posError}</div>
               ) : onchainPosition ? (
                 <div className="space-y-4">
-                  <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-3">
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-sm text-[#101720]/70 mb-1">
-                          Vault Token Balance
-                        </div>
-                        <div className="font-medium text-[#101720]">
-                          {fmtToken(onchainPosition.shares, 18)} Vault&nbsp;Shares
-                        </div>
-                      </div>
-                      <div className="pt-4 border-t border-[#E5E2D6]">
-                        <div className="text-sm text-[#101720]/70 mb-1">
-                          USD Value
-                        </div>
-                        <div className="font-medium text-[#101720]">
-                          {priceLoading ? <Skeleton className="h-6 w-32" /> : (typeof userHoldingsUsd === "number" ? fmtUsdSimple(userHoldingsUsd) : "—")}
-                        </div>
-                      </div>
-                    </div>
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-3">
+            <div className="space-y-4">
+              <div>
+                <div className="text-sm text-[#101720]/70 mb-1">
+                  Vault Token Balance
+                </div>
+                <div className="font-medium text-[#101720]">
+                  {fmtToken(onchainPosition.shares, 18)} Vault&nbsp;Shares
+                </div>
+              </div>
+              <div className="pt-4 border-t border-[#E5E2D6]">
+                <div className="text-sm text-[#101720]/70 mb-1">
+                  USD Value
+                </div>
+                <div className="font-medium text-[#101720]">
+                  {priceLoading ? <Skeleton className="h-6 w-32" /> : (typeof userHoldingsUsd === "number" ? fmtUsdSimple(userHoldingsUsd) : "—")}
+                </div>
+                {/* --- PnL Section --- */}
+                <div className="pt-4 border-t border-[#E5E2D6] mt-2">
+                  <div className="text-sm text-[#101720]/70 mb-1">Unrealized PnL</div>
+                  <div className={`font-medium ${typeof pnlUsd === "number" && pnlUsd < 0 ? "text-red-600" : "text-[#0A3D2E]"}`}>
+                    {priceLoading ? (
+                      <Skeleton className="h-6 w-32" />
+                    ) : (
+                      typeof pnlUsd === "number" ? `${pnlUsd < 0 ? "-" : "+"}$${Math.abs(pnlUsd).toFixed(2)}` : "—"
+                    )}
                   </div>
+                  <div className="text-xs text-[#101720]/70 mt-1">
+                    {typeof roiPct === "number" && isFinite(roiPct) ? `${roiPct >= 0 ? "+" : ""}${roiPct.toFixed(2)}%` : ""}
+                  </div>
+                </div>
+                {/* --- End PnL Section --- */}
+              </div>
+            </div>
+          </div>
                 </div>
               ) : (
                 <div className="text-[#101720]/60 text-sm">
@@ -1349,33 +1178,48 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
               <div className="text-red-500 text-sm">{positionError}</div>
             ) : position ? (
               <div className="space-y-4">
-                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-3">
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-sm text-[#101720]/70 mb-1">
-                        Vault Token Balance
-                      </div>
-                      <div className="font-medium text-[#101720]">
-                        {fmtToken(position.depositedAssets, 18)} {position.vaultSymbol}
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t border-[#E5E2D6]">
-                      <div className="text-sm text-[#101720]/70 mb-1">
-                        USD Value
-                      </div>
-                      <div className="font-medium text-[#101720]">
-                        {typeof userHoldingsUsd === "number" ? fmtUsdSimple(userHoldingsUsd) : "—"}
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t border-[#E5E2D6]">
-                      <div className="text-sm text-[#101720]/70 mb-1">Projected Earnings</div>
-                      <div className="font-medium text-[#101720] space-y-1">
-                        <div>Monthly: ${monthlyEarningsUsd.toFixed(2)}</div>
-                        <div>Annual:  ${annualEarningsUsd.toFixed(2)}</div>
-                      </div>
-                    </div>
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-3">
+            <div className="space-y-4">
+              <div>
+                <div className="text-sm text-[#101720]/70 mb-1">
+                  Vault Token Balance
+                </div>
+                <div className="font-medium text-[#101720]">
+                  {fmtToken(position.depositedAssets, 18)} {position.vaultSymbol}
+                </div>
+              </div>
+              <div className="pt-4 border-t border-[#E5E2D6]">
+                <div className="text-sm text-[#101720]/70 mb-1">
+                  USD Value
+                </div>
+                <div className="font-medium text-[#101720]">
+                  {typeof userHoldingsUsd === "number" ? fmtUsdSimple(userHoldingsUsd) : "—"}
+                </div>
+                {/* --- PnL Section --- */}
+                <div className="pt-4 border-t border-[#E5E2D6] mt-2">
+                  <div className="text-sm text-[#101720]/70 mb-1">Unrealized PnL</div>
+                  <div className={`font-medium ${typeof pnlUsd === "number" && pnlUsd < 0 ? "text-red-600" : "text-[#0A3D2E]"}`}>
+                    {priceLoading ? (
+                      <Skeleton className="h-6 w-32" />
+                    ) : (
+                      typeof pnlUsd === "number" ? `${pnlUsd < 0 ? "-" : "+"}$${Math.abs(pnlUsd).toFixed(2)}` : "—"
+                    )}
+                  </div>
+                  <div className="text-xs text-[#101720]/70 mt-1">
+                    {typeof roiPct === "number" && isFinite(roiPct) ? `${roiPct >= 0 ? "+" : ""}${roiPct.toFixed(2)}%` : ""}
                   </div>
                 </div>
+                {/* --- End PnL Section --- */}
+              </div>
+              <div className="pt-4 border-t border-[#E5E2D6]">
+                <div className="text-sm text-[#101720]/70 mb-1">Projected Earnings</div>
+                <div className="font-medium text-[#101720] space-y-1">
+                  <div>Monthly: ${monthlyEarningsUsd.toFixed(2)}</div>
+                  <div>Annual:  ${annualEarningsUsd.toFixed(2)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
               </div>
             ) : (
               <div className="text-[#101720]/60 text-sm">
@@ -1408,7 +1252,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                     onClick={() => {
                       setDepPreset("max");
                       if (chainId === 999 && onchainBalance != null) {
-                        setInputs((p) => ({ ...p, amountToDeposit: formatUnits(onchainBalance, 18) }));
+                        setInputs((p) => ({ ...p, amountToDeposit: formatUnits(onchainBalance, assetDecimals) }));
                       } else if (tokenBalance?.balance) {
                         setInputs((p) => ({
                           ...p,
@@ -1429,7 +1273,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
                     ) : balError ? (
                       <span className="text-red-400">{balError}</span>
                     ) : onchainBalance !== null ? (
-                      <>Balance: {fmtToken(onchainBalance, 18)} WHYPE</>
+                      <>Balance: {fmtToken(onchainBalance, assetDecimals)} {underlyingSym}</>
                     ) : (
                       "No balance data"
                     )
@@ -1657,20 +1501,6 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
         </div>
 
 
-        {/* Transaction History Section */}
-        <div className="mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-[#00295B]">Transaction History</h2>
-            <button
-              type="button"
-              onClick={exportHistoryCsv}
-              className="px-3 py-1.5 text-xs rounded-md border border-[#E5E2D6] bg-[#FFFFF5] hover:bg-[#F7F6EE] text-[#101720]"
-            >
-              Download CSV
-            </button>
-          </div>
-          <TransactionHistory key={historyBump} vaultAddress={vaultAddress} />
-        </div>
       </div>
       {/* Confirm Dialog */}
       <ConfirmDialog
@@ -1706,7 +1536,7 @@ export function VaultSdkView({ vaultAddress }: { vaultAddress: Address }) {
         }}
         confirmLabel={confirm.open && confirm.action === "deposit" ? "Confirm Deposit" : "Confirm Withdraw"}
       />
-      <Toasts toasts={toasts} onDismiss={dismissToast} />
+      <Toasts toasts={toasts} />
     </div>
   );
 }

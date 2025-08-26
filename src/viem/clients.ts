@@ -3,20 +3,38 @@ import { createPublicClient, http, fallback } from "viem";
 import { hyperEVM } from "../chains/hyperEVM";
 
 // Collect RPC URLs from env (only keep non-empty)
-const HYPER_RPC_URLS = [
+const ENV_HYPER_RPC_URLS = [
   import.meta.env.VITE_HYPER_RPC_1,
   import.meta.env.VITE_HYPER_RPC_2,
   import.meta.env.VITE_HYPER_RPC_3,
   import.meta.env.VITE_HYPER_RPC_4,
 ].filter(Boolean) as string[];
 
+// Sensible defaults (you can override via .env). Note:
+// - Alchemy requires a project endpoint; replace with your HTTPS URL.
+// - http://rpc.hypurrscan.io is HTTP only; keep if you’re comfortable with HTTP.
+const DEFAULT_HYPER_RPC_URLS: string[] = [
+  "https://rpc.hyperliquid.xyz/evm",
+  "http://rpc.hypurrscan.io",
+  "https://hyperliquid-json-rpc.stakely.io",
+  "https://rpc.purroofgroup.com",
+  // "https://<YOUR-ALCHEMY-ENDPOINT>" // e.g. https://hyperevm-mainnet.g.alchemy.com/v2/<key>
+];
+
+// Merge env + defaults and de-duplicate while preserving order
+const seen = new Set<string>();
+const HYPER_RPC_URLS = [...ENV_HYPER_RPC_URLS, ...DEFAULT_HYPER_RPC_URLS].filter((u) => {
+  if (!u) return false;
+  if (seen.has(u)) return false;
+  seen.add(u);
+  return true;
+});
+
 // Build per-URL http transports with batching + retries
 const hyperHttpTransports = HYPER_RPC_URLS.map((url) =>
   http(url, {
-    // Batch JSON-RPC calls that occur close together into one request.
-    // This alone reduces request count & rate-limit pressure.
-    batch: { wait: 20 }, // ms window to group calls
-    retryCount: 3,
+    batch: { wait: 25 }, // small window to coalesce calls
+    retryCount: 4,
     retryDelay: 300,
     timeout: 30_000,
   }),
@@ -34,6 +52,10 @@ const hyperTransport =
         retryDelay: 250,
       })
     : hyperHttpTransports[0];
+
+// NOTE: Some public RPCs are not archive nodes. If you query old blocks (e.g., for history),
+// a node may return "Block at number ... could not be found". The fallback list increases
+// the chance that at least one node can serve the request.
 
 export const hyperPublicClient = createPublicClient({
   chain: hyperEVM,

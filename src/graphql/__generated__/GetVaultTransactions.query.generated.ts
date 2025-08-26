@@ -31,7 +31,7 @@ export const GetVaultTransactionsDocument = gql`
       first: 10
       orderBy: Timestamp
       orderDirection: Desc
-      where: { vaultAddress_in: ["0xDCd35A430895cc8961ea0F5B42348609114a9d0c"] }
+      where: { vaultAddress_in: ["0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42"] }
     ) {
       items {
         blockNumber

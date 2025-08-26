@@ -54,10 +54,13 @@ export async function getUsdPrice(params: { token?: `0x${string}`; coingeckoId?:
   return price;
 }
 
+
 /**
- * Convenience helper for WHYPE (CoinGecko id: "wrapped-hype").
- * Optionally pass the HyperEVM token address so Dexscreener can be used as a fallback.
+ * Convenience helper for USDT0 (HyperEVM stablecoin). Pass the token address
+ * so Dexscreener can be used as the primary source. We intentionally do not
+ * set a CoinGecko id here because USDT0 may not have a direct listing; if you
+ * want to bias to a specific CG id (e.g., tether) you can extend this callsite.
  */
-export async function getWhypeUsd(opts?: { token?: `0x${string}` }): Promise<number | null> {
-  return getUsdPrice({ coingeckoId: "wrapped-hype", token: opts?.token });
+export async function getUsdt0Usd(opts?: { token?: `0x${string}` }): Promise<number | null> {
+  return getUsdPrice({ token: opts?.token });
 }

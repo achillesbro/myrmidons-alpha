@@ -4,7 +4,7 @@ export function AboutView() {
       {/* Intro (always visible) */}
       <section className="card p-6">
         <h2 className="text-2xl mb-2">About Myrmidons Strategies</h2>
-        <p className="text-[var(--heading)] italic mb-2">“Excellency forged in the heat of battle.”</p>
+        <p className="text-[var(--heading)] italic mb-2">“Excellence forged in the heat of battle.”</p>
         <p className="text-[var(--text)]">
           Myrmidons Strategies conducts research and implements investment strategies in crypto assets, with primary focus on the Hyperliquid ecosystem.
         </p>

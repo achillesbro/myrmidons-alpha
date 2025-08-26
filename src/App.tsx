@@ -20,13 +20,12 @@ import "@rainbow-me/rainbowkit/styles.css";
 import { ApolloProvider } from "@apollo/client";
 import { apolloClient } from "./service/apollo.client";
 import { VaultAPIView } from "./components/vault-api-view";
-import { VaultSdkView } from "./components/vault-sdk-view";
 import { AboutView } from "./components/about-view";
 import { SiteFooter } from "./components/site-footer";
 
-const DEFAULT_VAULT: Address = "0xDCd35A430895cc8961ea0F5B42348609114a9d0c";
+const DEFAULT_VAULT: Address = "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42";
 
-const TABS = ["USERPOSITION", "VAULTINFO", "ABOUT"] as const;
+const TABS = ["VAULTINFO", "ABOUT"] as const;
 type Tab = typeof TABS[number];
 const TAB_PARAM = "tab";
 const STORAGE_KEY = "myrmidons_activeTab";
@@ -34,10 +33,11 @@ const STORAGE_KEY = "myrmidons_activeTab";
 function normalizeTabParam(value: string | null): Tab | null {
   if (!value) return null;
   const v = value.toUpperCase();
-  // Back-compat
-  if (v === "SDK") return "USERPOSITION";
-  if (v === "API") return "VAULTINFO";
-  return (TABS as readonly string[]).includes(v) ? (v as Tab) : null;
+  // Back-compat: map old names to the new VAULTINFO tab
+  if (v === "SDK" || v === "USERPOSITION") return "VAULTINFO" as Tab;
+  if (v === "API" || v === "VAULTINFO") return "VAULTINFO" as Tab;
+  if (v === "ABOUT") return "ABOUT" as Tab;
+  return null;
 }
 
 function getInitialTab(): Tab {
@@ -47,9 +47,9 @@ function getInitialTab(): Tab {
     if (fromUrl) return fromUrl;
     const fromStorage = localStorage.getItem(STORAGE_KEY);
     const storageTab = normalizeTabParam(fromStorage);
-    return storageTab ?? "USERPOSITION";
+    return storageTab ?? "VAULTINFO";
   } catch {
-    return "USERPOSITION";
+    return "VAULTINFO";
   }
 }
 
@@ -114,17 +114,6 @@ const TestInterface = () => {
             {/* Tab Navigation */}
             <div className="flex space-x-4 mb-6">
               <button
-                aria-pressed={activeTab === "USERPOSITION"}
-                onClick={() => setActiveTab("USERPOSITION")}
-                className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center border ${
-                  activeTab === "USERPOSITION"
-                    ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
-                    : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
-                }`}
-              >
-                User Position
-              </button>
-              <button
                 aria-pressed={activeTab === "VAULTINFO"}
                 onClick={() => setActiveTab("VAULTINFO")}
                 className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center border ${
@@ -148,9 +137,7 @@ const TestInterface = () => {
               </button>
             </div>
 
-            {activeTab === "USERPOSITION" ? (
-              <VaultSdkView vaultAddress={vaultAddress} />
-            ) : activeTab === "VAULTINFO" ? (
+            {activeTab === "VAULTINFO" ? (
               <VaultAPIView vaultAddress={vaultAddress} />
             ) : (
               <AboutView />
