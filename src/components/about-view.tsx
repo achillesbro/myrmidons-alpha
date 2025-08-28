@@ -43,13 +43,13 @@ export function AboutView() {
                 Acquire crypto on a centralized exchange (e.g., Binance, Coinbase, Kraken). ETH or USDC are common starting points.
               </li>
               <li>
-                Install a self‑custodial wallet. Recommended: <a className="underline" href="https://rabby.io/" target="_blank" rel="noreferrer">Rabby Wallet</a>. Download exclusively from the official site to avoid phishing.
+                Install a self‑custodial wallet. Recommended: <a className="link underline" href="https://rabby.io/" target="_blank" rel="noreferrer">Rabby Wallet</a>. Download exclusively from the official site to avoid phishing.
               </li>
               <li>
                 Withdraw assets from the exchange to the self‑custodial address. Network fees apply; verify the destination network.
               </li>
               <li>
-                If required, bridge or swap into the vault’s underlying token on the target chain using a reputable aggregator such as <a className="underline" href="https://jumper.exchange/" target="_blank" rel="noreferrer">Jumper Exchange</a>. Return to the application and connect the wallet.
+                If required, bridge or swap into the vault’s underlying token on the target chain using a reputable aggregator such as <a className="link underline" href="https://jumper.exchange/" target="_blank" rel="noreferrer">Jumper Exchange</a>. Return to the application and connect the wallet.
               </li>
               <li>
                 Approve the token, specify an amount, and submit the deposit. The position updates once the transaction confirms.

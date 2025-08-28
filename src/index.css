@@ -25,13 +25,13 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
- a {
-   font-weight: 500;
-   color: var(--accent);
-   text-decoration: inherit;
- }
- a:hover {
-   opacity: 0.85;
+a {
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none; /* avoid inheriting no-underline from parents */
+}
+a:hover {
+  opacity: 0.85;
 }
 
 body {
@@ -41,6 +41,21 @@ body {
   min-height: 100vh;
   background-color: var(--bg);
   color: var(--text);
+}
+
+/* --- Brand link utility: always underlined & brand-colored --- */
+a.link,
+a.link:link,
+a.link:visited {
+  color: var(--accent);
+  text-decoration: underline !important;
+  text-decoration-thickness: 1.25px;
+  text-underline-offset: 2px;
+}
+a.link:hover,
+a.link:focus-visible {
+  opacity: 0.9;
+  outline: none;
 }
 
 html {

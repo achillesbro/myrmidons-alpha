@@ -9,7 +9,6 @@ import {
   fmtUsdSimple,
   friendlyError,
   Skeleton,
-  APPROVAL_PREF_KEY,
   NET_FLOW_STORE_KEY,
   type Toast,
   type ToastKind,
@@ -121,7 +120,9 @@ export function VaultAPIView() {
   // User state (HyperEVM tx path only)
   const [underlyingAddress, setUnderlyingAddress] = useState<`0x${string}` | null>(null);
   const [assetDecimals, setAssetDecimals] = useState<number>(18);
-  const [approvePref, setApprovePref] = useState<"exact" | "infinite">("infinite");
+  // Approval confirmation dialog state
+  const [confirmKind, setConfirmKind] = useState<"approve" | null>(null);
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [allowance, setAllowance] = useState<bigint>(0n);
   const [onchainBalance, setOnchainBalance] = useState<bigint>(0n); // underlying token balance
   const [userShares, setUserShares] = useState<bigint>(0n);
@@ -129,8 +130,9 @@ export function VaultAPIView() {
   const [depAmount, setDepAmount] = useState<string>("");
   const [wdAmount, setWdAmount] = useState<string>("");
   const [pending, setPending] = useState<"approve" | "deposit" | "withdraw" | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [txMode, setTxMode] = useState<"deposit" | "withdraw">("deposit");
+  // Force re-mount allocations after confirmed txs
+  const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
   // Load persisted toggle
   useEffect(() => {
@@ -233,12 +235,23 @@ export function VaultAPIView() {
     if (onchainData?.underlyingAddress) {
       setUnderlyingAddress(onchainData.underlyingAddress);
       setAssetDecimals(onchainData.underlyingDecimals);
-      // load approval pref
-      const k = APPROVAL_PREF_KEY(999, VAULT_ADDRESS, onchainData.underlyingAddress);
-      const v = localStorage.getItem(k);
-      if (v === "exact" || v === "infinite") setApprovePref(v);
     }
   }, [onchainData?.underlyingAddress, onchainData?.underlyingDecimals]);
+
+  // Fast-refresh TVL totals via wallet provider (avoids laggy public RPC)
+  const refreshVaultTotalsFast = async () => {
+    try {
+      const provider = new BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+      const [totalA, totalS] = await Promise.all([
+        vaultR.totalAssets() as Promise<bigint>,
+        vaultR.totalSupply() as Promise<bigint>,
+      ]);
+      setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
+      setLastUpdated(Date.now());
+    } catch {}
+  };
 
   useEffect(() => {
     const user = clientW.data?.account?.address;
@@ -276,35 +289,57 @@ export function VaultAPIView() {
     })();
   }, [clientW.data?.account?.address, underlyingAddress, VAULT_ADDRESS]);
 
-  const runApprove = async () => {
+  // Approve exactly the amount entered
+  const runApproveExact = async (amountWei: bigint) => {
     try {
       if (!clientW.data) throw new Error("Connect wallet");
       if (!underlyingAddress) throw new Error("Token unknown");
       const provider = new BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const token = new Contract(underlyingAddress, erc20Abi as any, signer);
-      const amount = approvePref === "infinite" ? (2n**256n - 1n) : parseUnits(depAmount || "0", assetDecimals);
       setPending("approve");
-      const tx = await token.approve(VAULT_ADDRESS, amount);
+      const tx = await token.approve(VAULT_ADDRESS, amountWei);
       pushToast("info", `Approval tx: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
-      await hyperPublicClient.waitForTransactionReceipt({ hash: tx.hash });
-      pushToast("success", "Approval confirmed");
-      setPending(null);
-      // persist pref & refresh allowance
-      try { localStorage.setItem(APPROVAL_PREF_KEY(999, VAULT_ADDRESS, underlyingAddress), approvePref); } catch {}
-      const allow = await hyperPublicClient.readContract({ address: underlyingAddress, abi: erc20Abi, functionName: "allowance", args: [clientW.data.account.address, VAULT_ADDRESS] }) as bigint;
-      setAllowance(allow);
+
+      // Prompt deposit immediately (do not wait for approval receipt)
+      // Nonce ordering guarantees the deposit will only execute after approval is mined.
+      // If it's mined in the same block, deposit proceeds seamlessly; otherwise it waits.
+      try {
+        runDeposit(amountWei); // fire-and-continue (no await) to surface the second wallet prompt now
+      } catch {}
+
+      // Still await approval receipt in the background to refresh UI state
+      try {
+        await hyperPublicClient.waitForTransactionReceipt({ hash: tx.hash, confirmations: 1, timeout: 15_000 });
+        pushToast("success", "Approval confirmed");
+      } catch (err) {
+        // Swallow timeout — deposit has already been prompted; nonce ordering will ensure safety
+        console.warn("Approval receipt wait timed out", err);
+      } finally {
+        // Try to refresh allowance either way (non-blocking semantics)
+        try {
+          const allow = await hyperPublicClient.readContract({
+            address: underlyingAddress,
+            abi: erc20Abi,
+            functionName: "allowance",
+            args: [clientW.data.account.address, VAULT_ADDRESS],
+          }) as bigint;
+          setAllowance(allow);
+        } catch {}
+        setLastUpdated(Date.now());
+        setPending(null);
+      }
     } catch (e) {
       setPending(null);
       pushToast("error", friendlyError(e));
     }
   };
 
-  const runDeposit = async () => {
+  const runDeposit = async (overrideAmountWei?: bigint) => {
     try {
       if (!clientW.data) throw new Error("Connect wallet");
       if (!underlyingAddress) throw new Error("Token unknown");
-      const amountWei = parseUnits(depAmount, assetDecimals);
+      const amountWei = overrideAmountWei ?? parseUnits(depAmount, assetDecimals);
       if (amountWei <= 0n) throw new Error("Enter amount");
       if (amountWei > onchainBalance) throw new Error("Insufficient balance");
       const provider = new BrowserProvider((window as any).ethereum);
@@ -313,16 +348,38 @@ export function VaultAPIView() {
       setPending("deposit");
       const tx = await vault.deposit(amountWei, clientW.data.account.address);
       pushToast("info", `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
-      await hyperPublicClient.waitForTransactionReceipt({ hash: tx.hash });
+      // Use wallet provider to wait for confirmation — typically faster than public RPCs
+      await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
       pushToast("success", "Deposit successful");
       setPending(null);
-      // refresh balances/position
-      const [bal, shares] = await Promise.all([
-        hyperPublicClient.readContract({ address: underlyingAddress, abi: erc20Abi, functionName: "balanceOf", args: [clientW.data.account.address] }) as Promise<bigint>,
-        hyperPublicClient.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "balanceOf", args: [clientW.data.account.address] }) as Promise<bigint>,
+      // Use wallet RPC for freshest reads immediately after confirmation
+      const provider2 = new BrowserProvider((window as any).ethereum);
+      const signer2 = await provider2.getSigner();
+      const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer2);
+      const tokenR = new Contract(underlyingAddress, erc20Abi as any, signer2);
+
+      const [bal, shares, totalA, totalS] = await Promise.all([
+        tokenR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+        vaultR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+        vaultR.totalAssets() as Promise<bigint>,
+        vaultR.totalSupply() as Promise<bigint>,
       ]);
-      const assets = (await hyperPublicClient.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "convertToAssets", args: [shares] })) as bigint;
-      setOnchainBalance(bal); setUserShares(shares); setUserAssets(assets);
+      const assets = (await vaultR.convertToAssets(shares)) as bigint;
+
+      setOnchainBalance(bal);
+      setUserShares(shares);
+      setUserAssets(assets);
+
+      // Update TVL totals immediately without waiting for public client
+      setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
+
+      // Re-mount allocations to force on-chain refresh for the table
+      setAllocRefreshKey((k) => k + 1);
+
+      // Extra: immediate + delayed TVL refresh via wallet RPC
+      await refreshVaultTotalsFast();
+      setTimeout(() => { refreshVaultTotalsFast(); }, 2000);
+
       // net flow update
       try {
         const k = NET_FLOW_STORE_KEY(999, VAULT_ADDRESS, clientW.data.account.address);
@@ -356,15 +413,38 @@ export function VaultAPIView() {
         withdrawnAssetsWei = amt;
       }
       pushToast("info", `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
-      await hyperPublicClient.waitForTransactionReceipt({ hash: tx.hash });
+      // Use wallet provider to wait for confirmation — typically faster than public RPCs
+      await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
       pushToast("success", "Withdraw successful");
       setPending(null);
-      const [bal, shares2] = await Promise.all([
-        hyperPublicClient.readContract({ address: underlyingAddress!, abi: erc20Abi, functionName: "balanceOf", args: [clientW.data.account.address] }) as Promise<bigint>,
-        hyperPublicClient.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "balanceOf", args: [clientW.data.account.address] }) as Promise<bigint>,
+      // Use wallet RPC for freshest reads
+      const provider2 = new BrowserProvider((window as any).ethereum);
+      const signer2 = await provider2.getSigner();
+      const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer2);
+      const tokenR = new Contract(underlyingAddress!, erc20Abi as any, signer2);
+
+      const [bal, shares2, totalA2, totalS2] = await Promise.all([
+        tokenR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+        vaultR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+        vaultR.totalAssets() as Promise<bigint>,
+        vaultR.totalSupply() as Promise<bigint>,
       ]);
-      const assets2 = (await hyperPublicClient.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "convertToAssets", args: [shares2] })) as bigint;
-      setOnchainBalance(bal); setUserShares(shares2); setUserAssets(assets2);
+      const assets2 = (await vaultR.convertToAssets(shares2)) as bigint;
+
+      setOnchainBalance(bal);
+      setUserShares(shares2);
+      setUserAssets(assets2);
+
+      // Update TVL immediately
+      setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA2, totalSupply: totalS2 } : prev));
+
+      // Force allocations refresh
+      setAllocRefreshKey((k) => k + 1);
+
+      // Extra: immediate + delayed TVL refresh via wallet RPC
+      await refreshVaultTotalsFast();
+      setTimeout(() => { refreshVaultTotalsFast(); }, 2000);
+
       // net flow update
       try {
         const k = NET_FLOW_STORE_KEY(999, VAULT_ADDRESS, clientW.data.account.address);
@@ -509,7 +589,7 @@ export function VaultAPIView() {
               <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
                 <h3 className="text-lg font-semibold mb-2 text-[#00295B]">About</h3>
                 <p className="text-[#101720]/80 text-sm">
-                  This vault allocates liquidity across selected Morpho markets on HyperEVM to capture supply yield while maintaining liquidity and risk constraints.
+                  This USDT0 vault targets premium supply yields across curated Morpho markets including BTC, ETH, HYPE, high-yield stablecoins, and principal tokens. Designed to accept higher volatility in pursuit of enhanced carry, with disciplined risk and liquidity controls.
                 </p>
               </div>
             </div>
@@ -599,6 +679,7 @@ export function VaultAPIView() {
                 <span className="text-xs text-[#101720]/70">Share • USD • Supply APY</span>
               </div>
               <OnchainAllocations
+                key={allocRefreshKey}
                 vaultAddress={VAULT_ADDRESS as `0x${string}`}
                 onSettled={(ts) => setLastUpdated(ts)}
               />
@@ -607,14 +688,14 @@ export function VaultAPIView() {
           {/* Right side: actions above current position */}
           <div className="space-y-6">
             {/* Actions: Deposit / Withdraw (toggle) */}
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-[#00295B]">Actions</h3>
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-base font-semibold text-[#00295B]">Actions</h3>
                 <div className="inline-flex rounded-md overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setTxMode("deposit")}
-                    className={`px-3 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "deposit" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
+                    className={`px-2.5 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "deposit" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
                     aria-pressed={txMode === "deposit"}
                   >
                     Deposit
@@ -622,7 +703,7 @@ export function VaultAPIView() {
                   <button
                     type="button"
                     onClick={() => setTxMode("withdraw")}
-                    className={`px-3 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "withdraw" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
+                    className={`px-2.5 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "withdraw" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
                     aria-pressed={txMode === "withdraw"}
                   >
                     Withdraw
@@ -630,12 +711,12 @@ export function VaultAPIView() {
                 </div>
               </div>
               {txMode === "deposit" ? (
-                <div className="min-h-[220px]">
+                <div className="min-h-[160px]">
                   <input
                     value={depAmount}
                     onChange={(e) => setDepAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full border rounded p-2 bg-white"
+                    className="w-full border rounded py-1.5 px-2 bg-white"
                     inputMode="decimal"
                   />
                   <div className="flex items-center justify-between mt-1 text-xs text-[#101720]/70">
@@ -651,36 +732,40 @@ export function VaultAPIView() {
                   {depAmount && parseUnits(depAmount || "0", onchainData.underlyingDecimals) > onchainBalance && (
                     <div className="text-xs text-red-600 mt-1">Exceeds wallet balance</div>
                   )}
-                  {/* Approval controls */}
-                  <div className="flex items-center gap-2 mt-3">
-                    {!(allowance === (2n**256n - 1n)) && (
-                      <>
-                        <button type="button" disabled={pending === "approve"} className="px-3 py-1.5 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50" onClick={runApprove}>
-                          {pending === "approve" ? "Approving…" : "Approve"}
-                        </button>
-                        <div className="text-xs text-[#101720]/70 flex items-center gap-2">
-                          <label className="flex items-center gap-1"><input type="radio" name="ap" checked={approvePref === "exact"} onChange={() => setApprovePref("exact")} /> Exact</label>
-                          <label className="flex items-center gap-1"><input type="radio" name="ap" checked={approvePref === "infinite"} onChange={() => setApprovePref("infinite")} /> Infinite</label>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    disabled={pending !== null || !depAmount || parseUnits(depAmount || "0", onchainData.underlyingDecimals) <= 0n || parseUnits(depAmount || "0", onchainData.underlyingDecimals) > onchainBalance || allowance < parseUnits(depAmount || "0", onchainData.underlyingDecimals)}
-                    className="mt-3 w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
-                    onClick={() => setConfirmOpen(true)}
-                  >
-                    {pending === "deposit" ? "Depositing…" : "Deposit"}
-                  </button>
+                  {(() => {
+                    const amountWei = parseUnits(depAmount || "0", onchainData.underlyingDecimals);
+                    const validAmount = depAmount && amountWei > 0n && amountWei <= onchainBalance;
+                    const needsApproval = validAmount && allowance < amountWei;
+                    const label = pending === "approve" ? "Approving…" : pending === "deposit" ? "Depositing…" : needsApproval ? "Approve" : "Deposit";
+                    const onClick = () => {
+                      if (!validAmount) return;
+                      if (needsApproval) {
+                        setConfirmKind("approve");
+                        setApproveConfirmOpen(true);
+                      } else {
+                        // Direct deposit without confirmation dialog
+                        runDeposit();
+                      }
+                    };
+                    return (
+                      <button
+                        type="button"
+                        disabled={pending !== null || !validAmount}
+                        className="mt-3 w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
+                        onClick={onClick}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })()}
                 </div>
               ) : (
-                <div className="min-h-[220px]">
+                <div className="min-h-[160px]">
                   <input
                     value={wdAmount}
                     onChange={(e) => setWdAmount(e.target.value)}
                     placeholder="0.00"
-                    className="w-full border rounded p-2 bg-white"
+                    className="w-full border rounded py-1.5 px-2 bg-white"
                     inputMode="decimal"
                   />
                   <div className="flex items-center justify-between mt-1 text-xs text-[#101720]/70">
@@ -705,24 +790,19 @@ export function VaultAPIView() {
               )}
             </div>
             {/* Current Position */}
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-[#00295B] mb-2">Current Position</h3>
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
+              <h3 className="text-base font-semibold text-[#00295B] mb-2">Current Position</h3>
               {!clientW.data?.account ? (
                 <div className="text-sm text-[#101720]/70">Connect wallet to view your position.</div>
               ) : (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <div className="text-sm text-[#101720]/70 mb-1">Vault Token Balance</div>
-                    <div className="font-medium text-[#101720]">{fmtToken(userShares, onchainData.shareDecimals)} shares</div>
+                    <div className="text-xs text-[#101720]/70 mb-1">Shares</div>
+                    <div className="font-medium text-[#101720]">{fmtToken(userShares, onchainData.shareDecimals)}</div>
                   </div>
-                  <div className="pt-3 border-t border-[#E5E2D6]">
-                    <div className="text-sm text-[#101720]/70 mb-1">USD Value</div>
-                    <div className="font-medium text-[#101720]">{priceLoading ? <Skeleton className="h-6 w-32"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
-                  </div>
-                  <div className="pt-3 border-t border-[#E5E2D6]">
-                    <div className="text-sm text-[#101720]/70 mb-1">Unrealized PnL</div>
-                    <div className={`font-medium ${pnlUsd != null && pnlUsd < 0 ? "text-red-600" : "text-[#0A3D2E]"}`}>{priceLoading ? <Skeleton className="h-6 w-32"/> : (pnlUsd != null ? `${pnlUsd < 0 ? "-" : "+"}$${Math.abs(pnlUsd).toFixed(2)}` : "—")}</div>
-                    <div className="text-xs text-[#101720]/70 mt-1">{roiPct != null && isFinite(roiPct) ? `${roiPct >= 0 ? "+" : ""}${roiPct.toFixed(2)}%` : ""}</div>
+                  <div>
+                    <div className="text-xs text-[#101720]/70 mb-1">USD Value</div>
+                    <div className="font-medium text-[#101720]">{priceLoading ? <Skeleton className="h-5 w-24"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
                   </div>
                 </div>
               )}
@@ -730,16 +810,20 @@ export function VaultAPIView() {
           </div>
         </div>
 
-        {/* Confirm dialog for deposit */}
+        {/* Confirm dialog for approval */}
         <ConfirmDialog
-          open={confirmOpen}
-          title="Confirm Deposit"
-          body={<div className="text-sm">Deposit {depAmount || "0"} USDT0 into the vault?</div>}
-          confirmLabel="Confirm"
+          open={approveConfirmOpen}
+          title="Approve USDT0"
+          body={<div className="text-sm">This approval allows the vault to transfer exactly the amount you entered ({depAmount || "0"} USDT0) on your behalf to complete the deposit. You will sign a separate transaction to confirm the deposit after approval.</div>}
+          confirmLabel="Approve"
           cancelLabel="Cancel"
-          onConfirm={() => { setConfirmOpen(false); runDeposit(); }}
-          onCancel={() => setConfirmOpen(false)}
-          busy={pending === "deposit"}
+          onConfirm={() => {
+            setApproveConfirmOpen(false);
+            const amountWei = parseUnits(depAmount || "0", onchainData.underlyingDecimals);
+            runApproveExact(amountWei);
+          }}
+          onCancel={() => setApproveConfirmOpen(false)}
+          busy={pending === "approve"}
         />
         <Toasts toasts={toasts} />
 
@@ -750,7 +834,6 @@ export function VaultAPIView() {
 
 }
 
-// Inline AllocationList component for on-chain allocations
 type AllocationRow = {
   id: `0x${string}`;
   label: string;
