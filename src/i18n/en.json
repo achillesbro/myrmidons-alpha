@@ -1,0 +1,58 @@
+{
+  "brand": "Myrmidons Strategies",
+  "tabs": { "user": "User Position", "vault": "Vault Information", "about": "About" },
+  "common": {
+    "lastUpdated": "Updated {{timeAgo}} ago"
+  },
+  "vaultInfo": {
+    "about": {
+      "title": "About",
+      "body": "MYRMIDONS USDT0 PHALANX allocates liquidity across selected Morpho markets on HyperEVM to capture yield while respecting strict risk limits."
+    },
+    "metrics": {
+      "title": "Key metrics",
+      "tvlUsd": "TVL (USD)",
+      "sharePrice": "Share price (USD)",
+      "yield": "Current APY",
+      "yieldHint": "APY is computed on-chain and may vary.",
+      "performanceFee": "Performance fee",
+      "recipient": "Recipient"
+    },
+    "allocations": {
+      "title": "Allocations",
+      "columns": {
+        "market": "Market",
+        "share": "Share",
+        "usd": "USD",
+        "supplyApy": "Supply APY"
+      },
+      "otherDust": "Other (dust)",
+      "loading": "Loading allocations…",
+      "error": "Failed to load allocations: {{error}}",
+      "empty": "No allocations found."
+    },
+    "actions": {
+      "title": "Actions",
+      "deposit": "Deposit",
+      "withdraw": "Withdraw",
+      "placeholderAmount": "0.00",
+      "balance": "Balance",
+      "max": "Max",
+      "exceedsBalance": "Amount exceeds balance",
+      "approving": "Approving…",
+      "depositing": "Depositing…",
+      "approve": "Approve",
+      "maxWithdrawable": "Max withdrawable",
+      "withdrawing": "Withdrawing…",
+      "approveTitle": "Approve {{symbol}}",
+      "approveBody": "Approve {{amount}} {{symbol}} for the vault to spend.",
+      "cancel": "Cancel"
+    },
+    "position": {
+      "title": "Current position",
+      "connectToView": "Connect your wallet to view your position.",
+      "shares": "Vault shares",
+      "usdValue": "USD value"
+    }
+  }
+}

@@ -22,6 +22,7 @@ import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain"
 
 // Simple error boundary to isolate rendering errors in the API View
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; err?: Error }>{
   constructor(props: { children: React.ReactNode }) {
@@ -48,12 +49,23 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 }
 
 import { getUsdt0Usd } from "../lib/prices"; // keeping current util; tooltips/UX polish below
+import { ChainVaultGuard } from "./ChainVaultGuard";
+
+// Allowed vaults per chain (checksum addresses)
+const ALLOWED_VAULTS: Record<number, readonly `0x${string}`[]> = {
+  999: [
+    "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42", // HyperEVM MYRMIDONS USDT0 PHALANX
+  ],
+  // 8453: ["0x..."], // Example for Base if needed later
+} as const;
 
 
-export function VaultAPIView() {
+
+export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` }) {
   // UX: last refresh timestamp for data shown on this page
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [, setTimeAgoTick] = useState<number>(0);
+  const { t } = useTranslation();
   useEffect(() => {
     if (lastUpdated == null) return;
     const id = setInterval(() => setTimeAgoTick((x) => x + 1), 1000);
@@ -68,10 +80,14 @@ export function VaultAPIView() {
       : seconds < 3600
         ? `${Math.floor(seconds / 60)}m`
         : `${Math.floor(seconds / 3600)}h`;
-    return <span className="text-xs text-[#101720]/60">Last updated {parts} ago</span>;
+    return (
+      <span className="text-xs text-[#101720]/60">
+        {t("common.lastUpdated", { defaultValue: "Last updated {{timeAgo}} ago", timeAgo: parts })}
+      </span>
+    );
   };
   // If using HyperEVM (chainId 999), fetch vault data on-chain instead of via GraphQL
-  const VAULT_ADDRESS = "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42";
+  const VAULT_ADDRESS = (vaultAddress ?? "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42") as `0x${string}`;
 
   // Reset on address change so we refetch everything cleanly
   useEffect(() => {
@@ -587,21 +603,30 @@ export function VaultAPIView() {
               </div>
               {/* Right: About */}
               <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-2 text-[#00295B]">About</h3>
+                <h3 className="text-lg font-semibold mb-2 text-[#00295B]">
+                  {t("vaultInfo.about.title", { defaultValue: "About" })}
+                </h3>
                 <p className="text-[#101720]/80 text-sm">
-                  This USDT0 vault targets premium supply yields across curated Morpho markets including BTC, ETH, HYPE, high-yield stablecoins, and principal tokens. Designed to accept higher volatility in pursuit of enhanced carry, with disciplined risk and liquidity controls.
+                  {t("vaultInfo.about.body", {
+                    defaultValue:
+                      "MYRMIDONS USDT0 PHALANX allocates liquidity across selected Morpho markets on HyperEVM to capture yield while respecting strict risk limits."
+                  })}
                 </p>
               </div>
             </div>
             {/* Metrics: TVL / Underlying / Yield / Performance Fee */}
             <div>
               <div className="flex items-center justify-between">
-                <div className="text-sm font-medium text-[#00295B]">Metrics</div>
+                <div className="text-sm font-medium text-[#00295B]">
+                  {t("vaultInfo.metrics.title", { defaultValue: "Metrics" })}
+                </div>
                 {renderTimeAgo()}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
-                  <p className="text-[#101720]/70 text-xs">TVL (USD)</p>
+                  <p className="text-[#101720]/70 text-xs">
+                    {t("vaultInfo.metrics.tvlUsd", { defaultValue: "TVL (USD)" })}
+                  </p>
                   <p className="text-xl font-semibold mt-1 text-[#101720]">
                     {priceLoading ? (
                       "Loading…"
@@ -613,7 +638,9 @@ export function VaultAPIView() {
                   </p>
                 </div>
                 <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
-                  <p className="text-[#101720]/70 text-xs">Share Price</p>
+                  <p className="text-[#101720]/70 text-xs">
+                    {t("vaultInfo.metrics.sharePrice", { defaultValue: "Share price (USD)" })}
+                  </p>
                   <p className="text-xl font-semibold mt-1 text-[#101720]">
                     {(() => {
                       // Compute share price = (assets/shares) * underlying USD, aligning decimals
@@ -628,7 +655,9 @@ export function VaultAPIView() {
                   </p>
                 </div>
                 <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
-                  <p className="text-[#101720]/70 text-xs">Yield</p>
+                  <p className="text-[#101720]/70 text-xs">
+                    {t("vaultInfo.metrics.yield", { defaultValue: "Current APY" })}
+                  </p>
                   <p className="text-xl font-semibold mt-1 text-[#101720]">
                     {apyLoading ? (
                       "Computing…"
@@ -640,10 +669,14 @@ export function VaultAPIView() {
                       "N/A"
                     )}
                   </p>
-                  <p className="text-[#101720]/60 text-xs mt-1">Blended APY by allocation</p>
+                  <p className="text-[#101720]/60 text-xs mt-1">
+                    {t("vaultInfo.metrics.yieldHint", { defaultValue: "Blended APY by allocation" })}
+                  </p>
                 </div>
                 <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
-                  <p className="text-[#101720]/70 text-xs">Performance Fee</p>
+                  <p className="text-[#101720]/70 text-xs">
+                    {t("vaultInfo.metrics.performanceFee", { defaultValue: "Performance fee" })}
+                  </p>
                   <p className="text-xl font-semibold mt-1 text-[#101720]">
                     {feeLoading ? (
                       "Loading…"
@@ -656,7 +689,9 @@ export function VaultAPIView() {
                     )}
                   </p>
                   <p className="text-[#101720]/60 text-xs mt-1">
-                    Recipient: {feeRecipient ? (
+                    {t("vaultInfo.metrics.recipient", { defaultValue: "Recipient" })}:
+                    {" "}
+                    {feeRecipient ? (
                       <a
                         href={`https://purrsec.com/address/${feeRecipient}`}
                         target="_blank"
@@ -675,8 +710,12 @@ export function VaultAPIView() {
             {/* Allocations */}
             <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-[#00295B]">Allocations</h3>
-                <span className="text-xs text-[#101720]/70">Share • USD • Supply APY</span>
+                <h3 className="text-lg font-semibold text-[#00295B]">
+                  {t("vaultInfo.allocations.title", { defaultValue: "Allocations" })}
+                </h3>
+                <span className="text-xs text-[#101720]/70">
+                  {t("vaultInfo.allocations.caption", { defaultValue: "Share • USD • Supply APY" })}
+                </span>
               </div>
               <OnchainAllocations
                 key={allocRefreshKey}
@@ -687,121 +726,154 @@ export function VaultAPIView() {
           </div>
           {/* Right side: actions above current position */}
           <div className="space-y-6">
-            {/* Actions: Deposit / Withdraw (toggle) */}
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-base font-semibold text-[#00295B]">Actions</h3>
-                <div className="inline-flex rounded-md overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setTxMode("deposit")}
-                    className={`px-2.5 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "deposit" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
-                    aria-pressed={txMode === "deposit"}
-                  >
-                    Deposit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTxMode("withdraw")}
-                    className={`px-2.5 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "withdraw" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
-                    aria-pressed={txMode === "withdraw"}
-                  >
-                    Withdraw
-                  </button>
-                </div>
-              </div>
-              {txMode === "deposit" ? (
-                <div className="min-h-[160px]">
-                  <input
-                    value={depAmount}
-                    onChange={(e) => setDepAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full border rounded py-1.5 px-2 bg-white"
-                    inputMode="decimal"
-                  />
-                  <div className="flex items-center justify-between mt-1 text-xs text-[#101720]/70">
-                    <div>Balance: {fmtToken(onchainBalance, onchainData.underlyingDecimals)} USDT0</div>
+            <ChainVaultGuard
+              requiredChainId={999}
+              requiredChainName="HyperEVM"
+              vaultAddress={VAULT_ADDRESS as `0x${string}`}
+              allowedVaultsByChain={ALLOWED_VAULTS}
+              warnOnly={false}
+            >
+              {/* Actions: Deposit / Withdraw (toggle) */}
+              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-base font-semibold text-[#00295B]">
+                    {t("vaultInfo.actions.title", { defaultValue: "Actions" })}
+                  </h3>
+                  <div className="inline-flex rounded-md overflow-hidden">
                     <button
                       type="button"
-                      className="px-2 py-0.5 text-xs border rounded"
-                      onClick={() => setDepAmount(formatUnits(onchainBalance, onchainData.underlyingDecimals))}
+                      onClick={() => setTxMode("deposit")}
+                      className={`px-2.5 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "deposit" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
+                      aria-pressed={txMode === "deposit"}
                     >
-                      Max
+                      {t("vaultInfo.actions.deposit", { defaultValue: "Deposit" })}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTxMode("withdraw")}
+                      className={`px-2.5 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "withdraw" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
+                      aria-pressed={txMode === "withdraw"}
+                    >
+                      {t("vaultInfo.actions.withdraw", { defaultValue: "Withdraw" })}
                     </button>
                   </div>
-                  {depAmount && parseUnits(depAmount || "0", onchainData.underlyingDecimals) > onchainBalance && (
-                    <div className="text-xs text-red-600 mt-1">Exceeds wallet balance</div>
-                  )}
-                  {(() => {
-                    const amountWei = parseUnits(depAmount || "0", onchainData.underlyingDecimals);
-                    const validAmount = depAmount && amountWei > 0n && amountWei <= onchainBalance;
-                    const needsApproval = validAmount && allowance < amountWei;
-                    const label = pending === "approve" ? "Approving…" : pending === "deposit" ? "Depositing…" : needsApproval ? "Approve" : "Deposit";
-                    const onClick = () => {
-                      if (!validAmount) return;
-                      if (needsApproval) {
-                        setConfirmKind("approve");
-                        setApproveConfirmOpen(true);
-                      } else {
-                        // Direct deposit without confirmation dialog
-                        runDeposit();
-                      }
-                    };
-                    return (
+                </div>
+                {txMode === "deposit" ? (
+                  <div className="min-h-[160px]">
+                    <input
+                      value={depAmount}
+                      onChange={(e) => setDepAmount(e.target.value)}
+                      placeholder={t("vaultInfo.actions.placeholderAmount", { defaultValue: "0.00" })}
+                      className="w-full border rounded py-1.5 px-2 bg-white"
+                      inputMode="decimal"
+                    />
+                    <div className="flex items-center justify-between mt-1 text-xs text-[#101720]/70">
+                      <div>
+                        {t("vaultInfo.actions.balance", { defaultValue: "Balance" })}: {fmtToken(onchainBalance, onchainData.underlyingDecimals)} USDT0
+                      </div>
                       <button
                         type="button"
-                        disabled={pending !== null || !validAmount}
-                        className="mt-3 w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
-                        onClick={onClick}
+                        className="px-2 py-0.5 text-xs border rounded"
+                        onClick={() => setDepAmount(formatUnits(onchainBalance, onchainData.underlyingDecimals))}
                       >
-                        {label}
+                        {t("vaultInfo.actions.max", { defaultValue: "Max" })}
                       </button>
-                    );
-                  })()}
-                </div>
-              ) : (
-                <div className="min-h-[160px]">
-                  <input
-                    value={wdAmount}
-                    onChange={(e) => setWdAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full border rounded py-1.5 px-2 bg-white"
-                    inputMode="decimal"
-                  />
-                  <div className="flex items-center justify-between mt-1 text-xs text-[#101720]/70">
-                    <div>Max withdrawable: {fmtToken(userAssets, onchainData.underlyingDecimals)} USDT0</div>
+                    </div>
+                    {depAmount && parseUnits(depAmount || "0", onchainData.underlyingDecimals) > onchainBalance && (
+                      <div className="text-xs text-red-600 mt-1">
+                        {t("vaultInfo.actions.exceedsBalance", { defaultValue: "Exceeds wallet balance" })}
+                      </div>
+                    )}
+                    {(() => {
+                      const amountWei = parseUnits(depAmount || "0", onchainData.underlyingDecimals);
+                      const validAmount = depAmount && amountWei > 0n && amountWei <= onchainBalance;
+                      const needsApproval = validAmount && allowance < amountWei;
+                      const label =
+                        pending === "approve"
+                          ? t("vaultInfo.actions.approving", { defaultValue: "Approving…" })
+                          : pending === "deposit"
+                          ? t("vaultInfo.actions.depositing", { defaultValue: "Depositing…" })
+                          : needsApproval
+                          ? t("vaultInfo.actions.approve", { defaultValue: "Approve" })
+                          : t("vaultInfo.actions.deposit", { defaultValue: "Deposit" });
+                      const onClick = () => {
+                        if (!validAmount) return;
+                        if (needsApproval) {
+                          setConfirmKind("approve");
+                          setApproveConfirmOpen(true);
+                        } else {
+                          // Direct deposit without confirmation dialog
+                          runDeposit();
+                        }
+                      };
+                      return (
+                        <button
+                          type="button"
+                          disabled={pending !== null || !validAmount}
+                          className="mt-3 w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
+                          onClick={onClick}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div className="min-h-[160px]">
+                    <input
+                      value={wdAmount}
+                      onChange={(e) => setWdAmount(e.target.value)}
+                      placeholder={t("vaultInfo.actions.placeholderAmount", { defaultValue: "0.00" })}
+                      className="w-full border rounded py-1.5 px-2 bg-white"
+                      inputMode="decimal"
+                    />
+                    <div className="flex items-center justify-between mt-1 text-xs text-[#101720]/70">
+                      <div>
+                        {t("vaultInfo.actions.maxWithdrawable", { defaultValue: "Max withdrawable" })}: {fmtToken(userAssets, onchainData.underlyingDecimals)} USDT0
+                      </div>
+                      <button
+                        type="button"
+                        className="px-2 py-0.5 text-xs border rounded"
+                        onClick={() => setWdAmount(formatUnits(userAssets, onchainData.underlyingDecimals))}
+                      >
+                        {t("vaultInfo.actions.max", { defaultValue: "Max" })}
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      className="px-2 py-0.5 text-xs border rounded"
-                      onClick={() => setWdAmount(formatUnits(userAssets, onchainData.underlyingDecimals))}
+                      disabled={pending !== null || !wdAmount || parseUnits(wdAmount || "0", onchainData.underlyingDecimals) <= 0n || parseUnits(wdAmount || "0", onchainData.underlyingDecimals) > userAssets}
+                      className="mt-3 w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
+                      onClick={() => runWithdraw(false)}
                     >
-                      Max
+                      {pending === "withdraw"
+                        ? t("vaultInfo.actions.withdrawing", { defaultValue: "Withdrawing…" })
+                        : t("vaultInfo.actions.withdraw", { defaultValue: "Withdraw" })}
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    disabled={pending !== null || !wdAmount || parseUnits(wdAmount || "0", onchainData.underlyingDecimals) <= 0n || parseUnits(wdAmount || "0", onchainData.underlyingDecimals) > userAssets}
-                    className="mt-3 w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
-                    onClick={() => runWithdraw(false)}
-                  >
-                    {pending === "withdraw" ? "Withdrawing…" : "Withdraw"}
-                  </button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </ChainVaultGuard>
             {/* Current Position */}
             <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
-              <h3 className="text-base font-semibold text-[#00295B] mb-2">Current Position</h3>
+              <h3 className="text-base font-semibold text-[#00295B] mb-2">
+                {t("vaultInfo.position.title", { defaultValue: "Current position" })}
+              </h3>
               {!clientW.data?.account ? (
-                <div className="text-sm text-[#101720]/70">Connect wallet to view your position.</div>
+                <div className="text-sm text-[#101720]/70">
+                  {t("vaultInfo.position.connectToView", { defaultValue: "Connect your wallet to view your position." })}
+                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-[#101720]/70 mb-1">Shares</div>
+                    <div className="text-xs text-[#101720]/70 mb-1">
+                      {t("vaultInfo.position.shares", { defaultValue: "Vault shares" })}
+                    </div>
                     <div className="font-medium text-[#101720]">{fmtToken(userShares, onchainData.shareDecimals)}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-[#101720]/70 mb-1">USD Value</div>
+                    <div className="text-xs text-[#101720]/70 mb-1">
+                      {t("vaultInfo.position.usdValue", { defaultValue: "USD value" })}
+                    </div>
                     <div className="font-medium text-[#101720]">{priceLoading ? <Skeleton className="h-5 w-24"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
                   </div>
                 </div>
@@ -813,10 +885,19 @@ export function VaultAPIView() {
         {/* Confirm dialog for approval */}
         <ConfirmDialog
           open={approveConfirmOpen}
-          title="Approve USDT0"
-          body={<div className="text-sm">This approval allows the vault to transfer exactly the amount you entered ({depAmount || "0"} USDT0) on your behalf to complete the deposit. You will sign a separate transaction to confirm the deposit after approval.</div>}
-          confirmLabel="Approve"
-          cancelLabel="Cancel"
+          title={t("vaultInfo.actions.approveTitle", { defaultValue: "Approve {{symbol}}", symbol: "USDT0" })}
+          body={
+            <div className="text-sm">
+              {t("vaultInfo.actions.approveBody", {
+                defaultValue:
+                  "This approval allows the vault to transfer exactly the amount you entered ({{amount}} {{symbol}}) on your behalf to complete the deposit. You will sign a separate transaction to confirm the deposit after approval.",
+                amount: depAmount || "0",
+                symbol: "USDT0"
+              })}
+            </div>
+          }
+          confirmLabel={t("vaultInfo.actions.approve", { defaultValue: "Approve" })}
+          cancelLabel={t("vaultInfo.actions.cancel", { defaultValue: "Cancel" })}
           onConfirm={() => {
             setApproveConfirmOpen(false);
             const amountWei = parseUnits(depAmount || "0", onchainData.underlyingDecimals);
@@ -855,6 +936,7 @@ function AllocationList({
   hiddenDust?: bigint | null;
   decimals?: number;
 }) {
+  const { t } = useTranslation();
   const ceilPct = (n: number) => Math.max(0, Math.min(100, Math.ceil(n)));
   const pctOf = (v?: bigint | null) =>
     v != null && totalAssets !== 0n
@@ -864,10 +946,10 @@ function AllocationList({
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-12 text-xs text-[#101720]/70 pb-2 border-b border-[#E5E2D6]">
-        <div className="col-span-5">Market</div>
-        <div className="col-span-3 text-right">Share</div>
-        <div className="col-span-2 text-right">USD</div>
-        <div className="col-span-2 text-right">Supply APY</div>
+        <div className="col-span-5">{t("vaultInfo.allocations.columns.market", { defaultValue: "Market" })}</div>
+        <div className="col-span-3 text-right">{t("vaultInfo.allocations.columns.share", { defaultValue: "Share" })}</div>
+        <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.usd", { defaultValue: "USD" })}</div>
+        <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.supplyApy", { defaultValue: "Supply APY" })}</div>
       </div>
 
       {items.map((it) => (
@@ -902,7 +984,9 @@ function AllocationList({
       {/* Hidden dust row (filtered allocations) */}
       {hiddenDust != null && hiddenDust > 0n && (
         <div className="grid grid-cols-12 items-center py-2">
-          <div className="col-span-5 font-medium">Other (dust)</div>
+          <div className="col-span-5 font-medium">
+            {t("vaultInfo.allocations.otherDust", { defaultValue: "Other (dust)" })}
+          </div>
           <div className="col-span-3 text-right text-[#101720]">
             {pctOf(hiddenDust) ? `${pctOf(hiddenDust)}%` : "—"}
           </div>
@@ -915,6 +999,7 @@ function AllocationList({
 }
 
 function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${string}`; onSettled?: (ts: number) => void }) {
+  const { t } = useTranslation();
   const { items, totalAssets, hiddenDust, loading, error } = useVaultAllocationsOnchain(vaultAddress);
 
   useEffect(() => {
@@ -923,9 +1008,9 @@ function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${st
     }
   }, [loading, onSettled]);
 
-  if (loading) return <p className="text-sm text-[#101720]/70">Loading allocations…</p>;
-  if (error) return <p className="text-sm text-red-500">Error: {error}</p>;
-  if (!items || totalAssets === null) return <p className="text-sm text-[#101720]/70">No allocation data.</p>;
+  if (loading) return <p className="text-sm text-[#101720]/70">{t("vaultInfo.allocations.loading", { defaultValue: "Loading allocations…" })}</p>;
+  if (error) return <p className="text-sm text-red-500">{t("vaultInfo.allocations.error", { defaultValue: "Failed to load allocations: {{error}}", error })}</p>;
+  if (!items || totalAssets === null) return <p className="text-sm text-[#101720]/70">{t("vaultInfo.allocations.empty", { defaultValue: "No allocations found." })}</p>;
 
   return (
     <AllocationList

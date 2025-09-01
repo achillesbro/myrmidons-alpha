@@ -22,6 +22,8 @@ import { apolloClient } from "./service/apollo.client";
 import { VaultAPIView } from "./components/vault-api-view";
 import { AboutView } from "./components/about-view";
 import { SiteFooter } from "./components/site-footer";
+import { useTranslation } from 'react-i18next'
+import i18n from "./i18n";
 
 const DEFAULT_VAULT: Address = "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42";
 
@@ -61,6 +63,8 @@ const TestInterface = () => {
   // `vaultAddress` is validated to be an Address
   const [vaultAddress, setVaultAddress] = useState(DEFAULT_VAULT);
 
+  const { t } = useTranslation();
+
   useEffect(() => {
     if (vaultAddressInput.length >= 42) {
       if (isAddress(vaultAddressInput, { strict: false })) {
@@ -95,13 +99,25 @@ const TestInterface = () => {
     return () => window.removeEventListener("popstate", onPop);
   }, [activeTab]);
 
+  useEffect(() => {
+    const page = activeTab === "VAULTINFO" ? t('tabs.vaultInfo') : t('tabs.about');
+    document.title = `${t('brand')} — ${page}`;
+  }, [activeTab, t]);
+
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
       {/* Full-width top band */}
       <div className="w-full bg-[var(--text)]">
-        <div className="max-w-7xl mx-auto flex justify-between items-center py-4 px-6">
-          <h1 className="text-3xl font-bold !text-[var(--bg)]">Myrmidons Strategies</h1>
-          <div>
+        <div className="max-w-7xl mx-auto flex justify-between items-center h-20 px-6 overflow-hidden">
+          <div className="flex items-center gap-3">
+            <img
+              src="/myrmidons-creamy.png"
+              alt="Myrmidons Strategies logo"
+              className="h-20 w-auto select-none"
+            />
+            <h1 className="text-3xl font-bold !text-[var(--bg)]">{t('brand')}</h1>
+          </div>
+          <div className="flex items-center gap-3">
             <ConnectButton />
           </div>
         </div>
@@ -122,7 +138,7 @@ const TestInterface = () => {
                     : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
                 }`}
               >
-                Vault Information
+                {t('tabs.vault')}
               </button>
               <button
                 aria-pressed={activeTab === "ABOUT"}
@@ -133,7 +149,7 @@ const TestInterface = () => {
                     : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
                 }`}
               >
-                About
+                {t('tabs.about')}
               </button>
             </div>
 
@@ -152,7 +168,7 @@ const TestInterface = () => {
 
 // Configuration for your app (Wagmi, RainbowKit, React Query, etc.)
 const config = getDefaultConfig({
-  appName: "Test Wagmi Interface",
+  appName: i18n.t('brand'),
   projectId: "841b6ddde2826ce0acf2d1b1f81f8582",
   chains: [
     //mainnet, 

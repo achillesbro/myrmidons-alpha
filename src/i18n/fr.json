@@ -1,0 +1,144 @@
+{
+  "brand": "Myrmidons Strategies",
+  "tabs": {
+    "user": "Position",
+    "vault": "Informations du Vault",
+    "about": "À propos"
+  },
+
+  "common": {
+    "lastUpdated": "Mis à jour il y a {{timeAgo}}"
+  },
+
+  "vaultInfo": {
+    "about": {
+      "title": "À propos",
+      "body": "MYRMIDONS USDT0 PHALANX réparti des liquidités sur des marchés Morpho sur l'HyperEVM afin de capter un rendement tout en respectant des contraintes de risque exigeantes."
+    },
+    "metrics": {
+      "title": "Indicateurs clés",
+      "tvlUsd": "Encours total (USD)",
+      "sharePrice": "Prix de part (USD)",
+      "yield": "Rendement actuel",
+      "yieldHint": "Le rendement est calculé on‑chain et peut varier.",
+      "performanceFee": "Commission de performance",
+      "recipient": "Bénéficiaire"
+    },
+    "allocations": {
+      "title": "Répartition",
+      "columns": {
+        "market": "Marché",
+        "share": "Part",
+        "usd": "USD",
+        "supplyApy": "APY de dépôt"
+      },
+      "otherDust": "Autres (montants négligeables)",
+      "loading": "Chargement des allocations…",
+      "error": "Échec du chargement des allocations : {{error}}",
+      "empty": "Aucune allocation."
+    },
+    "actions": {
+      "title": "Opérations",
+      "deposit": "Déposer",
+      "withdraw": "Retirer",
+      "placeholderAmount": "0,00",
+      "balance": "Solde",
+      "max": "Max",
+      "exceedsBalance": "Montant supérieur au solde",
+      "approving": "Approbation…",
+      "depositing": "Dépôt…",
+      "approve": "Approuver",
+      "maxWithdrawable": "Retrait maximal",
+      "withdrawing": "Retrait…",
+      "approveTitle": "Approuver {{symbol}}",
+      "approveBody": "Autoriser le dépôt de {{amount}} {{symbol}}.",
+      "cancel": "Annuler"
+    },
+    "position": {
+      "title": "Position actuelle",
+      "connectToView": "Connecter un wallet pour afficher la position.",
+      "shares": "Parts du Vault",
+      "usdValue": "Valeur USD"
+    }
+  },
+
+  "aboutView": {
+    "title": "À propos de Myrmidons Strategies",
+    "motto": "« L’excellence forgée dans la chaleur du combat. »",
+    "p1": "Myrmidons Strategies déploie des stratégies d’investissement sur les actifs cryptographiques, avec une attention particulière sur l’écosystème Hyperliquid.",
+    "p2": "L’ambition est d’offrir une exposition diversifiée et sélectionnée à la DeFi via des Vaults ERC‑4626, afin de maximiser le rendement ajusté du risque tout en conservant une discipline rigoureuse de gestion et de transparence. La plateforme s’adresse autant aux praticiens aguerris qu’aux nouveaux entrants.",
+    "bullets": {
+      "curated": "Sélection de cryptoactifs dans un univers DeFi.",
+      "hyperliquid": "Univers d’opportunités centré sur Hyperliquid.",
+      "risk": "Ingénierie et suivi avec primauté du risque."
+    },
+    "how": {
+      "title": "Comment déposer",
+      "checklist": {
+        "title": "Check‑list opérationnelle (wallet et fonds prêts)",
+        "items": {
+          "1": "Connecter un wallet compatible.",
+          "2": "Renseigner le montant souhaité puis sélectionner « Déposer ».",
+          "3": "Approuver le cryptoactif sous‑jacent du Vault.",
+          "4": "Confirmer à nouveau dans le wallet et attendre la confirmation on‑chain du dépôt."
+        }
+      },
+      "onboarding": {
+        "title": "Parcours d’onboarding (nouveaux en DeFi)",
+        "items": {
+          "1": "Acquérir des crypto‑actifs sur un exchange centralisé (ex. Binance, Coinbase, Kraken). ETH ou USDC sont des points de départ usuels.",
+          "2": {
+            "prefix": "Installer un wallet self‑custody. Recommandé : ",
+            "suffix": ". Télécharger uniquement depuis le site officiel pour éviter le phishing."
+          },
+          "3": "Transférer les actifs de l’exchange vers l’adresse du wallet. Des frais de réseau s’appliquent ; vérifier le bon réseau de destination.",
+          "4": {
+            "prefix": "Si nécessaire, utiliser un agrégateur réputé comme ",
+            "suffix": " pour bridge/swap vers le jeton sous‑jacent du Vault sur la bonne chaîne, puis revenir et connecter le wallet."
+          },
+          "5": "Approuver le jeton, saisir un montant et valider le dépôt. La position se met à jour après confirmation."
+        }
+      }
+    },
+    "fees": {
+      "title": "Frais",
+      "body": "Le Vault applique une commission de performance sur le rendement. Le taux en vigueur et le bénéficiaire sont affichés en temps réel sur la page « Informations du Vault » ; les valeurs font foi on‑chain."
+    },
+    "risks": {
+      "title": "Risques",
+      "items": {
+        "contract": "Risque de smart‑contract et risque protocolaire.",
+        "market": "Risque de marché et de liquidité des cryptoactifs.",
+        "infrastructure": "Dépendances d’infrastructure (chaîne/RPC) et indisponibilités potentielles.",
+        "operational": "Gestion des clés et risques opérationnels."
+      }
+    },
+    "faq": {
+      "title": "FAQ",
+      "q1": {
+        "title": "Comment fonctionnent les Vaults ERC‑4626 ?",
+        "p1": "Un Vault ERC‑4626 s’apparente à un fonds d’investissement ou à un ETF : les déposants apportent le cryptoactif sous‑jacent (ex. WHYPE ou USDT0) et reçoivent des parts représentant une propriété proportionnelle.",
+        "depositLabel": "Dépôts",
+        "deposit": "Le sous‑jacent est déposé et des parts sont émises à due proportion.",
+        "earningsLabel": "Gains",
+        "earnings": "À mesure que la stratégie performe, la valeur économique par part tend à augmenter. Le nombre de parts reste en général inchangé hors nouveaux dépôts/retraits.",
+        "withdrawalsLabel": "Retraits",
+        "withdrawals": "Des parts sont brûlées pour racheter le montant correspondant de sous‑jacent.",
+        "p2": "Exemple : un dépôt de 100 jetons avec ~5 % de performance positive se rachètera ultérieurement autour de 105 jetons (moins frais éventuels et arrondis). Une performance négative réduit la valeur de rachat.",
+        "p3": "L’APY est variable et dépend des conditions de marché et de l’allocation. La valeur de part reflète la performance du Vault dans le temps."
+      },
+      "q2": {
+        "title": "Quels wallets sont pris en charge ?",
+        "body": "MetaMask, Rabby, OKX (via RainbowKit)."
+      },
+      "q3": {
+        "title": "Quand l’APY est‑il mis à jour ?",
+        "body": "L’APY est directement calculé on‑chain ; il varie avec l’évolution des marchés et le rendement individuel de chaque sous‑jacent."
+      },
+      "q4": {
+        "title": "Comment retirer ?",
+        "body": "Les retraits s’effectuent depuis « Opérations » dans l'onglet Informations du Vault : saisir un montant ou choisir Max, puis confirmer dans le wallet."
+      }
+    }
+  }
+}

@@ -106,9 +106,10 @@ button[data-state="open"] {
   border-color: var(--text);
   color: var(--bg) !important;     /* #FFFFF5 */
 }
-button:focus,
+/* Use focus-visible only (no mouse-focus rings) */
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 3px solid var(--border-muted);
+  outline-offset: 2px;
 }
 
 /* Utilities to force heading/body fonts when needed */
@@ -169,4 +170,28 @@ button:focus-visible {
   .bg-slate-800 {
     background-color: var(--bg) !important;
   }
+}
+
+/* ==== Scoped fixes for LanguageSwitcher drop-up (remove per-item borders/rings) ==== */
+.lang-switcher [role="listbox"] button {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.lang-switcher [role="listbox"] button:hover {
+  box-shadow: none !important;
+}
+.lang-switcher [role="listbox"] button:focus,
+.lang-switcher [role="listbox"] button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.lang-switcher [role="listbox"] button::-moz-focus-inner {
+  border: 0 !important;
+}
+/* Ensure list items themselves don't get a generic card border */
+.lang-switcher [role="listbox"] li {
+  border: none !important;
 }
