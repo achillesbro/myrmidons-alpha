@@ -136,7 +136,7 @@ const TestInterface = () => {
                     : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
                 }`}
               >
-                {t('tabs.vault')}
+                {t('tabs.vaultInfo')}
               </button>
               <button
                 aria-pressed={activeTab === "ABOUT"}
