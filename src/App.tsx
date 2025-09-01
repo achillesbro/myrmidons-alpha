@@ -10,7 +10,7 @@ import { hyperEVM } from "./chains/hyperEVM";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "wagmi";
 import { useEffect, useState } from "react";
-import { Address, getAddress, Hex, isAddress } from "viem";
+import { Address, getAddress, isAddress } from "viem";
 import {
   metaMaskWallet,
   okxWallet,
@@ -57,9 +57,7 @@ function getInitialTab(): Tab {
 
 const TestInterface = () => {
   const [activeTab, setActiveTab] = useState<Tab>(() => getInitialTab());
-  // `vaultAddressInput` is whatever the user types in -- any length string as long as it's Hex
-  const [vaultAddressInput, setVaultAddressInput] =
-    useState<Hex>(DEFAULT_VAULT);
+  const [vaultAddressInput] = useState<string>(DEFAULT_VAULT);
   // `vaultAddress` is validated to be an Address
   const [vaultAddress, setVaultAddress] = useState(DEFAULT_VAULT);
 

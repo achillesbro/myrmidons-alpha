@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
 import {
   Address,
-  http,
   parseAbiItem,
   GetLogsReturnType,
 } from "viem";
 import { hyperPublicClient } from "../viem/clients";
-import { hyperEVM } from "../chains/hyperEVM";
 
 type OnchainTx = {
   hash: string;

@@ -9,7 +9,6 @@ import {
   fmtUsdSimple,
   friendlyError,
   Skeleton,
-  NET_FLOW_STORE_KEY,
   type Toast,
   type ToastKind,
 } from "./vault-shared";
@@ -32,7 +31,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, err: error };
   }
-  componentDidCatch(error: Error) {
+  componentDidCatch(_error: Error) {
     // no-op: could log to a service later
   }
   render() {
@@ -137,7 +136,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const [underlyingAddress, setUnderlyingAddress] = useState<`0x${string}` | null>(null);
   const [assetDecimals, setAssetDecimals] = useState<number>(18);
   // Approval confirmation dialog state
-  const [confirmKind, setConfirmKind] = useState<"approve" | null>(null);
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [allowance, setAllowance] = useState<bigint>(0n);
   const [onchainBalance, setOnchainBalance] = useState<bigint>(0n); // underlying token balance
@@ -161,7 +159,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   useEffect(() => {
     try { localStorage.setItem(TX_MODE_KEY, txMode); } catch {}
   }, [TX_MODE_KEY, txMode]);
-  const [netFlowWei, setNetFlowWei] = useState<bigint>(0n);
   useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -269,15 +266,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
     } catch {}
   };
 
-  useEffect(() => {
-    const user = clientW.data?.account?.address;
-    if (!user) { setNetFlowWei(0n); return; }
-    try {
-      const k = NET_FLOW_STORE_KEY(999, VAULT_ADDRESS, user);
-      const raw = localStorage.getItem(k);
-      setNetFlowWei(raw ? BigInt(raw) : 0n);
-    } catch { setNetFlowWei(0n); }
-  }, [clientW.data?.account?.address, VAULT_ADDRESS]);
 
   useEffect(() => {
     const user = clientW.data?.account?.address;
@@ -396,12 +384,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       await refreshVaultTotalsFast();
       setTimeout(() => { refreshVaultTotalsFast(); }, 2000);
 
-      // net flow update
-      try {
-        const k = NET_FLOW_STORE_KEY(999, VAULT_ADDRESS, clientW.data.account.address);
-        const current = (() => { try { return BigInt(localStorage.getItem(k) || "0"); } catch { return 0n; } })();
-        const next = current + amountWei; setNetFlowWei(next); try { localStorage.setItem(k, next.toString()); } catch {}
-      } catch {}
       setDepAmount("");
     } catch (e) {
       setPending(null);
@@ -416,17 +398,15 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       const signer = await provider.getSigner();
       const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
       setPending("withdraw");
-      let tx, withdrawnAssetsWei: bigint = 0n;
+      let tx: any;
       if (full) {
         const shares = await hyperPublicClient.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "balanceOf", args: [clientW.data.account.address] }) as bigint;
         const assetsOut = await hyperPublicClient.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "previewRedeem", args: [shares] }) as bigint;
         tx = await vault.withdraw(assetsOut, clientW.data.account.address, clientW.data.account.address);
-        withdrawnAssetsWei = assetsOut;
       } else {
         const amt = parseUnits(wdAmount, assetDecimals);
         if (amt <= 0n) throw new Error("Enter amount");
         tx = await vault.withdraw(amt, clientW.data.account.address, clientW.data.account.address);
-        withdrawnAssetsWei = amt;
       }
       pushToast("info", `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
       // Use wallet provider to wait for confirmation — typically faster than public RPCs
@@ -461,12 +441,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       await refreshVaultTotalsFast();
       setTimeout(() => { refreshVaultTotalsFast(); }, 2000);
 
-      // net flow update
-      try {
-        const k = NET_FLOW_STORE_KEY(999, VAULT_ADDRESS, clientW.data.account.address);
-        const current = (() => { try { return BigInt(localStorage.getItem(k) || "0"); } catch { return 0n; } })();
-        const next = current - withdrawnAssetsWei; setNetFlowWei(next); try { localStorage.setItem(k, next.toString()); } catch {}
-      } catch {}
       setWdAmount("");
     } catch (e) {
       setPending(null);
@@ -578,10 +552,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
     const tvlUsd = typeof usdPrice === "number" ? tvlUnits * usdPrice : undefined;
 
     const userUsd = typeof usdPrice === "number" ? Number(formatUnits(userAssets, onchainData.underlyingDecimals)) * usdPrice : undefined;
-    const investedUnits = Number(formatUnits(netFlowWei, onchainData.underlyingDecimals));
-    const investedUsd = typeof usdPrice === "number" ? investedUnits * usdPrice : undefined;
-    const pnlUsd = userUsd != null && investedUsd != null ? userUsd - investedUsd : undefined;
-    const roiPct = pnlUsd != null && investedUsd ? (pnlUsd / investedUsd) * 100 : undefined;
 
     return (
       <ErrorBoundary>
@@ -799,7 +769,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                       const onClick = () => {
                         if (!validAmount) return;
                         if (needsApproval) {
-                          setConfirmKind("approve");
                           setApproveConfirmOpen(true);
                         } else {
                           // Direct deposit without confirmation dialog
