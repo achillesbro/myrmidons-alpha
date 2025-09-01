@@ -13,7 +13,7 @@ import {
   type ToastKind,
 } from "./vault-shared";
 import { hyperPublicClient } from "../viem/clients";
-import vaultAbi from "../abis/Vault.json";
+import vaultAbi from "../abis/vault.json";
 import { useVaultCurrentApyOnchain } from "../hooks/useVaultCurrentApyOnchain";
 import { useState, useEffect, useRef } from "react";
 import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";

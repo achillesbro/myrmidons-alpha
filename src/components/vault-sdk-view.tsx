@@ -25,7 +25,7 @@ import { useHyperTxHistory } from "../hooks/useHyperTxHistory";
 //import { depositUsingBundler, withdrawUsingBundler } from "../service/actions";
 //import { Vault } from "@morpho-org/blue-sdk";
 import { BrowserProvider, Contract } from "ethers";
-import vaultAbi from "../abis/Vault.json";
+import vaultAbi from "../abis/vault.json";
 import { useTokenBalance } from "../hooks/useTokenBalance";
 // Minimal ERC-20 ABI for preview/limits & balances
 const erc20Abi = [
