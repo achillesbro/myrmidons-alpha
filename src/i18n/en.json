@@ -4,6 +4,17 @@
   "common": {
     "lastUpdated": "Updated {{timeAgo}} ago"
   },
+  "aboutView": {
+  "howNew": {
+    "setup": {
+      "items": {
+        "1": "Install a self-custodial wallet. Recommended: <rabby>Rabby Wallet</rabby>. Always download from the official site to avoid phishing.",
+        "2": "Create an account on a reputable exchange (recommended: <kraken>Kraken</kraken>) and purchase ETH.",
+        "5": "Bridge & swap using a trusted aggregator such as <jumper>Jumper Exchange</jumper>: swap from ETH on Arbitrum to USDT0 on HyperEVM (the vault’s underlying). Also bridge a small amount of HYPE (e.g., ~$10) for gas on HyperEVM."
+      }
+    }
+  }
+},
   "vaultInfo": {
     "about": {
       "title": "About",

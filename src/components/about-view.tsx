@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 export function AboutView() {
   const { t } = useTranslation();
   return (
@@ -33,66 +33,100 @@ export function AboutView() {
       {/* How to deposit (accordion) */}
       <details className="card overflow-hidden">
         <summary className="cursor-pointer select-none px-6 py-4 font-semibold text-[var(--heading)] border-b border-[var(--border)]">
-          {t("aboutView.how.title", { defaultValue: "How to deposit" })}
+          {t("aboutView.howNew.title", { defaultValue: "How to deposit" })}
         </summary>
-        <div className="p-6 space-y-5">
-          {/* Quick path for existing DeFi users */}
+        <div className="p-6 space-y-6 text-[var(--text)]">
+          {/* A) One‑time setup (first deposit) */}
           <div>
-            <h3 className="text-lg mb-2">
-              {t("aboutView.how.checklist.title", { defaultValue: "Operational checklist (wallet & funds ready)" })}
+            <h3 className="text-lg font-semibold text-[var(--heading)] mb-2">
+              {t("aboutView.howNew.setup.title", { defaultValue: "A) One‑time setup (first deposit)" })}
             </h3>
-            <ol className="list-decimal pl-5 space-y-1 text-[var(--text)]">
-              <li>{t("aboutView.how.checklist.items.1", { defaultValue: "Connect a compatible wallet." })}</li>
-              <li>{t("aboutView.how.checklist.items.2", { defaultValue: "Input the desired amount and select Deposit." })}</li>
-              <li>{t("aboutView.how.checklist.items.3", { defaultValue: "Approve the underlying token for the vault." })}</li>
-              <li>{t("aboutView.how.checklist.items.4", { defaultValue: "Confirm the transaction in the wallet and await confirmation." })}</li>
+            <ol className="list-decimal pl-5 space-y-2">
+              <li>
+                <Trans
+                  i18nKey="aboutView.howNew.setup.items.1"
+                  defaultValue="Install a self‑custodial wallet. Recommended: <rabby>Rabby Wallet</rabby>. Always download from the official site to avoid phishing."
+                  components={{
+                    rabby: (
+                      <a
+                        className="link underline"
+                        href="https://rabby.io/"
+                        target="_blank"
+                        rel="noreferrer"
+                      />
+                    ),
+                  }}
+                />
+              </li>
+              <li>
+                <Trans
+                  i18nKey="aboutView.howNew.setup.items.2"
+                  defaultValue="Create an account on a reputable exchange (recommended: <kraken>Kraken</kraken>) and purchase ETH."
+                  components={{
+                    kraken: (
+                      <a
+                        className="link underline"
+                        href="https://www.kraken.com/"
+                        target="_blank"
+                        rel="noreferrer"
+                      />
+                    ),
+                  }}
+                />
+              </li>
+              <li>
+                {t("aboutView.howNew.setup.items.3", { defaultValue: "Withdraw ETH to your wallet on Arbitrum One (Layer 2). This gives you fast/cheap transactions and ETH for gas on Arbitrum." })}
+              </li>
+              <li>
+                {t("aboutView.howNew.setup.items.4", { defaultValue: "Understand gas on HyperEVM: the native gas token is HYPE (not ETH). You will need a small amount of HYPE to transact on HyperEVM." })}
+              </li>
+              <li>
+                <Trans
+                  i18nKey="aboutView.howNew.setup.items.5"
+                  defaultValue="Bridge & swap using a trusted aggregator such as <jumper>Jumper Exchange</jumper>: swap from ETH on Arbitrum to USDT0 on HyperEVM (the vault’s underlying). Also bridge a small amount of HYPE (e.g., ~$10) for gas on HyperEVM."
+                  components={{
+                    jumper: (
+                      <a
+                        className="link underline"
+                        href="https://jumper.exchange/"
+                        target="_blank"
+                        rel="noreferrer"
+                      />
+                    ),
+                  }}
+                />
+              </li>
+              <li>
+                {t("aboutView.howNew.setup.items.6", { defaultValue: "Add/switch to the HyperEVM network in your wallet, then return here." })}
+              </li>
             </ol>
           </div>
 
-          {/* Beginner path */}
+          {/* B) Per‑deposit flow */}
           <div>
-            <h3 className="text-lg mb-2">
-              {t("aboutView.how.onboarding.title", { defaultValue: "Onboarding (for DeFi newcomers)" })}
+            <h3 className="text-lg font-semibold text-[var(--heading)] mb-2">
+              {t("aboutView.howNew.flow.title", { defaultValue: "B) Per‑deposit flow" })}
             </h3>
-            <ol className="list-decimal pl-5 space-y-2 text-[var(--text)]">
-              <li>
-                {t("aboutView.how.onboarding.items.1", {
-                  defaultValue:
-                    "Acquire crypto on a centralized exchange (e.g., Binance, Coinbase, Kraken). ETH or USDC are common starting points."
-                })}
-              </li>
-              <li>
-                {t("aboutView.how.onboarding.items.2.prefix", {
-                  defaultValue: "Install a self‑custodial wallet. Recommended: "
-                })}
-                <a className="link underline" href="https://rabby.io/" target="_blank" rel="noreferrer">Rabby Wallet</a>
-                {t("aboutView.how.onboarding.items.2.suffix", {
-                  defaultValue: ". Download exclusively from the official site to avoid phishing."
-                })}
-              </li>
-              <li>
-                {t("aboutView.how.onboarding.items.3", {
-                  defaultValue:
-                    "Withdraw assets from the exchange to the self‑custodial address. Network fees apply; verify the destination network."
-                })}
-              </li>
-              <li>
-                {t("aboutView.how.onboarding.items.4.prefix", {
-                  defaultValue:
-                    "If required, bridge or swap into the vault’s underlying token on the target chain using a reputable aggregator such as "
-                })}
-                <a className="link underline" href="https://jumper.exchange/" target="_blank" rel="noreferrer">Jumper Exchange</a>
-                {t("aboutView.how.onboarding.items.4.suffix", {
-                  defaultValue: ". Return to the application and connect the wallet."
-                })}
-              </li>
-              <li>
-                {t("aboutView.how.onboarding.items.5", {
-                  defaultValue:
-                    "Approve the token, specify an amount, and submit the deposit. The position updates once the transaction confirms."
-                })}
-              </li>
+            <ol className="list-decimal pl-5 space-y-2">
+              <li>{t("aboutView.howNew.flow.items.1", { defaultValue: "Connect the wallet and select HyperEVM." })}</li>
+              <li>{t("aboutView.howNew.flow.items.2", { defaultValue: "Ensure you hold USDT0 on HyperEVM and a small HYPE balance for gas." })}</li>
+              <li>{t("aboutView.howNew.flow.items.3", { defaultValue: "Enter the deposit amount. If this is the first time for USDT0, approve the token for the vault (choose exact or infinite)." })}</li>
+              <li>{t("aboutView.howNew.flow.items.4", { defaultValue: "Submit the deposit and confirm in the wallet." })}</li>
+              <li>{t("aboutView.howNew.flow.items.5", { defaultValue: "After confirmation, the position updates and shares appear under User Position." })}</li>
             </ol>
+          </div>
+
+          {/* C) Common pitfalls & quick checks */}
+          <div>
+            <h3 className="text-lg font-semibold text-[var(--heading)] mb-2">
+              {t("aboutView.howNew.pitfalls.title", { defaultValue: "C) Common pitfalls & quick checks" })}
+            </h3>
+            <ul className="list-disc pl-5 space-y-2">
+              <li>{t("aboutView.howNew.pitfalls.items.1", { defaultValue: "Ensure the connected network is HyperEVM; ETH is not the gas token on HyperEVM (HYPE is)." })}</li>
+              <li>{t("aboutView.howNew.pitfalls.items.2", { defaultValue: "Keep a small buffer of HYPE for fees on HyperEVM (e.g., ~$10)." })}</li>
+              <li>{t("aboutView.howNew.pitfalls.items.3", { defaultValue: "If the token approval is pending, wait for confirmation before submitting the deposit." })}</li>
+              <li>{t("aboutView.howNew.pitfalls.items.4", { defaultValue: "If a transaction fails, re‑check the amount, allowance, and gas token balance before retrying." })}</li>
+            </ul>
           </div>
         </div>
       </details>
