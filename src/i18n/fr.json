@@ -30,7 +30,7 @@
         "market": "Marché",
         "share": "Part",
         "usd": "USD",
-        "supplyApy": "APY de dépôt"
+        "supplyApy": "Rendement de dépôt"
       },
       "otherDust": "Autres (montants négligeables)",
       "loading": "Chargement des allocations…",
@@ -79,9 +79,9 @@
         "items": {
           "1": "Installez un wallet en auto-garde. Recommandation : <rabby>Rabby Wallet</rabby>. Téléchargez toujours depuis le site officiel pour éviter l’hameçonnage.",
           "2": "Créez un compte sur un échange réputé (par exemple <kraken>Kraken</kraken>) et achetez de l’ETH.",
-          "3": "Retirer des fonds en ETH vers Arbitrum One depuis le CEX (frais faibles, confirmation rapide).",
-          "4": "Sur Arbitrum, conserver un petit solde d’ETH pour les frais, puis se préparer à passer sur HyperEVM.",
-          "5": "Utilisez un agrégateur de bridge/échange fiable comme <jumper>Jumper Exchange</jumper> : échangez de l’ETH sur Arbitrum contre de l’USDT0 sur HyperEVM (l’actif sous-jacent du vault). Prévoyez également un petit montant de HYPE (≈ 10 $) pour les frais sur HyperEVM.",
+          "3": "Retirer des fonds en ETH vers Arbitrum One depuis votre plateforme d'échange (frais faibles, confirmation rapide) sur votre adresse Rabby Wallet.",
+          "4": "Sur Rabby Wallet, sur Arbitrum, conserver un petit solde d’ETH pour les frais, puis se préparer à passer sur le réseau du vault : HyperEVM.",
+          "5": "Pour cela, utilisez un agrégateur de bridge/échange fiable comme <jumper>Jumper Exchange</jumper> : échangez de l’ETH sur Arbitrum contre de l’USDT0 sur HyperEVM (l’actif sous-jacent du vault). Prévoyez également un petit montant de HYPE (≈ 10 $) pour les frais sur HyperEVM.",
           "6": "Sur HyperEVM, conserver ~10 $ de HYPE pour le gas (HYPE est le token de gas natif)."
         }
       },
@@ -130,15 +130,15 @@
         "withdrawalsLabel": "Retraits",
         "withdrawals": "Des parts sont brûlées pour racheter le montant correspondant de sous‑jacent.",
         "p2": "Exemple : un dépôt de 100 jetons avec ~5 % de performance positive se rachètera ultérieurement autour de 105 jetons (moins frais éventuels et arrondis). Une performance négative réduit la valeur de rachat.",
-        "p3": "L’APY est variable et dépend des conditions de marché et de l’allocation. La valeur de part reflète la performance du Vault dans le temps."
+        "p3": "Le rendement est variable et dépend des conditions de marché et de l’allocation. La valeur de part reflète la performance du Vault dans le temps."
       },
       "q2": {
         "title": "Quels wallets sont pris en charge ?",
         "body": "MetaMask, Rabby, OKX (via RainbowKit)."
       },
       "q3": {
-        "title": "Quand l’APY est‑il mis à jour ?",
-        "body": "L’APY est directement calculé on‑chain ; il varie avec l’évolution des marchés et le rendement individuel de chaque sous‑jacent."
+        "title": "Quand le rendement est‑il mis à jour ?",
+        "body": "Le rendement est directement calculé on‑chain ; il varie avec l’évolution des marchés et le rendement individuel de chaque sous‑jacent."
       },
       "q4": {
         "title": "Comment retirer ?",
