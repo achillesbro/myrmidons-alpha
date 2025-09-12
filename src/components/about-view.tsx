@@ -88,7 +88,7 @@ export function AboutView() {
                     jumper: (
                       <a
                         className="link underline"
-                        href="https://jumper.exchange/"
+                        href="https://jumper.exchange/?fromChain=42161&fromToken=0x0000000000000000000000000000000000000000&toChain=999&toToken=0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb"
                         target="_blank"
                         rel="noreferrer"
                       />

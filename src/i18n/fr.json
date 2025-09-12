@@ -38,6 +38,7 @@
       "empty": "Aucune allocation."
     },
     "actions": {
+      "bridgeCta": "Besoin de fonds sur HyperEVM ? Transférez depuis Arbitrum via Jumper",
       "title": "Opérations",
       "deposit": "Déposer",
       "withdraw": "Retirer",

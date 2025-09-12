@@ -148,6 +148,8 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
+  // const [bridgeAmount, setBridgeAmount] = useState<string>("");
+  // const chainId = useChainId();
   // Load persisted toggle
   useEffect(() => {
     try {
@@ -265,6 +267,8 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       setLastUpdated(Date.now());
     } catch {}
   };
+
+  // REMOVED: refreshWalletBalanceFast
 
 
   useEffect(() => {
@@ -749,6 +753,21 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                         {t("vaultInfo.actions.max", { defaultValue: "Max" })}
                       </button>
                     </div>
+                    <div className="mt-1 text-[11px]">
+                      <button
+                        type="button"
+                        className="underline text-[#00295B] hover:opacity-80"
+                        onClick={() => {
+                          const base = "https://jumper.exchange/?fromChain=42161&fromToken=0x0000000000000000000000000000000000000000&toChain=999&toToken=0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb";
+                          const amt = depAmount && Number(depAmount) > 0 ? `&amp;fromAmount=${encodeURIComponent(depAmount)}` : "";
+                          window.open(`${base}${amt}`, "_blank", "noopener,noreferrer");
+                        }}
+                      >
+                        {t("vaultInfo.actions.bridgeCta", {
+                          defaultValue: "Need funds on HyperEVM? Bridge from Arbitrum via Jumper",
+                        })}
+                      </button>
+                    </div>
                     {depAmount && parseUnits(depAmount || "0", onchainData.underlyingDecimals) > onchainBalance && (
                       <div className="text-xs text-red-600 mt-1">
                         {t("vaultInfo.actions.exceedsBalance", { defaultValue: "Exceeds wallet balance" })}
@@ -822,6 +841,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                 )}
               </div>
             </ChainVaultGuard>
+            {/* Bridge to HyperEVM (via Jumper) removed */}
             {/* Current Position */}
             <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
               <h3 className="text-base font-semibold text-[#00295B] mb-2">

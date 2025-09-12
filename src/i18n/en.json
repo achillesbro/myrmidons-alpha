@@ -43,6 +43,7 @@
       "empty": "No allocations found."
     },
     "actions": {
+      "bridgeCta": "Need funds on HyperEVM? Bridge from Arbitrum via Jumper",
       "title": "Actions",
       "deposit": "Deposit",
       "withdraw": "Withdraw",
