@@ -72,6 +72,18 @@
       "curated": "Sélection de cryptoactifs dans un univers DeFi.",
       "hyperliquid": "Univers d’opportunités centré sur Hyperliquid.",
       "risk": "Ingénierie et suivi avec primauté du risque."
+      },
+    "strategy": {
+      "title": "Notre stratégie",
+      "p1": "La vault recherche un rendement systématique et maîtrisé sur HyperEVM en allouant aux marchés Morpho sélectionnés. La construction privilégie la liquidité, la préservation du capital sur l’ensemble du cycle, et la capitalisation des gains lorsque cela est pertinent.",
+      "p2": "L’univers inclut HYPE, BTC, ETH, des actifs indexés sur l'USD, et des Principal Tokens lorsque leur sous-jacent et leur maturité sont attractifs. Les pondérations s’ajustent selon les conditions de marché, les différentiels de taux, l’utilisation et les récompenses.",
+      "bullets": {
+        "risk": "Taille de l'investissement pilotée par le risque : plafonds d’apport (« caps »), LLTV prudents, suivi continu des drawdowns et liquidations.",
+        "liquidity": "Discipline de liquidité : préférence pour des marchés forts liquides et une capacité de rachat claire.",
+        "rebalance": "Rééquilibrages dynamiques : réponse aux changements de taux, à l’utilisation et aux récompenses en limitant les mouvements inutiles.",
+        "transparency": "Transparence : les allocations et la performance sont observables on-chain et reflétés en direct."
+      },
+      "p3": "Ambition : des rendements compétitifs et durables, ajustés du risque, dans le temps. Ceci ne constitue pas une garantie de performance."
     },
     "howNew": {
       "title": "Comment déposer",
