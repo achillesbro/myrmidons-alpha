@@ -1,4 +1,4 @@
-// src/App.tsx
+import { Analytics } from '@vercel/analytics/react';
 import {
   getDefaultConfig,
   RainbowKitProvider,
@@ -160,6 +160,7 @@ const TestInterface = () => {
         </div>
       </div>
       <SiteFooter />
+      <Analytics />
     </div>
   );
 };
