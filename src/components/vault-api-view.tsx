@@ -1,6 +1,12 @@
 import { formatUnits, erc20Abi } from "viem";
 import { parseUnits } from "viem";
-import { useWalletClient } from "wagmi";
+import { useWalletClient, useAccount } from "wagmi";
+import type { Address } from "viem";
+import { getRelayClient } from "../relay/relayClient";
+import { fetchBalancesFor, type TokenCurrency, type TokenBalance } from "../relay/balances";
+import { getRelayCurrencies } from "../relay/relayCurrencies";
+import { chainName, nativeSymbolFor, nativeLogoFor } from "../relay/chains";
+import { getUsdPrices, priceForToken, WRAPPED_NATIVE_BY_CHAIN } from "../relay/prices";
 import { BrowserProvider, Contract } from "ethers";
 import {
   Toasts,
@@ -16,6 +22,7 @@ import { hyperPublicClient } from "../viem/clients";
 import vaultAbi from "../abis/vault.json";
 import { useVaultCurrentApyOnchain } from "../hooks/useVaultCurrentApyOnchain";
 import { useState, useEffect, useRef } from "react";
+import { useMemo } from "react";
 import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";
 // Inline AllocationList component for on-chain allocations
 
@@ -57,8 +64,6 @@ const ALLOWED_VAULTS: Record<number, readonly `0x${string}`[]> = {
   ],
   // 8453: ["0x..."], // Example for Base if needed later
 } as const;
-
-
 
 export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` }) {
   // UX: last refresh timestamp for data shown on this page
@@ -132,6 +137,80 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
     if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
   };
 
+  // Prefetch cross-chain balances on wallet connect to warm cache for the dialog
+  useEffect(() => {
+    const user = clientW.data?.account?.address as Address | undefined;
+    if (!user) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        getRelayClient(); // ensure SDK is initialized
+        const candidateChains: number[] = [1, 42161, 8453, 10, 137, 56, 43114, 324, 250, 1101, 999];
+
+        const lists = await Promise.all(
+          candidateChains.map(async (cid) => {
+            try {
+              const list = await getRelayCurrencies(cid);
+              const mapped = list.map<TokenCurrency>((c) => ({
+                chainId: cid,
+                address: c.address === "native" ? "native" : (c.address as Address),
+                symbol: c.symbol,
+                decimals: c.decimals,
+                name: c.name,
+                logoURI: c.logoURI ?? (c.address === "native" ? nativeLogoFor(cid) : null),
+              }));
+              const hasNative = mapped.some((x) => x.address === "native");
+              if (!hasNative) {
+                mapped.unshift({
+                  chainId: cid,
+                  address: "native",
+                  symbol: nativeSymbolFor(cid),
+                  decimals: 18,
+                  name: "Native",
+                  logoURI: nativeLogoFor(cid),
+                });
+              }
+              return mapped;
+            } catch {
+              return [{
+                chainId: cid,
+                address: "native",
+                symbol: nativeSymbolFor(cid),
+                decimals: 18,
+                name: "Native",
+                logoURI: nativeLogoFor(cid),
+              } satisfies TokenCurrency];
+            }
+          })
+        );
+
+        if (cancelled) return;
+        const merged = lists.flat();
+
+        // De-duplicate by (chainId, address)
+        const deduped = (() => {
+          const seen = new Set<string>();
+          const out: TokenCurrency[] = [];
+          for (const tk of merged) {
+            const key = `${tk.chainId}:${tk.address === "native" ? "native" : String(tk.address).toLowerCase()}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(tk);
+          }
+          return out;
+        })();
+
+        // Warm the in-memory cache by fetching balances once in the background.
+        await fetchBalancesFor(user, deduped);
+      } catch {
+        // ignore prefetch errors; dialog will still fetch on open
+      }
+
+      return () => { cancelled = true; };
+    })();
+  }, [clientW.data?.account?.address]);
+
   // User state (HyperEVM tx path only)
   const [underlyingAddress, setUnderlyingAddress] = useState<`0x${string}` | null>(null);
   const [assetDecimals, setAssetDecimals] = useState<number>(18);
@@ -145,6 +224,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const [wdAmount, setWdAmount] = useState<string>("");
   const [pending, setPending] = useState<"approve" | "deposit" | "withdraw" | null>(null);
   const [txMode, setTxMode] = useState<"deposit" | "withdraw">("deposit");
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
@@ -733,78 +813,17 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                   </div>
                 </div>
                 {txMode === "deposit" ? (
-                  <div className="min-h-[160px]">
-                    <input
-                      value={depAmount}
-                      onChange={(e) => setDepAmount(e.target.value)}
-                      placeholder={t("vaultInfo.actions.placeholderAmount", { defaultValue: "0.00" })}
-                      className="w-full border rounded py-1.5 px-2 bg-white"
-                      inputMode="decimal"
-                    />
-                    <div className="flex items-center justify-between mt-1 text-xs text-[#101720]/70">
-                      <div>
-                        {t("vaultInfo.actions.balance", { defaultValue: "Balance" })}: {fmtToken(onchainBalance, onchainData.underlyingDecimals)} USDT0
-                      </div>
-                      <button
-                        type="button"
-                        className="px-2 py-0.5 text-xs border rounded"
-                        onClick={() => setDepAmount(formatUnits(onchainBalance, onchainData.underlyingDecimals))}
-                      >
-                        {t("vaultInfo.actions.max", { defaultValue: "Max" })}
-                      </button>
-                    </div>
-                    <div className="mt-1 text-[11px]">
-                      <button
-                        type="button"
-                        className="underline text-[#00295B] hover:opacity-80"
-                        onClick={() => {
-                          const base = "https://jumper.exchange/?fromChain=42161&fromToken=0x0000000000000000000000000000000000000000&toChain=999&toToken=0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb";
-                          const amt = depAmount && Number(depAmount) > 0 ? `&amp;fromAmount=${encodeURIComponent(depAmount)}` : "";
-                          window.open(`${base}${amt}`, "_blank", "noopener,noreferrer");
-                        }}
-                      >
-                        {t("vaultInfo.actions.bridgeCta", {
-                          defaultValue: "Need funds on HyperEVM? Bridge from Arbitrum via Jumper",
-                        })}
-                      </button>
-                    </div>
-                    {depAmount && parseUnits(depAmount || "0", onchainData.underlyingDecimals) > onchainBalance && (
-                      <div className="text-xs text-red-600 mt-1">
-                        {t("vaultInfo.actions.exceedsBalance", { defaultValue: "Exceeds wallet balance" })}
-                      </div>
-                    )}
-                    {(() => {
-                      const amountWei = parseUnits(depAmount || "0", onchainData.underlyingDecimals);
-                      const validAmount = depAmount && amountWei > 0n && amountWei <= onchainBalance;
-                      const needsApproval = validAmount && allowance < amountWei;
-                      const label =
-                        pending === "approve"
-                          ? t("vaultInfo.actions.approving", { defaultValue: "Approving…" })
-                          : pending === "deposit"
-                          ? t("vaultInfo.actions.depositing", { defaultValue: "Depositing…" })
-                          : needsApproval
-                          ? t("vaultInfo.actions.approve", { defaultValue: "Approve" })
-                          : t("vaultInfo.actions.deposit", { defaultValue: "Deposit" });
-                      const onClick = () => {
-                        if (!validAmount) return;
-                        if (needsApproval) {
-                          setApproveConfirmOpen(true);
-                        } else {
-                          // Direct deposit without confirmation dialog
-                          runDeposit();
-                        }
-                      };
-                      return (
-                        <button
-                          type="button"
-                          disabled={pending !== null || !validAmount}
-                          className="mt-3 w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
-                          onClick={onClick}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })()}
+                  <div className="min-h-[120px] flex flex-col items-stretch">
+                    <p className="text-xs text-[#101720]/70 mb-2">
+                      Select any token from any supported chain and deposit to USDT0 on HyperEVM.
+                    </p>
+                    <button
+                      type="button"
+                      className="mt-auto w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
+                      onClick={() => setDepositDialogOpen(true)}
+                    >
+                      {t("vaultInfo.actions.deposit", { defaultValue: "Deposit" })}
+                    </button>
                   </div>
                 ) : (
                   <div className="min-h-[160px]">
@@ -871,6 +890,19 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
           </div>
         </div>
 
+        {/* Deposit dialog (Relay-based, step 2 scaffold) */}
+        <DepositDialog
+          open={depositDialogOpen}
+          onClose={() => setDepositDialogOpen(false)}
+          destTokenAddress={onchainData.underlyingAddress}
+          destTokenDecimals={onchainData.underlyingDecimals}
+          onLocalDepositRequested={(amountWei) => {
+            // amountWei is in underlying decimals (USDT0)
+            setDepAmount(formatUnits(amountWei, onchainData.underlyingDecimals));
+            setApproveConfirmOpen(true);   // re-use your existing approve→deposit flow
+            setDepositDialogOpen(false);   // close the dialog since we’re doing a local deposit
+          }}
+        />
         {/* Confirm dialog for approval */}
         <ConfirmDialog
           open={approveConfirmOpen}
@@ -1007,5 +1039,543 @@ function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${st
       totalAssets={totalAssets}
       hiddenDust={hiddenDust ?? null}
     />
+  );
+}
+function DepositDialog({
+  open,
+  onClose,
+  destTokenAddress,
+  destTokenDecimals,
+  onLocalDepositRequested,
+}: {
+  open: boolean;
+  onClose: () => void;
+  destTokenAddress: `0x${string}`;
+  destTokenDecimals: number;
+  onLocalDepositRequested: (amountWei: bigint) => void;
+}) {
+  const { t } = useTranslation();
+  const [step, setStep] = useState<"pickToken" | "enterAmount" | "review">("pickToken");
+
+  const [usdPrices, setUsdPrices] = useState<Record<string, number>>({});
+
+  // Selected origin asset & chain (placeholder types for now; Relay wiring in Step 3)
+  const [originChainId, setOriginChainId] = useState<number | null>(null);
+  const [originToken, setOriginToken] = useState<{ address: `0x${string}` | "native"; symbol: string } | null>(null);
+
+  // Amount in destination USDT0 (USD)
+  const [amountUsd, setAmountUsd] = useState<string>("");
+
+  const wallet = useWalletClient();
+  const { address: connectedAddress } = useAccount();
+  const userAddr = (connectedAddress ?? wallet.data?.account?.address ?? null) as Address | null;
+
+  const [loadingList, setLoadingList] = useState(false);
+  const [tokens, setTokens] = useState<TokenCurrency[]>([]);
+  const [balances, setBalances] = useState<TokenBalance[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  function isLocalUsdt0SameChain(): boolean {
+    return originChainId === 999 &&
+      originToken?.address !== "native" &&
+      typeof destTokenAddress === "string" &&
+      (originToken?.address as string).toLowerCase() === destTokenAddress.toLowerCase();
+  }
+
+  // --- QUOTE STATE ---
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [quote, setQuote] = useState<any | null>(null);
+
+  // --- ZERO address helper and addrForRelay ---
+  const ZERO = "0x0000000000000000000000000000000000000000" as const;
+  const addrForRelay = (a: `0x${string}` | "native") => (a === "native" ? (ZERO as `0x${string}`) : a);
+
+  // --- async quote fetcher ---
+  async function fetchRelayQuoteExactOutput() {
+    if (!userAddr || originChainId == null || !originToken) {
+      throw new Error("Missing origin token/chain or user");
+    }
+    if (!amountUsd) {
+      throw new Error("Enter an amount");
+    }
+
+    // If the user selected USDT0 on HyperEVM as origin, bypass Relay and run local ERC-4626 deposit.
+    if (isLocalUsdt0SameChain()) {
+      const outputWeiBig = parseUnits(amountUsd, destTokenDecimals);
+      onLocalDepositRequested(outputWeiBig);
+      return null;
+    }
+
+    // Destination = HyperEVM (999), token = USDT0 (vault underlying)
+    const toChainId = 999;
+    const toCurrencyId = `${toChainId}:${destTokenAddress.toLowerCase()}`;
+    const outputWei = parseUnits(amountUsd, destTokenDecimals).toString();
+
+    const relayClient = getRelayClient();
+    if (!relayClient?.actions?.getQuote) throw new Error("Relay client not ready");
+
+    // Build origin currencyId (native vs ERC-20)
+    const currencyId = originToken.address === "native"
+      ? `${originChainId}:native`
+      : `${originChainId}:${(originToken.address as string).toLowerCase()}`;
+
+    // Prefer currencyId fields (native-safe). Keep address fields for back-compat if SDK accepts them.
+    const q = await relayClient.actions.getQuote({
+      chainId: originChainId,
+      toChainId,
+      currency: addrForRelay(originToken.address),
+      toCurrency: destTokenAddress,
+      tradeType: "EXACT_OUTPUT",
+      amount: outputWei,
+      user: userAddr,
+      recipient: userAddr,
+      wallet: wallet.data ?? undefined,
+      options: {
+        useExternalLiquidity: true,
+        useFallbacks: true,
+      },
+    });
+
+    return q;
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      if (!open) return;
+      if (!userAddr) {
+        setTokens([]);
+        setBalances([]);
+        setLoadingList(false);
+        return;
+      }
+      setLoadingList(true);
+      setErrorMsg(null);
+
+      try {
+        // Touch Relay client to ensure init (chains fetched in background)
+        getRelayClient();
+
+        // Curated origin chains (destination is HyperEVM; we don't need to query it here)
+        const candidateChains: number[] = [1, 42161, 8453, 10, 137, 56, 43114, 324, 250, 1101, 999];
+
+        // Fetch currencies for each chain (no slice limit)
+        const lists = await Promise.all(
+          candidateChains.map(async (cid) => {
+            try {
+              const list = await getRelayCurrencies(cid);
+              const mapped = list.map<TokenCurrency>((c) => ({
+                chainId: cid,
+                address: c.address === "native" ? "native" : (c.address as Address),
+                symbol: c.symbol,
+                decimals: c.decimals,
+                name: c.name,
+                logoURI: c.logoURI ?? (c.address === "native" ? nativeLogoFor(cid) : null),
+              }));
+              // Ensure native token exists for each chain
+              const hasNative = mapped.some((x) => x.address === "native");
+              if (!hasNative) {
+                mapped.unshift({
+                  chainId: cid,
+                  address: "native",
+                  symbol: nativeSymbolFor(cid),
+                  decimals: 18,
+                  name: "Native",
+                  logoURI: nativeLogoFor(cid),
+                });
+              }
+              return mapped;
+            } catch (e) {
+              // Fallback: native-only if currencies API fails
+              return [{
+                chainId: cid,
+                address: "native",
+                symbol: nativeSymbolFor(cid),
+                decimals: 18,
+                name: "Native",
+                logoURI: nativeLogoFor(cid),
+              } satisfies TokenCurrency];
+            }
+          })
+        );
+
+        // Ensure must-have wrapped tokens (WETH/WMATIC/WBNB/WAVAX; WHYPE on 999 if provided) are present
+        const mustInclude: TokenCurrency[] = [];
+        for (const [cidStr, addr] of Object.entries(WRAPPED_NATIVE_BY_CHAIN)) {
+          const cid = Number(cidStr);
+          if (!addr) continue;
+          const wrapSym =
+            cid === 137   ? "WMATIC" :
+            cid === 56    ? "WBNB"   :
+            cid === 43114 ? "WAVAX"  :
+            cid === 999   ? "WHYPE"  :
+                            "WETH";
+          mustInclude.push({
+            chainId: cid,
+            address: addr as Address,
+            symbol: wrapSym,
+            decimals: 18,
+            name: wrapSym,
+            logoURI: null, // will be hydrated below
+          });
+        }
+
+        // Hydrate logos for mustInclude entries using fetched data
+        const logoByAddr = new Map<string, string | null>();
+        for (const arr of lists) {
+          for (const it of arr) {
+            const addr = it.address === "native" ? "native" : String(it.address).toLowerCase();
+            const k = `${it.chainId}:${addr}`;
+            if (!logoByAddr.has(k)) logoByAddr.set(k, it.logoURI ?? null);
+          }
+        }
+        for (const it of mustInclude) {
+          const k = `${it.chainId}:${String(it.address).toLowerCase()}`;
+          const l = logoByAddr.get(k);
+          if (l != null) it.logoURI = l;
+        }
+
+        const merged = lists.flat().concat(mustInclude);
+        // Simple de-duplication by chainId+address
+        const deduped = (() => {
+          const seen = new Set<string>();
+          const out: TokenCurrency[] = [];
+          for (const tk of merged) {
+            const key = `${tk.chainId}:${tk.address === "native" ? "native" : String(tk.address).toLowerCase()}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            out.push(tk);
+          }
+          return out;
+        })();
+        if (cancelled) return;
+        setTokens(deduped);
+
+        // Prefetch USD prices for the token universe (best-effort)
+        try {
+          const pm = await getUsdPrices(deduped);
+          if (!cancelled) setUsdPrices(pm);
+        } catch {}
+
+        // Fetch balances across these chains
+        const bals = await fetchBalancesFor(userAddr, deduped);
+        if (cancelled) return;
+
+        // Filter dust: show any strictly positive balance
+        const filtered = bals.filter((b) => {
+          const amt = Number(b.human);
+          return Number.isFinite(amt) && amt > 0;
+        });
+
+        // Sort by raw amount desc (USD sort to be added later with pricing)
+        filtered.sort((a, b) => (a.raw === b.raw ? 0 : a.raw > b.raw ? -1 : 1));
+
+        setBalances(filtered);
+      } catch (e: any) {
+        if (!cancelled) setErrorMsg(e?.message ?? "Failed to load tokens.");
+      } finally {
+        if (!cancelled) setLoadingList(false);
+      }
+    }
+
+    load();
+  }, [open, userAddr]);
+
+  // Basic derived guards
+  const canContinueFromPick = useMemo(() => originChainId != null && originToken != null, [originChainId, originToken]);
+  const canContinueFromAmount = useMemo(() => {
+    if (!amountUsd) return false;
+    const n = Number(amountUsd);
+    return Number.isFinite(n) && n > 0;
+  }, [amountUsd]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      {/* Panel */}
+      <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg w-full sm:w-[520px] max-h-[85vh] overflow-hidden shadow-lg">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E2D6]">
+          <h3 className="text-base font-semibold text-[#00295B]">
+            {t("relay.deposit.title", { defaultValue: "Cross-chain Deposit" })}
+          </h3>
+          <button
+            type="button"
+            className="text-[#00295B] hover:opacity-80"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Step headers */}
+        <div className="px-4 pt-3 pb-2 text-xs text-[#101720]/70">
+          <span className={step === "pickToken" ? "font-semibold text-[#00295B]" : ""}>
+            {t("relay.deposit.step.pickToken", { defaultValue: "1) Pick token" })}
+          </span>
+          <span className="mx-1">›</span>
+          <span className={step === "enterAmount" ? "font-semibold text-[#00295B]" : ""}>
+            {t("relay.deposit.step.enterAmount", { defaultValue: "2) Enter USDT0 amount" })}
+          </span>
+          <span className="mx-1">›</span>
+          <span className={step === "review" ? "font-semibold text-[#00295B]" : ""}>
+            {t("relay.deposit.step.review", { defaultValue: "3) Review & confirm" })}
+          </span>
+        </div>
+
+        {/* Body */}
+        <div className="px-4 pb-4 pt-2 overflow-y-auto" style={{ maxHeight: "60vh" }}>
+          {step === "pickToken" && (
+            <div>
+              <p className="text-sm text-[#101720]/80 mb-3">
+                {t("relay.deposit.pickToken.hint", { defaultValue: "Choose the token you want to pay with. This list will aggregate balances across supported chains." })}
+              </p>
+              {!userAddr && (
+                <div className="p-3 border border-[#E5E2D6] rounded text-[#101720]/70 text-sm mb-2">
+                  {t("relay.deposit.pickToken.connect", { defaultValue: "Connect your wallet to load balances across chains." })}
+                </div>
+              )}
+              <div className="space-y-2">
+                {loadingList && (
+                  <div className="p-3 border border-[#E5E2D6] rounded text-[#101720]/70 text-sm">
+                    {t("relay.deposit.pickToken.loading", { defaultValue: "Loading balances across chains…" })}
+                  </div>
+                )}
+                {errorMsg && (
+                  <div className="p-3 border border-red-200 bg-red-50 rounded text-sm text-red-700">
+                    {errorMsg}
+                  </div>
+                )}
+                {!loadingList && !errorMsg && userAddr && balances.length === 0 && (
+                  <div className="p-3 border border-dashed border-[#E5E2D6] rounded text-[#101720]/70 text-sm">
+                    {t("relay.deposit.pickToken.empty", { defaultValue: "No balances detected on the checked chains. If you’re sure funds exist, they may be on an unlisted token for this preview. We’ll still support it in Step 4 via manual input." })}
+                  </div>
+                )}
+                {!loadingList && balances.length > 0 && (
+                  <div className="max-h-[44vh] overflow-y-auto divide-y divide-[#EDE9D7]">
+                    {balances.map((b, idx) => (
+                      <button
+                        type="button"
+                        key={`${b.chainId}-${b.address}-${idx}`}
+                        className="w-full flex items-center justify-between py-2 px-1 hover:bg-[#F7F6EE] text-left"
+                        onClick={() => {
+                          setOriginChainId(b.chainId);
+                          setOriginToken({ address: b.address === "native" ? "native" : (b.address as `0x${string}`), symbol: b.symbol });
+                        }}
+                      >
+                        <div className="flex items-center space-x-2">
+                          {b.logoURI ? (
+                            <img
+                              src={b.logoURI}
+                              alt={b.symbol}
+                              className="w-5 h-5 rounded-full border border-[#E5E2D6] object-contain"
+                              onError={(e) => (e.currentTarget.style.display = 'none')}
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full border border-[#E5E2D6]" />
+                          )}
+                          <div className="flex flex-col">
+                            <span className="text-sm text-[#101720]">
+                              {b.symbol}
+                              <span className="text-[11px] text-[#101720]/60 ml-1">• {chainName(b.chainId)}</span>
+                            </span>
+                            {b.name && <span className="text-[11px] text-[#101720]/60">{b.name}</span>}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-mono text-sm text-[#101720]">
+                            {Number(b.human).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                          </div>
+                          {(() => {
+                            const p = priceForToken(usdPrices, b);
+                            if (p == null) return null;
+                            const usd = p * Number(b.human || "0");
+                            if (!Number.isFinite(usd)) return null;
+                            return (
+                              <div className="text-[11px] text-[#101720]/60">
+                                ${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="pt-2 text-[11px] text-[#101720]/60">
+                  {t("relay.deposit.pickToken.disclaimer", { defaultValue: "Showing balances from a curated set of popular chains. More chains will appear as support is added." })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === "enterAmount" && (
+            <div>
+              <label className="text-sm text-[#101720]/80 mb-1 block">
+                {t("relay.deposit.amount.label", { defaultValue: "Amount in USDT0 (USD)" })}
+              </label>
+              <input
+                value={amountUsd}
+                onChange={(e) => setAmountUsd(e.target.value)}
+                placeholder={t("relay.deposit.amount.placeholder", { defaultValue: "0.00" })}
+                className="w-full border rounded py-1.5 px-2 bg-white"
+                inputMode="decimal"
+              />
+              <p className="text-[11px] text-[#101720]/70 mt-1">
+                {t("relay.deposit.amount.hint", { defaultValue: "You specify the exact destination amount. Origin spend is computed automatically." })}
+              </p>
+            </div>
+          )}
+
+          {step === "review" && (
+            <div className="text-sm text-[#101720] space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[#101720]/70">{t("relay.deposit.review.token", { defaultValue: "Pay with" })}</span>
+                <span className="font-mono">
+                  {originToken ? originToken.symbol : "—"} {originChainId != null ? `(${chainName(originChainId)})` : ""}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#101720]/70">{t("relay.deposit.review.dest", { defaultValue: "Receive (destination)" })}</span>
+                <span className="font-mono">{amountUsd || "0.00"} USDT0 @ HyperEVM</span>
+              </div>
+              <div className="p-3 border border-dashed border-[#E5E2D6] rounded text-[#101720]/80">
+                {quoteLoading && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#101720]/70">You’ll spend (origin)</span>
+                      <Skeleton className="h-4 w-28" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#101720]/70">You’ll receive (destination)</span>
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#101720]/70">Total fees (USD est.)</span>
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#101720]/70">ETA</span>
+                      <Skeleton className="h-4 w-12" />
+                    </div>
+                  </div>
+                )}
+                {quoteError && <div className="text-red-600">Quote error: {quoteError}</div>}
+                {!quoteLoading && !quoteError && quote && (
+                  <div className="space-y-1">
+                    {/* Origin spend */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#101720]/70">You’ll spend (origin)</span>
+                      <span className="font-mono">
+                        {quote?.details?.currencyIn?.amountFormatted ??
+                         quote?.route?.origin?.inputCurrency?.amountFormatted ??
+                         quote?.input?.amountFormatted ??
+                         "—"}{" "}
+                        {originToken?.symbol}
+                      </span>
+                    </div>
+                    {/* Destination receive */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#101720]/70">You’ll receive (destination)</span>
+                      <span className="font-mono">
+                        {amountUsd} USDT0
+                      </span>
+                    </div>
+                    {/* Fees (best-effort USD) */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#101720]/70">Total fees (USD est.)</span>
+                      <span className="font-mono">
+                        {quote?.fees?.totalImpact?.usd ??
+                         quote?.fees?.relayer?.amountUsd ??
+                         quote?.fees?.gas?.amountUsd ??
+                         "—"}
+                      </span>
+                    </div>
+                    {/* ETA */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[#101720]/70">ETA</span>
+                      <span className="font-mono">
+                        {quote?.timeEstimate ? `${Math.round(Number(quote.timeEstimate))}s` : "—"}
+                      </span>
+                    </div>
+                    {/* Route hint */}
+                    {quote?.route?.origin?.includedSwapSources?.length ? (
+                      <div className="text-[11px] text-[#101720]/60">
+                        Route: {quote.route.origin.includedSwapSources.join(", ")}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+                {!quoteLoading && !quoteError && !quote && <div>No quote yet.</div>}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-[#E5E2D6] flex items-center justify-between">
+          <button
+            type="button"
+            className="px-2 py-1 text-sm border rounded"
+            onClick={() => {
+              if (step === "pickToken") onClose();
+              else if (step === "enterAmount") setStep("pickToken");
+              else if (step === "review") setStep("enterAmount");
+            }}
+          >
+            {step === "pickToken"
+              ? t("relay.deposit.cancel", { defaultValue: "Cancel" })
+              : t("relay.deposit.back", { defaultValue: "Back" })}
+          </button>
+
+          <button
+            type="button"
+            className="px-3 py-1.5 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
+            onClick={async () => {
+              if (step === "pickToken" && canContinueFromPick) {
+                setStep("enterAmount");
+              } else if (step === "enterAmount" && canContinueFromAmount) {
+                // advance to review immediately, then fetch in the background
+                setStep("review");
+                setQuoteError(null);
+                setQuote(null);
+                setQuoteLoading(true);
+                try {
+                  const q = await fetchRelayQuoteExactOutput();
+                  if (q) {
+                    setQuote(q);
+                  } else {
+                    // Local ERC-4626 flow was triggered; parent closed the dialog.
+                    return;
+                  }
+                } catch (e: any) {
+                  setQuoteError(e?.message ?? "Failed to fetch quote");
+                } finally {
+                  setQuoteLoading(false);
+                }
+              } else if (step === "review") {
+                onClose();
+              }
+            }}
+            disabled={
+              (step === "pickToken" && !canContinueFromPick) ||
+              (step === "enterAmount" && !canContinueFromAmount) ||
+              (step === "review" && (quoteLoading || !quote))
+            }
+          >
+            {step === "review"
+              ? (quoteLoading
+                  ? t("relay.deposit.fetching", { defaultValue: "Fetching…" })
+                  : t("relay.deposit.confirmCta", { defaultValue: "Confirm (next step wires Relay)" }))
+              : t("relay.deposit.continue", { defaultValue: "Continue" })}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
