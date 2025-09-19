@@ -18,13 +18,21 @@ export const MARKET_LABELS: Record<`0x${string}`, string> = {
   "0x11e9e354e996b7603231041307cada35d4024539917175267b512dae3a355bce": "dnHYPE",
   "0x707dddc200e95dc984feb185abf1321cabec8486dca5a9a96fb5202184106e54": "BTC",
   "0xace279b5c6eff0a1ce7287249369fa6f4d3d32225e1629b04ef308e0eb568fb0": "WHYPE",
-  "0x78f6b57d825ef01a5dc496ad1f426a6375c685047d07a30cd07ac5107ffc7976": "kHYPE"
+  "0x78f6b57d825ef01a5dc496ad1f426a6375c685047d07a30cd07ac5107ffc7976": "kHYPE",
+  "0xfbe436e9aa361487f0c3e4ff94c88aea72887a4482c6b8bcfec60a8584cdb05e": "thBILL"
 };
 
 // Group multiple market ids (addresses) under the same asset metadata
 type TokenMeta = { label: string; logo: string };
 
 export const TOKEN_GROUPS = [
+  {
+    label: "thBILL",
+    logo: "/assets/thBILL-TokenIcon.png",
+    ids: [
+      "0xfbe436e9aa361487f0c3e4ff94c88aea72887a4482c6b8bcfec60a8584cdb05e"
+    ] as const,
+  },
   {
     label: "WHYPE",
     logo: "/assets/WHYPE-TokenIcon.jpg",
@@ -86,7 +94,7 @@ export const TOKEN_GROUPS = [
   },
   {
     label: "dnHYPE",
-    logo: "/assets/dnHYPE-TokenIcon.svg",
+    logo: "public/dnHYPE-TokenIcon.svg",
     ids: [
       "0x11e9e354e996b7603231041307cada35d4024539917175267b512dae3a355bce"
     ] as const,
