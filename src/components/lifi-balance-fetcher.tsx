@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useAccount, usePublicClient } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
+import { getTokens, getTokenBalances, ChainType } from '@lifi/sdk';
 import { formatUnits } from 'viem';
 
 interface TokenBalance {
@@ -44,109 +45,92 @@ export const LiFiBalanceFetcher = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch native token balance for a specific chain
-  const fetchNativeBalance = async (chainId: number) => {
+  // Fetch all balances using Li.Fi's getTokenBalances function
+  const fetchAllBalancesWithLifi = async () => {
+    if (!address) return [];
+
     try {
-      const publicClient = usePublicClient({ chainId });
-      if (!publicClient || !address) return null;
-
-      const balance = await publicClient.getBalance({ address: address as `0x${string}` });
-      const chainInfo = CHAIN_INFO[chainId as keyof typeof CHAIN_INFO];
-      const tokenSymbol = chainInfo.nativeSymbol;
-      
-      return {
-        chainId,
-        chainName: chainInfo.name,
-        tokenSymbol,
-        tokenAddress: '0x0000000000000000000000000000000000000000',
-        balance: balance.toString(),
-        balanceFormatted: formatUnits(balance, 18),
-        decimals: 18,
-      };
-    } catch (error) {
-      console.error(`Error fetching native balance for chain ${chainId}:`, error);
-      return null;
-    }
-  };
-
-  // Fetch ERC-20 token balance for a specific chain
-  const fetchTokenBalance = async (chainId: number, tokenSymbol: string, tokenAddress: string, decimals: number) => {
-    try {
-      const publicClient = usePublicClient({ chainId });
-      if (!publicClient || !address || tokenAddress === '0x0000000000000000000000000000000000000000') return null;
-
-      const balance = await publicClient.readContract({
-        address: tokenAddress as `0x${string}`,
-        abi: [
-          {
-            name: 'balanceOf',
-            type: 'function',
-            stateMutability: 'view',
-            inputs: [{ name: 'account', type: 'address' }],
-            outputs: [{ name: 'balance', type: 'uint256' }],
-          },
-        ],
-        functionName: 'balanceOf',
-        args: [address as `0x${string}`],
+      // Get all available tokens from Li.Fi
+      const tokensResponse = await getTokens({
+        chainTypes: [ChainType.EVM],
       });
 
-      const chainInfo = CHAIN_INFO[chainId as keyof typeof CHAIN_INFO];
-      
-      return {
-        chainId,
-        chainName: chainInfo.name,
-        tokenSymbol,
-        tokenAddress,
-        balance: balance.toString(),
-        balanceFormatted: formatUnits(balance as bigint, decimals),
-        decimals,
-      };
+      // Filter tokens for our supported chains and specific tokens we want to check
+      const supportedChainIds = [
+        CHAIN_IDS.ETHEREUM,
+        CHAIN_IDS.ARBITRUM,
+        CHAIN_IDS.BASE,
+        CHAIN_IDS.OPTIMISM,
+        CHAIN_IDS.BSC,
+      ];
+
+      const tokensToCheck: any[] = [];
+
+      // Add native tokens and specific ERC-20 tokens for each chain
+      for (const chainId of supportedChainIds) {
+        const chainTokens = tokensResponse.tokens[chainId];
+        if (!chainTokens) continue;
+
+        // Add native token (ETH, BNB, etc.)
+        const nativeToken = chainTokens.find(token => 
+          token.address === '0x0000000000000000000000000000000000000000'
+        );
+        if (nativeToken) {
+          tokensToCheck.push(nativeToken);
+        }
+
+        // Add specific ERC-20 tokens we want to track
+        const chainTokenAddresses = TOKEN_ADDRESSES[chainId as keyof typeof TOKEN_ADDRESSES];
+        if (chainTokenAddresses) {
+          for (const [, address] of Object.entries(chainTokenAddresses)) {
+            if (address !== '0x0000000000000000000000000000000000000000') {
+              const token = chainTokens.find(t => 
+                t.address.toLowerCase() === address.toLowerCase()
+              );
+              if (token) {
+                tokensToCheck.push(token);
+              }
+            }
+          }
+        }
+      }
+
+      // Get balances for all tokens
+      const tokenBalances = await getTokenBalances(address, tokensToCheck);
+
+      // Convert to our format
+      const balances: TokenBalance[] = tokenBalances
+        .filter(balance => balance && balance.amount && parseFloat(balance.amount.toString()) > 0)
+        .map(balance => {
+          const chainInfo = CHAIN_INFO[balance.chainId as keyof typeof CHAIN_INFO];
+          const amountStr = balance.amount?.toString() || '0';
+          return {
+            chainId: balance.chainId,
+            chainName: chainInfo.name,
+            tokenSymbol: balance.symbol,
+            tokenAddress: balance.address,
+            balance: amountStr,
+            balanceFormatted: formatUnits(BigInt(amountStr), balance.decimals),
+            decimals: balance.decimals,
+          };
+        });
+
+      return balances;
     } catch (error) {
-      console.error(`Error fetching token balance for ${tokenSymbol} on chain ${chainId}:`, error);
-      return null;
+      console.error('Error fetching balances with Li.Fi:', error);
+      return [];
     }
   };
 
-  // Fetch all balances across all chains
+  // Fetch all balances across all chains using Li.Fi
   const fetchAllBalances = async () => {
     if (!address) return;
 
     setLoading(true);
     setError(null);
-    const allBalances: TokenBalance[] = [];
 
     try {
-      // Fetch native token balances
-      for (const chainId of Object.values(CHAIN_IDS)) {
-        if (chainId === CHAIN_IDS.HYPEREVM) continue; // Skip HyperEVM as it's the target
-        
-        const nativeBalance = await fetchNativeBalance(chainId);
-        if (nativeBalance && parseFloat(nativeBalance.balanceFormatted) > 0) {
-          allBalances.push(nativeBalance);
-        }
-      }
-
-      // Fetch ERC-20 token balances
-      for (const [chainId, tokens] of Object.entries(TOKEN_ADDRESSES)) {
-        if (chainId === CHAIN_IDS.HYPEREVM.toString()) continue; // Skip HyperEVM as it's the target
-        
-        for (const [tokenSymbol, tokenAddress] of Object.entries(tokens)) {
-          if (tokenAddress === '0x0000000000000000000000000000000000000000') continue; // Skip native tokens
-          
-          const decimals = tokenSymbol === 'USDC' || tokenSymbol === 'USDT' ? 6 : 18;
-          const tokenBalance = await fetchTokenBalance(
-            parseInt(chainId), 
-            tokenSymbol, 
-            tokenAddress, 
-            decimals
-          );
-          
-          if (tokenBalance && parseFloat(tokenBalance.balanceFormatted) > 0) {
-            allBalances.push(tokenBalance);
-          }
-        }
-      }
-
+      const allBalances = await fetchAllBalancesWithLifi();
       setBalances(allBalances);
     } catch (error) {
       console.error('Error fetching balances:', error);
