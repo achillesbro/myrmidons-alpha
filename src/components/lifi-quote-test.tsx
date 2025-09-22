@@ -4,8 +4,35 @@ import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain, getWalletClient } from '@wagmi/core';
 import { formatUnits } from 'viem';
+import { BrowserProvider } from 'ethers';
 import { useLifiConfig } from '../hooks/useLifiConfig';
 import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
+
+// Helper functions for chain names and explorer URLs
+const getChainName = (chainId: number): string => {
+  const chainNames: Record<number, string> = {
+    1: 'Ethereum',
+    42161: 'Arbitrum',
+    8453: 'Base',
+    10: 'Optimism',
+    56: 'BSC',
+    999: 'HyperEVM',
+  };
+  return chainNames[chainId] || `Chain ${chainId}`;
+};
+
+const getExplorerUrl = (chainId: number, txHash: string): string => {
+  const explorerUrls: Record<number, string> = {
+    1: 'https://etherscan.io',
+    42161: 'https://arbiscan.io',
+    8453: 'https://basescan.org',
+    10: 'https://optimistic.etherscan.io',
+    56: 'https://bscscan.com',
+    999: 'https://hyperevmscan.io',
+  };
+  const baseUrl = explorerUrls[chainId] || 'https://etherscan.io';
+  return `${baseUrl}/tx/${txHash}`;
+};
 
 interface ExecutionResult {
   success: boolean;
@@ -42,17 +69,6 @@ export function LiFiQuoteTest() {
   // Initialize Li.Fi SDK configuration
   const { isConfigured } = useLifiConfig();
 
-  const getChainName = (chainId: number) => {
-    const chainNames: { [key: number]: string } = {
-      [CHAIN_IDS.ETHEREUM]: 'Ethereum',
-      [CHAIN_IDS.ARBITRUM]: 'Arbitrum',
-      [CHAIN_IDS.BASE]: 'Base',
-      [CHAIN_IDS.OPTIMISM]: 'Optimism',
-      [CHAIN_IDS.BSC]: 'BSC',
-      [CHAIN_IDS.HYPEREVM]: 'HyperEVM',
-    };
-    return chainNames[chainId] || `Chain ${chainId}`;
-  };
 
   // Handler functions for balance fetcher
   const handleTokenSelect = (tokenInfo: any) => {
@@ -204,6 +220,11 @@ export function LiFiQuoteTest() {
 
       // Execute the route
       console.log('Starting route execution...');
+      
+      // Track transaction hashes for wallet monitoring
+      const txHashes: string[] = [];
+      let finalTxHash = 'Unknown';
+      
       const executedRoute = await executeRoute(selectedRoute, {
         updateRouteHook: (updatedRoute) => {
           console.log('Route update:', {
@@ -212,6 +233,18 @@ export function LiFiQuoteTest() {
               tool: step.toolDetails?.key,
               txHash: step.execution?.process?.[0]?.txHash
             }))
+          });
+          
+          // Collect all transaction hashes
+          updatedRoute.steps?.forEach(step => {
+            if (step.execution?.process) {
+              step.execution.process.forEach(process => {
+                if (process.txHash && !txHashes.includes(process.txHash)) {
+                  txHashes.push(process.txHash);
+                  finalTxHash = process.txHash; // Keep the latest one
+                }
+              });
+            }
           });
         },
         acceptExchangeRateUpdateHook: async () => {
@@ -231,23 +264,35 @@ export function LiFiQuoteTest() {
         },
       });
 
-      // Extract transaction hash from the executed route
-      let txHash = 'Unknown';
+      // Extract final transaction hash from the executed route
       if (executedRoute.steps && executedRoute.steps.length > 0) {
         const lastStep = executedRoute.steps[executedRoute.steps.length - 1];
         if (lastStep.execution?.process && lastStep.execution.process.length > 0) {
           const lastProcess = lastStep.execution.process[lastStep.execution.process.length - 1];
-          txHash = lastProcess.txHash || 'Unknown';
+          finalTxHash = lastProcess.txHash || finalTxHash;
         }
       }
-      
+
+      // Show immediate success toast with clickable transaction hash
       setExecutions(prev => [...prev, {
         success: true,
-        txHash: txHash,
+        txHash: finalTxHash,
         chainId: selectedTokenInfo.chainId,
         token: selectedTokenInfo.tokenSymbol,
         amount: amount,
       }]);
+
+      // Monitor transaction using wallet provider for faster confirmation
+      if (finalTxHash !== 'Unknown') {
+        try {
+          const provider = new BrowserProvider((window as any).ethereum);
+          // Wait for confirmation using wallet provider (faster than public RPC)
+          await provider.waitForTransaction(finalTxHash, 1, 20_000).catch(() => null);
+          console.log('Transaction confirmed via wallet provider');
+        } catch (error) {
+          console.warn('Wallet transaction monitoring failed:', error);
+        }
+      }
 
       // Reset form
       setSelectedTokenInfo(null);
@@ -328,7 +373,20 @@ export function LiFiQuoteTest() {
                 
                 {execution.success ? (
                   <div className="text-sm text-gray-600">
-                    <div>Transaction Hash: {execution.txHash}</div>
+                    <div>
+                      Transaction Hash: {execution.txHash && execution.txHash !== 'Unknown' ? (
+                        <a
+                          href={getExplorerUrl(execution.chainId, execution.txHash)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 underline font-mono"
+                        >
+                          {execution.txHash}
+                        </a>
+                      ) : (
+                        <span className="text-gray-500">Unknown</span>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-sm text-red-600">

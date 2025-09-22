@@ -11,14 +11,11 @@ const ENV_HYPER_RPC_URLS = [
 ].filter(Boolean) as string[];
 
 // Sensible defaults (you can override via .env). Note:
-// - Alchemy requires a project endpoint; replace with your HTTPS URL.
 // - http://rpc.hypurrscan.io is HTTP only; keep if you’re comfortable with HTTP.
 const DEFAULT_HYPER_RPC_URLS: string[] = [
   "https://rpc.hyperliquid.xyz/evm",
   "http://rpc.hypurrscan.io",
-  "https://hyperliquid-json-rpc.stakely.io",
   "https://rpc.purroofgroup.com",
-  // "https://<YOUR-ALCHEMY-ENDPOINT>" // e.g. https://hyperevm-mainnet.g.alchemy.com/v2/<key>
 ];
 
 // Merge env + defaults and de-duplicate while preserving order
