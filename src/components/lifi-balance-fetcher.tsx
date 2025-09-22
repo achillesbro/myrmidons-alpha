@@ -392,7 +392,7 @@ export const LiFiBalanceFetcher = ({
           </div>
 
           {/* Quick Select Buttons */}
-          {selectedToken.balanceUSD && (
+          {(selectedToken.balanceUSD || (selectedToken.tokenSymbol === 'USDT0' && selectedToken.balanceFormatted)) && (
             <div className="mb-4">
               <div className="text-sm font-medium text-gray-700 mb-2">Quick Select:</div>
               <div className="flex space-x-2">
@@ -400,8 +400,12 @@ export const LiFiBalanceFetcher = ({
                   <button
                     key={percentage}
                     onClick={() => {
-                      const maxUSD = parseFloat(selectedToken.balanceUSD || '0');
-                      const amountUSD = (maxUSD * percentage / 100).toFixed(2);
+                      // For USDT0, use balanceFormatted directly since it's 1:1 with USD
+                      // For other tokens, use balanceUSD
+                      const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
+                        ? parseFloat(selectedToken.balanceFormatted)
+                        : parseFloat(selectedToken.balanceUSD || '0');
+                      const amountUSD = (maxAmount * percentage / 100).toFixed(2);
                       handleAmountChange({ target: { value: amountUSD } } as any);
                     }}
                     className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
