@@ -11,7 +11,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "wagmi";
 import { useEffect, useState } from "react";
 import { Address, getAddress, isAddress } from "viem";
-import { mainnet, arbitrum, base } from "wagmi/chains";
+import { mainnet, arbitrum, base, optimism, bsc } from "wagmi/chains";
 import {
   metaMaskWallet,
   okxWallet,
@@ -191,6 +191,8 @@ const config = getDefaultConfig({
     mainnet,
     arbitrum, 
     base,
+    optimism,
+    bsc,
     hyperEVM],
   wallets: [
     {
@@ -202,6 +204,8 @@ const config = getDefaultConfig({
     [mainnet.id]: http(),
     [arbitrum.id]: http(),
     [base.id]: http(),
+    [optimism.id]: http(),
+    [bsc.id]: http(),
     [hyperEVM.id]: http("https://rpc.hyperliquid.xyz/evm"),
   },
 });
