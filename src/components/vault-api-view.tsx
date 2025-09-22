@@ -17,6 +17,7 @@ import vaultAbi from "../abis/vault.json";
 import { useVaultCurrentApyOnchain } from "../hooks/useVaultCurrentApyOnchain";
 import { useState, useEffect, useRef } from "react";
 import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";
+import { LiFiQuoteTest } from "./lifi-quote-test";
 // Inline AllocationList component for on-chain allocations
 
 // Simple error boundary to isolate rendering errors in the API View
@@ -137,7 +138,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const [assetDecimals, setAssetDecimals] = useState<number>(18);
   // Approval confirmation dialog state
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
-  const [allowance, setAllowance] = useState<bigint>(0n);
   const [onchainBalance, setOnchainBalance] = useState<bigint>(0n); // underlying token balance
   const [userShares, setUserShares] = useState<bigint>(0n);
   const [userAssets, setUserAssets] = useState<bigint>(0n);
@@ -145,6 +145,9 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const [wdAmount, setWdAmount] = useState<string>("");
   const [pending, setPending] = useState<"approve" | "deposit" | "withdraw" | null>(null);
   const [txMode, setTxMode] = useState<"deposit" | "withdraw">("deposit");
+  
+  // Deposit dialog state
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
@@ -285,11 +288,9 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
             { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "balanceOf", args: [user] },
           ],
         });
-        const allow = mcu[0].result as bigint;
         const bal = mcu[1].result as bigint;
         const shares = mcu[2].result as bigint;
         const assets = (await client.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "convertToAssets", args: [shares] })) as bigint;
-        setAllowance(allow);
         setOnchainBalance(bal);
         setUserShares(shares);
         setUserAssets(assets);
@@ -324,16 +325,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         // Swallow timeout — deposit has already been prompted; nonce ordering will ensure safety
         console.warn("Approval receipt wait timed out", err);
       } finally {
-        // Try to refresh allowance either way (non-blocking semantics)
-        try {
-          const allow = await hyperPublicClient.readContract({
-            address: underlyingAddress,
-            abi: erc20Abi,
-            functionName: "allowance",
-            args: [clientW.data.account.address, VAULT_ADDRESS],
-          }) as bigint;
-          setAllowance(allow);
-        } catch {}
+        // Allowance refresh removed - not needed for new deposit flow
         setLastUpdated(Date.now());
         setPending(null);
       }
@@ -733,78 +725,24 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                   </div>
                 </div>
                 {txMode === "deposit" ? (
-                  <div className="min-h-[160px]">
-                    <input
-                      value={depAmount}
-                      onChange={(e) => setDepAmount(e.target.value)}
-                      placeholder={t("vaultInfo.actions.placeholderAmount", { defaultValue: "0.00" })}
-                      className="w-full border rounded py-1.5 px-2 bg-white"
-                      inputMode="decimal"
-                    />
-                    <div className="flex items-center justify-between mt-1 text-xs text-[#101720]/70">
-                      <div>
-                        {t("vaultInfo.actions.balance", { defaultValue: "Balance" })}: {fmtToken(onchainBalance, onchainData.underlyingDecimals)} USDT0
-                      </div>
-                      <button
-                        type="button"
-                        className="px-2 py-0.5 text-xs border rounded"
-                        onClick={() => setDepAmount(formatUnits(onchainBalance, onchainData.underlyingDecimals))}
-                      >
-                        {t("vaultInfo.actions.max", { defaultValue: "Max" })}
-                      </button>
-                    </div>
-                    <div className="mt-1 text-[11px]">
-                      <button
-                        type="button"
-                        className="underline text-[#00295B] hover:opacity-80"
-                        onClick={() => {
-                          const base = "https://jumper.exchange/?fromChain=42161&fromToken=0x0000000000000000000000000000000000000000&toChain=999&toToken=0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb";
-                          const amt = depAmount && Number(depAmount) > 0 ? `&amp;fromAmount=${encodeURIComponent(depAmount)}` : "";
-                          window.open(`${base}${amt}`, "_blank", "noopener,noreferrer");
-                        }}
-                      >
-                        {t("vaultInfo.actions.bridgeCta", {
-                          defaultValue: "Need funds on HyperEVM? Bridge from Arbitrum via Jumper",
+                  <div className="min-h-[160px] flex flex-col justify-center">
+                    <div className="text-center mb-4">
+                      <h4 className="text-lg font-semibold text-[#00295B] mb-2">
+                        {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into Hyperbeat USDC" })}
+                      </h4>
+                      <p className="text-sm text-[#101720]/70">
+                        {t("vaultInfo.actions.depositDescription", { 
+                          defaultValue: "Bridge from any chain or deposit USDT0 directly" 
                         })}
-                      </button>
+                      </p>
                     </div>
-                    {depAmount && parseUnits(depAmount || "0", onchainData.underlyingDecimals) > onchainBalance && (
-                      <div className="text-xs text-red-600 mt-1">
-                        {t("vaultInfo.actions.exceedsBalance", { defaultValue: "Exceeds wallet balance" })}
-                      </div>
-                    )}
-                    {(() => {
-                      const amountWei = parseUnits(depAmount || "0", onchainData.underlyingDecimals);
-                      const validAmount = depAmount && amountWei > 0n && amountWei <= onchainBalance;
-                      const needsApproval = validAmount && allowance < amountWei;
-                      const label =
-                        pending === "approve"
-                          ? t("vaultInfo.actions.approving", { defaultValue: "Approving…" })
-                          : pending === "deposit"
-                          ? t("vaultInfo.actions.depositing", { defaultValue: "Depositing…" })
-                          : needsApproval
-                          ? t("vaultInfo.actions.approve", { defaultValue: "Approve" })
-                          : t("vaultInfo.actions.deposit", { defaultValue: "Deposit" });
-                      const onClick = () => {
-                        if (!validAmount) return;
-                        if (needsApproval) {
-                          setApproveConfirmOpen(true);
-                        } else {
-                          // Direct deposit without confirmation dialog
-                          runDeposit();
-                        }
-                      };
-                      return (
-                        <button
-                          type="button"
-                          disabled={pending !== null || !validAmount}
-                          className="mt-3 w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
-                          onClick={onClick}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })()}
+                    <button
+                      type="button"
+                      onClick={() => setDepositDialogOpen(true)}
+                      className="w-full px-4 py-3 text-base font-medium rounded-lg bg-[#00295B] text-[#FFFFF5] hover:bg-[#001a3d] transition-colors"
+                    >
+                      {t("vaultInfo.actions.deposit", { defaultValue: "Deposit" })}
+                    </button>
                   </div>
                 ) : (
                   <div className="min-h-[160px]">
@@ -895,6 +833,29 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
           onCancel={() => setApproveConfirmOpen(false)}
           busy={pending === "approve"}
         />
+
+        {/* Deposit Dialog */}
+        {depositDialogOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-semibold text-[#00295B]">
+                  {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into Hyperbeat USDC" })}
+                </h2>
+                <button
+                  onClick={() => setDepositDialogOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                <LiFiQuoteTest />
+              </div>
+            </div>
+          </div>
+        )}
+
         <Toasts toasts={toasts} />
 
       </div>

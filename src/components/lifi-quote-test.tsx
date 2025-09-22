@@ -245,6 +245,17 @@ export function LiFiQuoteTest() {
       setExecuting(true);
       pushToast('info', 'Starting direct deposit...', 3000);
       
+      // Force switch to HyperEVM chain for USDT0 deposit
+      try {
+        await switchChain(wagmiConfig, { chainId: CHAIN_IDS.HYPEREVM });
+        pushToast('info', 'Switched to HyperEVM', 2000);
+      } catch (error: any) {
+        console.error('Chain switch failed:', error);
+        pushToast('error', 'Failed to switch to HyperEVM. Please switch manually.', 5000);
+        setExecuting(false);
+        return;
+      }
+      
       // Convert USD amount to USDT0 amount (assuming 1:1 for USDT0)
       const usdt0Amount = parseUnits(enteredAmount, usdt0Balance.decimals);
       
