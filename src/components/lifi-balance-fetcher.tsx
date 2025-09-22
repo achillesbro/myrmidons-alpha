@@ -188,12 +188,12 @@ export const LiFiBalanceFetcher = ({
     }
   }, [address]);
 
-  // Auto-refresh balances every 30 seconds
+  // Auto-refresh balances every 60 seconds
   useEffect(() => {
     if (address) {
       const interval = setInterval(() => {
         fetchAllBalances();
-      }, 30000); // 30 seconds
+      }, 60000); // 60 seconds
       
       setRefreshInterval(interval);
       
@@ -214,12 +214,10 @@ export const LiFiBalanceFetcher = ({
     };
   }, [refreshInterval]);
 
-  // Fetch USDT0 logo when reaching step 3
+  // Fetch USDT0 logo when component mounts
   useEffect(() => {
-    if (currentStep === 3 && selectedToken) {
-      fetchUsdt0Logo();
-    }
-  }, [currentStep, selectedToken]);
+    fetchUsdt0Logo();
+  }, []);
 
   // Fetch USDT0 logo from Li.Fi
   const fetchUsdt0Logo = async () => {
@@ -277,8 +275,41 @@ export const LiFiBalanceFetcher = ({
       {currentStep === 1 && (
         <>
           {loading ? (
-            <div className="text-center py-8 text-gray-600">
-              Loading token balances...
+            <div className="space-y-2">
+              {/* Skeleton for USDT0 */}
+              <div className="p-3 border-l-4 border-gray-300 bg-gray-100 rounded-r-lg animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-full bg-gray-300"></div>
+                    <div>
+                      <div className="h-4 w-16 bg-gray-300 rounded mb-1"></div>
+                      <div className="h-3 w-20 bg-gray-300 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="h-5 w-24 bg-gray-300 rounded mb-1"></div>
+                    <div className="h-3 w-16 bg-gray-300 rounded"></div>
+                  </div>
+                </div>
+              </div>
+              {/* Skeleton for other tokens */}
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="p-3 border border-gray-300 rounded animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 rounded-full bg-gray-300"></div>
+                      <div>
+                        <div className="h-4 w-12 bg-gray-300 rounded mb-1"></div>
+                        <div className="h-3 w-16 bg-gray-300 rounded"></div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="h-4 w-16 bg-gray-300 rounded mb-1"></div>
+                      <div className="h-3 w-12 bg-gray-300 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="space-y-2">
@@ -294,20 +325,31 @@ export const LiFiBalanceFetcher = ({
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">$</span>
-                      </div>
+                    <div className="flex items-center space-x-2">
+                      {usdt0Logo ? (
+                        <img
+                          src={usdt0Logo}
+                          alt="USDT0"
+                          className="w-6 h-6 rounded-full"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                          <span className="text-white font-bold text-xs">$</span>
+                        </div>
+                      )}
                       <div>
-                        <div className="font-semibold text-green-800">USDT0</div>
-                        <div className="text-sm text-green-600">HyperEVM</div>
+                        <div className="font-semibold text-base text-green-800">USDT0</div>
+                        <div className="text-xs text-green-600">HyperEVM</div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-mono text-lg text-green-800">
-                        {parseFloat(usdt0Balance.balanceFormatted).toFixed(6)} USDT0
+                      <div className="font-mono text-sm font-semibold text-green-800">
+                        {parseFloat(usdt0Balance.balanceFormatted).toFixed(4)}
                       </div>
-                      <div className="text-sm text-green-600">
+                      <div className="text-xs text-green-600">
                         ${usdt0Balance.balanceUSD || '0.00'} USD
                       </div>
                     </div>
@@ -392,8 +434,8 @@ export const LiFiBalanceFetcher = ({
               onClick={() => onStepChange(1)}
               className="text-gray-600 hover:text-gray-800 flex items-center space-x-2"
             >
+              <span className="text-xl">←</span>
               <span>Back</span>
-              <span className="text-xl">→</span>
             </button>
           </div>
 
@@ -485,8 +527,8 @@ export const LiFiBalanceFetcher = ({
               onClick={() => onStepChange(2)}
               className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
             >
+              <span className="text-xl">←</span>
               <span>Back</span>
-              <span className="text-xl">→</span>
             </button>
           </div>
           

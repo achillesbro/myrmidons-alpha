@@ -148,7 +148,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   
   // Deposit dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
-  const [currentDepositStep, setCurrentDepositStep] = useState(1);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
@@ -741,7 +740,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                       type="button"
                       onClick={() => {
               setDepositDialogOpen(true);
-              setCurrentDepositStep(1);
             }}
                       className="w-full px-4 py-3 text-base font-medium rounded-lg bg-[#00295B] text-[#FFFFF5] hover:bg-[#001a3d] transition-colors"
                     >
@@ -848,25 +846,9 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
             <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl">
             <div className="sticky top-0 bg-[#FFFFF5] border-b border-[#E5E2D6] z-10">
               <div className="flex items-center justify-between p-6">
-                <div className="flex items-center space-x-4">
-                  <h2 className="text-xl font-semibold text-[#00295B]">
-                    {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
-                  </h2>
-                  {/* Step Tracker */}
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                      currentDepositStep >= 1 ? 'bg-[#00295B] text-white' : 'bg-gray-300 text-gray-600'
-                    }`}>1</div>
-                    <div className={`w-4 h-0.5 ${currentDepositStep >= 2 ? 'bg-[#00295B]' : 'bg-gray-300'}`}></div>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                      currentDepositStep >= 2 ? 'bg-[#00295B] text-white' : 'bg-gray-300 text-gray-600'
-                    }`}>2</div>
-                    <div className={`w-4 h-0.5 ${currentDepositStep >= 3 ? 'bg-[#00295B]' : 'bg-gray-300'}`}></div>
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
-                      currentDepositStep >= 3 ? 'bg-[#00295B] text-white' : 'bg-gray-300 text-gray-600'
-                    }`}>3</div>
-                  </div>
-                </div>
+                <h2 className="text-xl font-semibold text-[#00295B]">
+                  {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
+                </h2>
                 <button
                   onClick={() => setDepositDialogOpen(false)}
                   className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
@@ -876,7 +858,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
               </div>
             </div>
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-                <LiFiQuoteTest onStepChange={setCurrentDepositStep} />
+                <LiFiQuoteTest />
               </div>
             </div>
           </div>

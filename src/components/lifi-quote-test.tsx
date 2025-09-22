@@ -41,11 +41,9 @@ const getExplorerUrl = (chainId: number, txHash: string): string => {
 };
 
 
-interface LiFiQuoteTestProps {
-  onStepChange?: (step: number) => void;
-}
+interface LiFiQuoteTestProps {}
 
-export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
+export function LiFiQuoteTest({}: LiFiQuoteTestProps = {}) {
   const [executing, setExecuting] = useState(false);
   
   // New state for balance fetcher
@@ -171,7 +169,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
   const handleTokenSelect = (tokenInfo: any) => {
     setSelectedTokenInfo(tokenInfo);
     setCurrentStep(2); // Move to step 2 when token is selected
-    onStepChange?.(2); // Notify parent component
   };
 
   const handleAmountEnter = (enteredAmount: string) => {
@@ -602,10 +599,7 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
          usdt0Balance={usdt0Balance}
          usdt0Loading={usdt0Loading}
          currentStep={currentStep}
-         onStepChange={(step) => {
-           setCurrentStep(step);
-           onStepChange?.(step);
-         }}
+         onStepChange={setCurrentStep}
        />
 
 
