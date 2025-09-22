@@ -61,7 +61,7 @@ export const LiFiBalanceFetcher = ({
     fastest: number;
     lastUpdated: number;
   } | null>(null);
-  const [ethPrice, setEthPrice] = useState<number>(2000); // Default ETH price
+  const [usdt0Logo, setUsdt0Logo] = useState<string | null>(null);
 
   // Fetch all balances using Li.Fi's getTokenBalances function
   const fetchAllBalancesWithLifi = async () => {
@@ -197,14 +197,14 @@ export const LiFiBalanceFetcher = ({
   useEffect(() => {
     if (currentStep === 3 && selectedToken) {
       fetchGasPrices(selectedToken.chainId);
-      fetchEthPrice();
+      fetchUsdt0Logo();
     }
   }, [currentStep, selectedToken]);
 
-  // Fetch ETH price from Li.Fi
-  const fetchEthPrice = async () => {
+  // Fetch USDT0 logo from Li.Fi
+  const fetchUsdt0Logo = async () => {
     try {
-      const response = await fetch('https://li.quest/v1/tokens?chainIds=1', {
+      const response = await fetch('https://li.quest/v1/tokens?chainIds=999', {
         headers: {
           'x-lifi-api-key': 'f6f27ae1-842e-479b-93df-96965d72bffd.ce2dfa79-b4f9-40f9-8420-ca0a3b07b489'
         }
@@ -212,15 +212,15 @@ export const LiFiBalanceFetcher = ({
       
       if (response.ok) {
         const data = await response.json();
-        const ethToken = data.tokens.find((token: any) => 
-          token.address === '0x0000000000000000000000000000000000000000' && token.chainId === 1
+        const usdt0Token = data.tokens.find((token: any) => 
+          token.symbol === 'USDT0' && token.chainId === 999
         );
-        if (ethToken && ethToken.priceUSD) {
-          setEthPrice(parseFloat(ethToken.priceUSD));
+        if (usdt0Token && usdt0Token.logoURI) {
+          setUsdt0Logo(usdt0Token.logoURI);
         }
       }
     } catch (error) {
-      console.warn('Error fetching ETH price:', error);
+      console.warn('Error fetching USDT0 logo:', error);
     }
   };
 
@@ -230,17 +230,16 @@ export const LiFiBalanceFetcher = ({
     const ethAmount = gwei / 1e9;
     // Estimate gas cost in ETH (using standard gas limit for simple transfers)
     const gasCostETH = ethAmount * gasLimit;
-    // Convert to USD using fetched ETH price
+    // Use a reasonable ETH price (around $2000-3000)
+    const ethPrice = 2500; // Conservative ETH price
     const gasCostUSD = gasCostETH * ethPrice;
     
     if (gasCostUSD < 0.01) {
       return '< $0.01';
     } else if (gasCostUSD < 1) {
       return `$${gasCostUSD.toFixed(3)}`;
-    } else if (gasCostUSD < 100) {
-      return `$${gasCostUSD.toFixed(2)}`;
     } else {
-      return `$${gasCostUSD.toFixed(0)}`;
+      return `$${gasCostUSD.toFixed(2)}`;
     }
   };
 
@@ -432,7 +431,7 @@ export const LiFiBalanceFetcher = ({
 
       {/* Selected Token and Amount Input - Only show in step 2 */}
       {selectedToken && currentStep === 2 && (
-        <div className="p-4 h-full flex flex-col">
+        <div className="p-4">
           {/* Back button */}
           <div className="flex items-center justify-between mb-4">
             <button
@@ -444,67 +443,77 @@ export const LiFiBalanceFetcher = ({
             </button>
           </div>
 
-          {/* Large Amount Display - This is the main input */}
-          <div className="text-center mb-6 flex-1 flex flex-col justify-center">
-            <div className="text-6xl font-bold text-black mb-4">
-              ${amount || '0.00'}
+          {/* Main Amount Input - This is the large display that acts as input */}
+          <div className="text-center mb-4">
+            <input
+              type="number"
+              value={amount}
+              onChange={handleAmountChange}
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+              max={selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)}
+              className="w-full text-center text-5xl font-bold text-black bg-transparent border-none outline-none placeholder-gray-300"
+            />
+            <div className="text-lg text-gray-600 mt-2">
+              ↑↓ {selectedToken.priceUSD ? (parseFloat(amount || '0') / parseFloat(selectedToken.priceUSD)).toFixed(6) : '0.000000'} {selectedToken.tokenSymbol}
             </div>
-            <div className="text-xl text-gray-600 mb-6">
-              ↓ {selectedToken.priceUSD ? (parseFloat(amount || '0') / parseFloat(selectedToken.priceUSD)).toFixed(6) : '0.000000'} {selectedToken.tokenSymbol}
-            </div>
-
-            {/* Inline Amount Input */}
-            <div className="mb-6">
-              <input
-                type="number"
-                value={amount}
-                onChange={handleAmountChange}
-                placeholder="0.00"
-                step="0.01"
-                min="0"
-                max={selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)}
-                className="w-full text-center text-3xl font-semibold py-3 px-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Quick Select Buttons */}
-            {(selectedToken.balanceUSD || (selectedToken.tokenSymbol === 'USDT0' && selectedToken.balanceFormatted)) && (
-              <div className="mb-6">
-                <div className="flex justify-center space-x-2">
-                  {[25, 50, 75, 100].map((percentage) => (
-                    <button
-                      key={percentage}
-                      onClick={() => {
-                        const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
-                          ? parseFloat(selectedToken.balanceFormatted)
-                          : parseFloat(selectedToken.balanceUSD || '0');
-                        const amountUSD = (maxAmount * percentage / 100).toFixed(2);
-                        handleAmountChange({ target: { value: amountUSD } } as any);
-                      }}
-                      className="px-4 py-2 text-sm font-medium bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {percentage === 100 ? 'Max' : `${percentage}%`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Continue Button */}
-            <button
-              onClick={() => onStepChange(3)}
-              disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > (selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)) || isExecuting}
-              className="w-full py-3 px-6 text-lg font-semibold bg-[#00295B] text-white rounded-lg hover:bg-[#001a3d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              CONTINUE
-            </button>
           </div>
+
+          {/* Quick Select Buttons */}
+          {(selectedToken.balanceUSD || (selectedToken.tokenSymbol === 'USDT0' && selectedToken.balanceFormatted)) && (
+            <div className="mb-4">
+              <div className="flex justify-center space-x-2">
+                {[25, 50, 75, 100].map((percentage) => (
+                  <button
+                    key={percentage}
+                    onClick={() => {
+                      const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
+                        ? parseFloat(selectedToken.balanceFormatted)
+                        : parseFloat(selectedToken.balanceUSD || '0');
+                      const amountUSD = (maxAmount * percentage / 100).toFixed(2);
+                      handleAmountChange({ target: { value: amountUSD } } as any);
+                    }}
+                    className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {percentage === 100 ? 'Max' : `${percentage}%`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Transaction Flow Indicator */}
+          <div className="flex items-center justify-center space-x-4 mb-4 text-sm">
+            <div className="flex items-center space-x-2">
+              <div className="w-6 h-6 rounded-full bg-gray-400 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">1</span>
+              </div>
+              <span>You send {selectedToken.tokenSymbol}</span>
+            </div>
+            <div className="text-gray-400">→</div>
+            <div className="flex items-center space-x-2">
+              <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                <span className="text-white font-bold text-xs">$</span>
+              </div>
+              <span>You receive USDT0</span>
+            </div>
+          </div>
+
+          {/* Continue Button */}
+          <button
+            onClick={() => onStepChange(3)}
+            disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > (selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)) || isExecuting}
+            className="w-full py-3 px-4 text-lg font-semibold bg-[#00295B] text-white rounded-lg hover:bg-[#001a3d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            CONTINUE
+          </button>
         </div>
       )}
 
       {/* Confirmation Step - Step 3 */}
       {selectedToken && currentStep === 3 && (
-        <div className="p-4 h-full flex flex-col">
+        <div className="p-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-blue-800">Confirm Transaction</h3>
             <button
@@ -516,79 +525,86 @@ export const LiFiBalanceFetcher = ({
             </button>
           </div>
           
-          <div className="flex-1 flex flex-col justify-center">
-            <div className="bg-white p-4 rounded-lg border border-blue-200 mb-4">
-              <h4 className="font-semibold text-gray-800 mb-4 text-center">Transaction Summary</h4>
-              
-              {/* Transaction Flow with Logos */}
-              <div className="flex items-center justify-center space-x-3 mb-4">
-                {/* From Token */}
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center space-x-2 mb-1">
-                    {selectedToken.logoURI && (
-                      <img
-                        src={selectedToken.logoURI}
-                        alt={selectedToken.tokenSymbol}
-                        className="w-6 h-6 rounded-full"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    )}
-                    <span className="font-semibold text-base">{selectedToken.tokenSymbol}</span>
-                  </div>
-                  <div className="text-xs text-gray-600">{selectedToken.chainName}</div>
+          <div className="bg-white p-4 rounded-lg border border-blue-200 mb-4">
+            {/* Transaction Flow with Logos */}
+            <div className="flex items-center justify-center space-x-3 mb-4">
+              {/* From Token */}
+              <div className="flex flex-col items-center">
+                <div className="flex items-center space-x-2 mb-1">
+                  {selectedToken.logoURI && (
+                    <img
+                      src={selectedToken.logoURI}
+                      alt={selectedToken.tokenSymbol}
+                      className="w-6 h-6 rounded-full"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <span className="font-semibold text-base">{selectedToken.tokenSymbol}</span>
                 </div>
+                <div className="text-xs text-gray-600">{selectedToken.chainName}</div>
+              </div>
 
-                {/* Arrow */}
-                <div className="text-xl text-gray-400">→</div>
+              {/* Arrow */}
+              <div className="text-xl text-gray-400">→</div>
 
-                {/* To Token */}
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center space-x-2 mb-1">
+              {/* To Token */}
+              <div className="flex flex-col items-center">
+                <div className="flex items-center space-x-2 mb-1">
+                  {usdt0Logo ? (
+                    <img
+                      src={usdt0Logo}
+                      alt="USDT0"
+                      className="w-6 h-6 rounded-full"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
                     <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                       <span className="text-white font-bold text-xs">$</span>
                     </div>
-                    <span className="font-semibold text-base">USDT0</span>
-                  </div>
-                  <div className="text-xs text-gray-600">HyperEVM</div>
+                  )}
+                  <span className="font-semibold text-base">USDT0</span>
                 </div>
-              </div>
-
-              {/* Transaction Details */}
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center py-1 border-b border-gray-100">
-                  <span className="text-gray-600">Amount:</span>
-                  <span className="font-semibold text-base">${amount} USD</span>
-                </div>
-                <div className="flex justify-between items-center py-1 border-b border-gray-100">
-                  <span className="text-gray-600">Method:</span>
-                  <span className="font-medium text-sm">
-                    {selectedToken.tokenSymbol === 'USDT0' && selectedToken.chainId === 999 
-                      ? 'Direct Deposit' 
-                      : 'Bridge & Swap via Li.Fi'
-                    }
-                  </span>
-                </div>
-                {gasFees && (
-                  <div className="flex justify-between items-center py-1">
-                    <span className="text-gray-600">Gas Fee:</span>
-                    <span className="font-medium text-sm">
-                      {convertGweiToUSD(gasFees.fast)}
-                    </span>
-                  </div>
-                )}
+                <div className="text-xs text-gray-600">HyperEVM</div>
               </div>
             </div>
-            
-            <button
-              onClick={onExecute}
-              disabled={isExecuting}
-              className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isExecuting ? 'Executing...' : 'Confirm & Execute'}
-            </button>
+
+            {/* Transaction Details */}
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                <span className="text-gray-600">Amount:</span>
+                <span className="font-semibold text-base">${amount} USD</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-gray-100">
+                <span className="text-gray-600">Method:</span>
+                <span className="font-medium text-sm">
+                  {selectedToken.tokenSymbol === 'USDT0' && selectedToken.chainId === 999 
+                    ? 'Direct Deposit' 
+                    : 'Bridge & Swap via Li.Fi'
+                  }
+                </span>
+              </div>
+              {gasFees && (
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-gray-600">Gas Fee:</span>
+                  <span className="font-medium text-sm">
+                    {convertGweiToUSD(gasFees.fast)}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
+          
+          <button
+            onClick={onExecute}
+            disabled={isExecuting}
+            className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isExecuting ? 'Executing Transaction...' : 'Confirm & Execute'}
+          </button>
         </div>
       )}
     </div>

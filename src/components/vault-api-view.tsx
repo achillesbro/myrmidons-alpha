@@ -845,34 +845,32 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
             <div className="absolute inset-0 backdrop-blur-sm"></div>
             
             {/* Dialog container with cropping effect */}
-            <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
-              {/* Sticky Header */}
-              <div className="sticky top-0 z-10 bg-[#FFFFF5] border-b border-[#E5E2D6] flex-shrink-0">
-                <div className="flex items-center justify-between p-6">
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => setDepositDialogOpen(false)}
-                      className="text-[#101720]/60 hover:text-[#101720] text-xl font-bold"
-                    >
-                      ←
-                    </button>
-                    <h2 className="text-xl font-semibold text-[#00295B]">
-                      {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
-                    </h2>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-[#101720]/60">Step {currentDepositStep} of 3</span>
-                    <button
-                      onClick={() => setDepositDialogOpen(false)}
-                      className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
-                    >
-                      ×
-                    </button>
-                  </div>
+            <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl">
+            <div className="sticky top-0 bg-[#FFFFF5] border-b border-[#E5E2D6] z-10">
+              <div className="flex items-center justify-between p-6">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setDepositDialogOpen(false)}
+                    className="text-[#101720]/60 hover:text-[#101720] text-xl font-bold"
+                  >
+                    ←
+                  </button>
+                  <h2 className="text-xl font-semibold text-[#00295B]">
+                    {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
+                  </h2>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-[#101720]/60">Step {currentDepositStep} of 3</span>
+                  <button
+                    onClick={() => setDepositDialogOpen(false)}
+                    className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
+                  >
+                    ×
+                  </button>
                 </div>
               </div>
-              {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto">
+            </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
                 <LiFiQuoteTest onStepChange={setCurrentDepositStep} />
               </div>
             </div>
