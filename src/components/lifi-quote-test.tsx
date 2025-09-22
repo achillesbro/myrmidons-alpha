@@ -3,11 +3,15 @@ import { getRoutes, executeRoute } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain, getWalletClient } from '@wagmi/core';
-import { formatUnits } from 'viem';
-import { BrowserProvider } from 'ethers';
+import { formatUnits, parseUnits } from 'viem';
+import { BrowserProvider, Contract } from 'ethers';
 import { useLifiConfig } from '../hooks/useLifiConfig';
 import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
+import vaultAbi from '../abis/vault.json';
+
+// Vault address for direct deposits
+const VAULT_ADDRESS = '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42' as `0x${string}`;
 
 // Helper functions for chain names and explorer URLs
 const getChainName = (chainId: number): string => {
@@ -86,6 +90,33 @@ export function LiFiQuoteTest() {
     setToasts([]);
   };
 
+  // Direct deposit function for USDT0 on HyperEVM
+  const runDirectDeposit = async (amountWei: bigint) => {
+    try {
+      if (!clientW.data) throw new Error("Connect wallet");
+      
+      const provider = new BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+      
+      pushToast('info', 'Submitting deposit transaction...', 3000);
+      
+      const tx = await vault.deposit(amountWei, clientW.data.account.address);
+      pushToast('info', `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
+      
+      // Wait for confirmation using wallet provider
+      await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
+      pushToast('success', 'Deposit successful');
+      
+      // Reset form
+      setSelectedTokenInfo(null);
+      setAmount('');
+      
+    } catch (e: any) {
+      pushToast('error', `Deposit failed: ${e.message || 'Unknown error'}`, 8000);
+    }
+  };
+
   // Route monitoring functions based on Li.Fi documentation
   const getStepStatus = (step: any): string => {
     if (!step.execution?.process || step.execution.process.length === 0) {
@@ -123,19 +154,21 @@ export function LiFiQuoteTest() {
       
       // Show toast for each step
       if (stepStatus === 'DONE') {
-        pushToast('success', `✅ ${stepDescription} completed`, 3000);
+        pushToast('success', `${stepDescription} completed`, 3000);
       } else if (stepStatus === 'FAILED') {
-        pushToast('error', `❌ ${stepDescription} failed`, 5000);
+        pushToast('error', `${stepDescription} failed`, 5000);
       } else if (stepStatus === 'PENDING') {
-        pushToast('info', `⏳ ${stepDescription} pending...`, 2000);
+        pushToast('info', `${stepDescription} pending...`, 2000);
       } else if (stepStatus === 'PROCESSING') {
-        pushToast('info', `🔄 ${stepDescription} processing...`, 2000);
+        pushToast('info', `${stepDescription} processing...`, 2000);
       }
       
-      // Show transaction hashes for completed steps
+      // Show transaction hashes for completed steps (only once per unique hash)
       if (step.execution?.process) {
+        const seenHashes = new Set<string>();
         step.execution.process.forEach((process: any) => {
-          if (process.txHash && process.status === 'DONE') {
+          if (process.txHash && process.status === 'DONE' && !seenHashes.has(process.txHash)) {
+            seenHashes.add(process.txHash);
             const explorerUrl = getExplorerUrl(step.action?.fromChainId || 0, process.txHash);
             pushToast('info', `Transaction: ${process.txHash.slice(0, 8)}...`, 5000, explorerUrl);
           }
@@ -158,7 +191,34 @@ export function LiFiQuoteTest() {
     
     setExecuting(true);
     clearToasts(); // Clear any existing toasts
-    pushToast('info', '🚀 Starting bridge execution...', 3000);
+    
+    // Check if it's USDT0 on HyperEVM - use direct deposit
+    if (selectedTokenInfo.tokenSymbol === 'USDT0' && selectedTokenInfo.chainId === CHAIN_IDS.HYPEREVM) {
+      try {
+        // Convert USD amount to native token amount
+        let fromAmount: string;
+        if (selectedTokenInfo.priceUSD) {
+          const usdAmount = parseFloat(amount);
+          const tokenPrice = parseFloat(selectedTokenInfo.priceUSD);
+          const nativeAmount = usdAmount / tokenPrice;
+          fromAmount = Math.round(nativeAmount * Math.pow(10, selectedTokenInfo.decimals)).toString();
+        } else {
+          fromAmount = parseUnits(amount, selectedTokenInfo.decimals).toString();
+        }
+        
+        pushToast('info', 'Processing direct deposit...', 3000);
+        await runDirectDeposit(BigInt(fromAmount));
+        return;
+      } catch (error: any) {
+        pushToast('error', `Direct deposit failed: ${error.message || 'Unknown error'}`, 8000);
+        return;
+      } finally {
+        setExecuting(false);
+      }
+    }
+    
+    // Otherwise, use Li.Fi for bridging/swapping
+    pushToast('info', 'Starting bridge execution...', 3000);
     
     try {
       // Convert USD amount to native token amount
@@ -354,7 +414,7 @@ export function LiFiQuoteTest() {
       }
 
       // Show success toast
-      pushToast('success', '🎉 Bridge execution completed successfully!', 5000);
+      pushToast('success', 'Bridge execution completed successfully!', 5000);
       
       // Add to executions list
       setExecutions(prev => [...prev, {
@@ -372,7 +432,7 @@ export function LiFiQuoteTest() {
           // Wait for confirmation using wallet provider (faster than public RPC)
           await provider.waitForTransaction(finalTxHash, 1, 20_000).catch(() => null);
           console.log('Transaction confirmed via wallet provider');
-          pushToast('success', '✅ Transaction confirmed on-chain', 3000);
+          pushToast('success', 'Transaction confirmed on-chain', 3000);
         } catch (error) {
           console.warn('Wallet transaction monitoring failed:', error);
         }
@@ -384,7 +444,7 @@ export function LiFiQuoteTest() {
       
     } catch (error: any) {
       console.error('Execution failed:', error);
-      pushToast('error', `❌ Bridge execution failed: ${error.message || 'Unknown error'}`, 8000);
+      pushToast('error', `Bridge execution failed: ${error.message || 'Unknown error'}`, 8000);
       
       setExecutions(prev => [...prev, {
         success: false,
