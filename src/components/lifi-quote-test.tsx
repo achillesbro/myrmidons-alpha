@@ -40,21 +40,12 @@ const getExplorerUrl = (chainId: number, txHash: string): string => {
   return `${baseUrl}/tx/${txHash}`;
 };
 
-interface ExecutionResult {
-  success: boolean;
-  txHash?: string;
-  error?: string;
-  chainId: number;
-  token: string;
-  amount: string;
-}
 
 interface LiFiQuoteTestProps {
   onStepChange?: (step: number) => void;
 }
 
 export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
-  const [executions, setExecutions] = useState<ExecutionResult[]>([]);
   const [executing, setExecuting] = useState(false);
   
   // New state for balance fetcher
@@ -526,14 +517,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
       // Show success toast
       pushToast('success', 'Bridge execution completed successfully!', 5000);
       
-      // Add to executions list
-      setExecutions(prev => [...prev, {
-        success: true,
-        txHash: finalTxHash,
-        chainId: selectedTokenInfo.chainId,
-        token: selectedTokenInfo.tokenSymbol,
-        amount: amount,
-      }]);
 
       // Monitor transaction using wallet provider for faster confirmation
       if (finalTxHash !== 'Unknown') {
@@ -555,14 +538,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
     } catch (error: any) {
       console.error('Execution failed:', error);
       pushToast('error', `Bridge execution failed: ${error.message || 'Unknown error'}`, 8000);
-      
-      setExecutions(prev => [...prev, {
-        success: false,
-        error: error.message || 'Unknown error',
-        chainId: selectedTokenInfo.chainId,
-        token: selectedTokenInfo.tokenSymbol,
-        amount: amount,
-      }]);
     } finally {
       setExecuting(false);
     }
@@ -633,59 +608,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
          }}
        />
 
-      {/* Execution Results */}
-      {executions.length > 0 && (
-        <div className="mt-8 space-y-4">
-          <h3 className="text-lg font-semibold">Execution Results:</h3>
-          <div className="grid gap-4">
-            {executions.map((execution, index) => (
-              <div
-                key={index}
-                className={`p-4 rounded border ${
-                  execution.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                }`}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <span className="font-medium">
-                      {execution.token} on {getChainName(execution.chainId)} → USDT0 on HyperEVM
-                    </span>
-                    <span className="text-gray-500 ml-2">({execution.amount} {execution.token})</span>
-                  </div>
-                  <span className={`px-2 py-1 rounded text-sm ${
-                    execution.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {execution.success ? 'Success' : 'Failed'}
-                  </span>
-                </div>
-                
-                {execution.success ? (
-                  <div className="text-sm text-gray-600">
-                    <div>
-                      Transaction Hash: {execution.txHash && execution.txHash !== 'Unknown' ? (
-                        <a
-                          href={getExplorerUrl(execution.chainId, execution.txHash)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 underline font-mono"
-                        >
-                          {execution.txHash}
-                        </a>
-                      ) : (
-                        <span className="text-gray-500">Unknown</span>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-red-600">
-                    Error: {execution.error}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Toast notifications */}
       <Toasts toasts={toasts} />

@@ -55,6 +55,12 @@ export const LiFiBalanceFetcher = ({
   const [balances, setBalances] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gasFees, setGasFees] = useState<{
+    standard: number;
+    fast: number;
+    fastest: number;
+    lastUpdated: number;
+  } | null>(null);
 
   // Fetch all balances using Li.Fi's getTokenBalances function
   const fetchAllBalancesWithLifi = async () => {
@@ -186,6 +192,13 @@ export const LiFiBalanceFetcher = ({
     }
   }, [address]);
 
+  // Fetch gas prices when reaching step 3
+  useEffect(() => {
+    if (currentStep === 3 && selectedToken) {
+      fetchGasPrices(selectedToken.chainId);
+    }
+  }, [currentStep, selectedToken]);
+
   const handleTokenClick = (balance: TokenBalance) => {
     onTokenSelect(balance);
     onStepChange(2); // Move to step 2 when token is selected
@@ -193,6 +206,26 @@ export const LiFiBalanceFetcher = ({
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onAmountEnter(e.target.value);
+  };
+
+  // Fetch gas prices for the selected token's chain
+  const fetchGasPrices = async (chainId: number) => {
+    try {
+      const response = await fetch(`https://li.quest/v1/gas/prices/${chainId}`, {
+        headers: {
+          'x-lifi-api-key': 'f6f27ae1-842e-479b-93df-96965d72bffd.ce2dfa79-b4f9-40f9-8420-ca0a3b07b489'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setGasFees(data);
+      } else {
+        console.warn('Failed to fetch gas prices:', response.status);
+      }
+    } catch (error) {
+      console.warn('Error fetching gas prices:', error);
+    }
   };
 
 
@@ -219,8 +252,8 @@ export const LiFiBalanceFetcher = ({
         </div>
       )}
 
-      {/* USDT0 Direct Deposit Section */}
-      {usdt0Balance && (
+      {/* USDT0 Direct Deposit Section - Only show in step 1 */}
+      {usdt0Balance && currentStep === 1 && (
         <div className="p-3 border-l-4 border-green-500 bg-green-50 rounded-r-lg">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
@@ -264,27 +297,29 @@ export const LiFiBalanceFetcher = ({
         </div>
       )}
 
-      {/* Bridge Tokens Section */}
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="text-base font-semibold text-[#00295B]">SELECT TOKEN TO BRIDGE</h4>
-        <button
-          onClick={fetchAllBalances}
-          disabled={loading}
-          className="px-3 py-1 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
-        >
-          Refresh Balances
-        </button>
-      </div>
+      {/* Bridge Tokens Section - Only show in step 1 */}
+      {currentStep === 1 && (
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-base font-semibold text-[#00295B]">SELECT TOKEN TO BRIDGE</h4>
+          <button
+            onClick={fetchAllBalances}
+            disabled={loading}
+            className="px-3 py-1 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+          >
+            Refresh Balances
+          </button>
+        </div>
+      )}
 
-      {/* USDT0 Loading State */}
-      {usdt0Loading && (
+      {/* USDT0 Loading State - Only show in step 1 */}
+      {usdt0Loading && currentStep === 1 && (
         <div className="p-4 border border-gray-300 bg-gray-50 rounded-lg">
           <div className="text-center text-gray-600">Loading USDT0 balance...</div>
         </div>
       )}
 
-      {/* Separator */}
-      {usdt0Balance && balances.length > 0 && (
+      {/* Separator - Only show in step 1 */}
+      {usdt0Balance && balances.length > 0 && currentStep === 1 && (
         <div className="flex items-center my-3">
           <div className="flex-1 border-t border-gray-300"></div>
           <div className="px-3 text-xs text-gray-500 bg-white">Bridge & Swap Tokens</div>
@@ -292,68 +327,65 @@ export const LiFiBalanceFetcher = ({
         </div>
       )}
 
-      {/* Balances List */}
-      {loading ? (
-        <div className="text-center py-8 text-gray-600">
-          Loading token balances...
-        </div>
-      ) : balances.length === 0 ? (
-        <div className="text-center py-8 text-gray-600">
-          No token balances found. Make sure you have tokens on the supported chains.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {balances.map((balance, index) => (
-            <div
-              key={`${balance.chainId}-${balance.tokenSymbol}-${index}`}
-              onClick={() => handleTokenClick(balance)}
-              className={`p-3 border rounded cursor-pointer transition-colors ${
-                selectedToken?.chainId === balance.chainId && 
-                selectedToken?.tokenSymbol === balance.tokenSymbol
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  {balance.logoURI && (
-                    <img
-                      src={balance.logoURI}
-                      alt={balance.tokenSymbol}
-                      className="w-6 h-6 rounded-full"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  )}
-                  <div>
-                    <div className="font-semibold text-base">{balance.tokenSymbol}</div>
-                    <div className="text-xs text-gray-600">{balance.chainName}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-sm font-semibold">
-                    {parseFloat(balance.balanceFormatted).toFixed(4)}
-                  </div>
-                  <div className="text-xs text-gray-600">
-                    {balance.balanceUSD ? `$${balance.balanceUSD}` : balance.tokenSymbol}
-                  </div>
-                </div>
-              </div>
+      {/* Balances List - Only show in step 1 */}
+      {currentStep === 1 && (
+        <>
+          {loading ? (
+            <div className="text-center py-8 text-gray-600">
+              Loading token balances...
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* No Balances Message - Legacy */}
-      {!loading && balances.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No token balances found. Make sure you have tokens on the supported chains.
-        </div>
+          ) : balances.length === 0 ? (
+            <div className="text-center py-8 text-gray-600">
+              No token balances found. Make sure you have tokens on the supported chains.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {balances.map((balance, index) => (
+                <div
+                  key={`${balance.chainId}-${balance.tokenSymbol}-${index}`}
+                  onClick={() => handleTokenClick(balance)}
+                  className={`p-3 border rounded cursor-pointer transition-colors ${
+                    selectedToken?.chainId === balance.chainId && 
+                    selectedToken?.tokenSymbol === balance.tokenSymbol
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      {balance.logoURI && (
+                        <img
+                          src={balance.logoURI}
+                          alt={balance.tokenSymbol}
+                          className="w-6 h-6 rounded-full"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      )}
+                      <div>
+                        <div className="font-semibold text-base">{balance.tokenSymbol}</div>
+                        <div className="text-xs text-gray-600">{balance.chainName}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono text-sm font-semibold">
+                        {parseFloat(balance.balanceFormatted).toFixed(4)}
+                      </div>
+                      <div className="text-xs text-gray-600">
+                        {balance.balanceUSD ? `$${balance.balanceUSD}` : balance.tokenSymbol}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Selected Token and Amount Input - Only show in step 2 */}
-      {selectedToken && currentStep >= 2 && (
+      {selectedToken && currentStep === 2 && (
         <div className="p-6 bg-gray-50 rounded-lg">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Selected Token</h3>
@@ -459,7 +491,7 @@ export const LiFiBalanceFetcher = ({
       )}
 
       {/* Confirmation Step - Step 3 */}
-      {selectedToken && currentStep >= 3 && (
+      {selectedToken && currentStep === 3 && (
         <div className="p-6 bg-blue-50 rounded-lg">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-blue-800">Confirm Transaction</h3>
@@ -497,6 +529,14 @@ export const LiFiBalanceFetcher = ({
                     }
                   </span>
                 </div>
+                {gasFees && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Gas Fee (Fast):</span>
+                    <span className="font-medium">
+                      {gasFees.fast} Gwei
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             
