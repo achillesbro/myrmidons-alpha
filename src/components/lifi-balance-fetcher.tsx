@@ -55,7 +55,6 @@ export const LiFiBalanceFetcher = ({
   const [balances, setBalances] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [inputUnit, setInputUnit] = useState<'USD' | 'NATIVE'>('USD');
   const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
 
   // Fetch all balances using Li.Fi's getTokenBalances function
@@ -318,9 +317,9 @@ export const LiFiBalanceFetcher = ({
                       <div className="font-mono text-sm font-semibold text-green-800">
                         {parseFloat(usdt0Balance.balanceFormatted).toFixed(4)}
                       </div>
-                      <div className="text-xs text-green-600">
-                        {usdt0Balance.balanceUSD ? `$${usdt0Balance.balanceUSD}` : '$0.00'}
-                      </div>
+                        <div className="text-xs text-green-600">
+                          ${usdt0Balance.balanceUSD || '0.00'}
+                        </div>
                     </div>
                   </div>
                 </div>
@@ -410,38 +409,19 @@ export const LiFiBalanceFetcher = ({
 
           {/* Main Amount Input - This is the large display that acts as input */}
           <div className="text-center mb-4">
-            <div className="text-5xl font-bold text-black mb-2">
-              {inputUnit === 'USD' ? `$${amount || '0.00'}` : `${amount || '0.000000'}`}
-            </div>
-            <div className="text-lg text-gray-600 mb-2">
-              {inputUnit === 'USD' 
-                ? `↑↓ ${selectedToken.priceUSD ? (parseFloat(amount || '0') / parseFloat(selectedToken.priceUSD)).toFixed(6) : '0.000000'} ${selectedToken.tokenSymbol}`
-                : `↑↓ $${selectedToken.priceUSD ? (parseFloat(amount || '0') * parseFloat(selectedToken.priceUSD)).toFixed(2) : '0.00'} USD`
-              }
-            </div>
-            {/* Unit Switch */}
-            <div className="flex items-center justify-center space-x-2">
-              <button
-                onClick={() => setInputUnit('USD')}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                  inputUnit === 'USD' 
-                    ? 'bg-[#00295B] text-white' 
-                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                }`}
-              >
-                USD
-              </button>
-              <span className="text-gray-400">↔</span>
-              <button
-                onClick={() => setInputUnit('NATIVE')}
-                className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                  inputUnit === 'NATIVE' 
-                    ? 'bg-[#00295B] text-white' 
-                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                }`}
-              >
-                {selectedToken.tokenSymbol}
-              </button>
+            <input
+              type="text"
+              value={amount || ''}
+              onChange={handleAmountChange}
+              placeholder="0.00"
+              className="text-5xl font-bold text-black mb-2 text-center bg-transparent border-none outline-none w-full"
+              style={{ 
+                WebkitAppearance: 'none',
+                MozAppearance: 'textfield'
+              }}
+            />
+            <div className="text-lg text-gray-600">
+              ↑↓ {selectedToken.priceUSD ? (parseFloat(amount || '0') / parseFloat(selectedToken.priceUSD)).toFixed(6) : '0.000000'} {selectedToken.tokenSymbol}
             </div>
           </div>
 
@@ -453,21 +433,11 @@ export const LiFiBalanceFetcher = ({
                   <button
                     key={percentage}
                     onClick={() => {
-                      if (inputUnit === 'USD') {
-                        const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
-                          ? parseFloat(selectedToken.balanceFormatted)
-                          : parseFloat(selectedToken.balanceUSD || '0');
-                        const amountUSD = (maxAmount * percentage / 100).toFixed(2);
-                        handleAmountChange({ target: { value: amountUSD } } as any);
-                      } else {
-                        const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
-                          ? parseFloat(selectedToken.balanceFormatted)
-                          : selectedToken.priceUSD 
-                            ? parseFloat(selectedToken.balanceUSD || '0') / parseFloat(selectedToken.priceUSD)
-                            : 0;
-                        const amountNative = (maxAmount * percentage / 100).toFixed(6);
-                        handleAmountChange({ target: { value: amountNative } } as any);
-                      }
+                      const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
+                        ? parseFloat(selectedToken.balanceFormatted)
+                        : parseFloat(selectedToken.balanceUSD || '0');
+                      const amountUSD = (maxAmount * percentage / 100).toFixed(2);
+                      handleAmountChange({ target: { value: amountUSD } } as any);
                     }}
                     className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
@@ -495,9 +465,9 @@ export const LiFiBalanceFetcher = ({
             </div>
             <div className="text-gray-400">→</div>
             <div className="flex items-center space-x-2">
-              {selectedToken.logoURI ? (
+              {usdt0Balance?.logoURI ? (
                 <img
-                  src={selectedToken.logoURI}
+                  src={usdt0Balance.logoURI}
                   alt="USDT0"
                   className="w-6 h-6 rounded-full"
                   onError={(e) => {
@@ -512,13 +482,7 @@ export const LiFiBalanceFetcher = ({
           {/* Continue Button */}
           <button
             onClick={() => onStepChange(3)}
-            disabled={!amount || parseFloat(amount) <= 0 || (() => {
-              if (inputUnit === 'USD') {
-                return parseFloat(amount) > (selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted));
-              } else {
-                return parseFloat(amount) > parseFloat(selectedToken.balanceFormatted);
-              }
-            })() || isExecuting}
+            disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > (selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)) || isExecuting}
             className="w-full py-3 px-4 text-lg font-semibold bg-[#00295B] text-white rounded-lg hover:bg-[#001a3d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             CONTINUE
@@ -566,19 +530,19 @@ export const LiFiBalanceFetcher = ({
 
               {/* To Token */}
               <div className="flex flex-col items-center">
-                <div className="flex items-center space-x-2 mb-1">
-                  {selectedToken.logoURI ? (
-                    <img
-                      src={selectedToken.logoURI}
-                      alt="USDT0"
-                      className="w-6 h-6 rounded-full"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : null}
-                  <span className="font-semibold text-base">USDT0</span>
-                </div>
+                  <div className="flex items-center space-x-2 mb-1">
+                    {usdt0Balance?.logoURI ? (
+                      <img
+                        src={usdt0Balance.logoURI}
+                        alt="USDT0"
+                        className="w-6 h-6 rounded-full"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                    <span className="font-semibold text-base">USDT0</span>
+                  </div>
                 <div className="text-xs text-gray-600">HyperEVM</div>
               </div>
             </div>
@@ -587,12 +551,7 @@ export const LiFiBalanceFetcher = ({
             <div className="space-y-2 text-sm">
               <div className="flex justify-between items-center py-1 border-b border-gray-100">
                 <span className="text-gray-600">Amount:</span>
-                <span className="font-semibold text-base">
-                  {inputUnit === 'USD' 
-                    ? `$${amount} USD`
-                    : `${amount} ${selectedToken.tokenSymbol}`
-                  }
-                </span>
+                <span className="font-semibold text-base">${amount} USD</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b border-gray-100">
                 <span className="text-gray-600">Method:</span>
@@ -603,21 +562,17 @@ export const LiFiBalanceFetcher = ({
                   }
                 </span>
               </div>
-              <div className="flex justify-between items-center py-1">
-                <span className="text-gray-600">Estimated Output:</span>
-                <span className="font-medium text-sm">
-                  {selectedToken.tokenSymbol === 'USDT0' && selectedToken.chainId === 999 
-                    ? `${parseFloat(amount || '0').toFixed(6)} USDT0`
-                    : inputUnit === 'USD'
-                      ? selectedToken.priceUSD 
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-gray-600">Estimated Output:</span>
+                  <span className="font-medium text-sm">
+                    {selectedToken.tokenSymbol === 'USDT0' && selectedToken.chainId === 999 
+                      ? `${parseFloat(amount || '0').toFixed(6)} USDT0`
+                      : selectedToken.priceUSD 
                         ? `${(parseFloat(amount || '0') / parseFloat(selectedToken.priceUSD)).toFixed(6)} USDT0`
                         : '0.000000 USDT0'
-                      : selectedToken.priceUSD
-                        ? `${(parseFloat(amount || '0') * parseFloat(selectedToken.priceUSD)).toFixed(2)} USDT0`
-                        : '0.00 USDT0'
-                  }
-                </span>
-              </div>
+                    }
+                  </span>
+                </div>
             </div>
           </div>
           
