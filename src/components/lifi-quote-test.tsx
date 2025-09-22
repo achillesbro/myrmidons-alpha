@@ -74,10 +74,29 @@ export function LiFiQuoteTest() {
         const usdAmount = parseFloat(amount);
         const tokenPrice = parseFloat(selectedTokenInfo.priceUSD);
         const nativeAmount = usdAmount / tokenPrice;
-        fromAmount = (nativeAmount * Math.pow(10, selectedTokenInfo.decimals)).toString();
+        // Round to ensure we get a whole number for the smallest token units
+        fromAmount = Math.round(nativeAmount * Math.pow(10, selectedTokenInfo.decimals)).toString();
+        
+        console.log('USD to Native conversion:', {
+          usdAmount,
+          tokenPrice,
+          nativeAmount,
+          decimals: selectedTokenInfo.decimals,
+          fromAmount
+        });
       } else {
         // Fallback: treat amount as native token amount
-        fromAmount = (parseFloat(amount) * Math.pow(10, selectedTokenInfo.decimals)).toString();
+        fromAmount = Math.round(parseFloat(amount) * Math.pow(10, selectedTokenInfo.decimals)).toString();
+        console.log('Native amount conversion:', {
+          amount,
+          decimals: selectedTokenInfo.decimals,
+          fromAmount
+        });
+      }
+
+      // Validate that fromAmount is a valid positive integer
+      if (!fromAmount || fromAmount === '0' || fromAmount === 'NaN' || !/^\d+$/.test(fromAmount)) {
+        throw new Error('Invalid amount: must be a positive number');
       }
 
       // Get token addresses
