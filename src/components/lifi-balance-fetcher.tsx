@@ -428,17 +428,18 @@ export const LiFiBalanceFetcher = ({
 
           {/* Main Amount Input - This is the large display that acts as input */}
           <div className="text-center mb-4">
-            <div className="relative inline-block">
-              <span className="text-5xl font-bold text-black absolute left-0 top-0 pointer-events-none">$</span>
+            <div className="inline-flex items-center justify-center">
+              <span className="text-5xl font-bold text-black mr-2">$</span>
               <input
                 type="text"
                 value={formatNumberWithCommas(amount || '')}
                 onChange={handleFormattedAmountChange}
                 placeholder="0.00"
-                className="text-5xl font-bold text-black mb-2 text-center bg-transparent border-none outline-none pl-8"
+                className="text-5xl font-bold text-black bg-transparent border-none outline-none text-center min-w-0 flex-1"
                 style={{ 
                   WebkitAppearance: 'none',
-                  MozAppearance: 'textfield'
+                  MozAppearance: 'textfield',
+                  width: `${Math.max((formatNumberWithCommas(amount || '').length * 0.6), 4)}ch`
                 }}
               />
             </div>
