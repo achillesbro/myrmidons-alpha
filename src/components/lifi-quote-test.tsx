@@ -138,21 +138,38 @@ export function LiFiQuoteTest() {
 
       console.log('Available routes:', result.routes.length);
       result.routes.forEach((route, index) => {
+        const relayers = route.steps?.map(step => step.toolDetails?.key).filter(Boolean) || [];
         console.log(`Route ${index}:`, {
           id: route.id,
           fromToken: route.fromToken,
           toToken: route.toToken,
           steps: route.steps?.length || 0,
-          gasCostUSD: route.gasCostUSD
+          gasCostUSD: route.gasCostUSD,
+          relayers: relayers
         });
       });
 
-      const route = result.routes[0];
+      // Find the best route (prefer non-Glacis for ETH on Arbitrum)
+      let selectedRoute = result.routes[0];
+      
+      if (selectedTokenInfo.tokenSymbol === 'ETH' && selectedTokenInfo.chainId === CHAIN_IDS.ARBITRUM) {
+        // For ETH on Arbitrum, prefer non-Glacis routes
+        const nonGlacisRoute = result.routes.find(route => 
+          !route.steps?.some(step => step.toolDetails?.key?.toLowerCase().includes('glacis'))
+        );
+        if (nonGlacisRoute) {
+          selectedRoute = nonGlacisRoute;
+          console.log('🚀 Selected non-Glacis route for ETH on Arbitrum:', selectedRoute.id);
+        } else {
+          console.log('⚠️ No non-Glacis route found, using first available route');
+        }
+      }
+
       console.log('Selected route details:', {
-        id: route.id,
-        fromToken: route.fromToken,
-        toToken: route.toToken,
-        steps: route.steps?.map(step => ({
+        id: selectedRoute.id,
+        fromToken: selectedRoute.fromToken,
+        toToken: selectedRoute.toToken,
+        steps: selectedRoute.steps?.map(step => ({
           type: step.type,
           tool: step.toolDetails?.key,
           fromToken: step.action?.fromToken,
@@ -167,8 +184,8 @@ export function LiFiQuoteTest() {
       });
 
       // Check for minimum amount requirements
-      if (route.steps && route.steps.length > 0) {
-        const firstStep = route.steps[0];
+      if (selectedRoute.steps && selectedRoute.steps.length > 0) {
+        const firstStep = selectedRoute.steps[0];
         const action = firstStep.action as any;
         if (action?.minAmount) {
           const minAmount = BigInt(action.minAmount);
@@ -187,7 +204,7 @@ export function LiFiQuoteTest() {
 
       // Execute the route
       console.log('Starting route execution...');
-      const executedRoute = await executeRoute(route, {
+      const executedRoute = await executeRoute(selectedRoute, {
         updateRouteHook: (updatedRoute) => {
           console.log('Route update:', {
             steps: updatedRoute.steps?.map(step => ({
