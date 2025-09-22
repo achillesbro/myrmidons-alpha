@@ -9,6 +9,7 @@ import { useLifiConfig } from '../hooks/useLifiConfig';
 import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
 import vaultAbi from '../abis/vault.json';
+import { erc20Abi } from 'viem';
 
 // Vault address for direct deposits
 const VAULT_ADDRESS = '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42' as `0x${string}`;
@@ -71,6 +72,21 @@ export function LiFiQuoteTest() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef<number>(1);
   
+  // Transaction flow state
+  const [txFlow, setTxFlow] = useState<{
+    isActive: boolean;
+    steps: Array<{
+      id: string;
+      title: string;
+      status: 'pending' | 'processing' | 'completed' | 'failed';
+      txHash?: string;
+      explorerUrl?: string;
+    }>;
+  }>({
+    isActive: false,
+    steps: []
+  });
+  
   const clientW = useWalletClient();
   const wagmiConfig = useConfig();
   const userAddress = clientW.data?.account?.address || '0x552008c0f6870c2f77e5cC1d2eb9bdff03e30Ea0';
@@ -90,30 +106,82 @@ export function LiFiQuoteTest() {
     setToasts([]);
   };
 
+  // Transaction flow helpers
+  const startTxFlow = (steps: Array<{ id: string; title: string }>) => {
+    setTxFlow({
+      isActive: true,
+      steps: steps.map(step => ({ ...step, status: 'pending' as const }))
+    });
+  };
+
+  const updateTxStep = (stepId: string, status: 'processing' | 'completed' | 'failed', txHash?: string) => {
+    setTxFlow(prev => ({
+      ...prev,
+      steps: prev.steps.map(step => 
+        step.id === stepId 
+          ? { 
+              ...step, 
+              status, 
+              txHash,
+              explorerUrl: txHash ? getExplorerUrl(selectedTokenInfo?.chainId || 0, txHash) : undefined
+            }
+          : step
+      )
+    }));
+  };
+
+  const completeTxFlow = () => {
+    setTxFlow(prev => ({ ...prev, isActive: false }));
+  };
+
   // Direct deposit function for USDT0 on HyperEVM
   const runDirectDeposit = async (amountWei: bigint) => {
     try {
       if (!clientW.data) throw new Error("Connect wallet");
       
+      // Start transaction flow
+      startTxFlow([
+        { id: 'approve', title: 'Approve USDT0 spending' },
+        { id: 'deposit', title: 'Deposit to vault' }
+      ]);
+      
       const provider = new BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
       
-      pushToast('info', 'Submitting deposit transaction...', 3000);
+      // Check if approval is needed
+      const token = new Contract(selectedTokenInfo?.tokenAddress || '', erc20Abi as any, signer);
+      const allowance = await token.allowance(clientW.data.account.address, VAULT_ADDRESS);
       
+      if (allowance < amountWei) {
+        updateTxStep('approve', 'processing');
+        const approveTx = await token.approve(VAULT_ADDRESS, amountWei);
+        updateTxStep('approve', 'completed', approveTx.hash);
+        
+        // Wait for approval confirmation
+        await provider.waitForTransaction(approveTx.hash, 1, 20_000).catch(() => null);
+      } else {
+        updateTxStep('approve', 'completed');
+      }
+      
+      // Execute deposit
+      updateTxStep('deposit', 'processing');
       const tx = await vault.deposit(amountWei, clientW.data.account.address);
-      pushToast('info', `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
+      updateTxStep('deposit', 'completed', tx.hash);
       
-      // Wait for confirmation using wallet provider
+      // Wait for confirmation
       await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
-      pushToast('success', 'Deposit successful');
+      
+      // Complete flow
+      completeTxFlow();
       
       // Reset form
       setSelectedTokenInfo(null);
       setAmount('');
       
     } catch (e: any) {
-      pushToast('error', `Deposit failed: ${e.message || 'Unknown error'}`, 8000);
+      updateTxStep('deposit', 'failed');
+      completeTxFlow();
     }
   };
 
@@ -152,25 +220,39 @@ export function LiFiQuoteTest() {
       
       console.log(`Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus}`);
       
-      // Show toast for each step
-      if (stepStatus === 'DONE') {
-        pushToast('success', `${stepDescription} completed`, 3000);
+      // Update transaction flow instead of toasts
+      if (stepStatus === 'PROCESSING') {
+        if (stepDescription.includes('Bridge')) {
+          updateTxStep('bridge', 'processing');
+        } else if (stepDescription.includes('Swap')) {
+          updateTxStep('swap', 'processing');
+        }
+      } else if (stepStatus === 'DONE') {
+        if (stepDescription.includes('Bridge')) {
+          updateTxStep('bridge', 'completed');
+        } else if (stepDescription.includes('Swap')) {
+          updateTxStep('swap', 'completed');
+        }
       } else if (stepStatus === 'FAILED') {
-        pushToast('error', `${stepDescription} failed`, 5000);
-      } else if (stepStatus === 'PENDING') {
-        pushToast('info', `${stepDescription} pending...`, 2000);
-      } else if (stepStatus === 'PROCESSING') {
-        pushToast('info', `${stepDescription} processing...`, 2000);
+        if (stepDescription.includes('Bridge')) {
+          updateTxStep('bridge', 'failed');
+        } else if (stepDescription.includes('Swap')) {
+          updateTxStep('swap', 'failed');
+        }
       }
       
-      // Show transaction hashes for completed steps (only once per unique hash)
+      // Collect transaction hashes for completed steps
       if (step.execution?.process) {
         const seenHashes = new Set<string>();
         step.execution.process.forEach((process: any) => {
           if (process.txHash && process.status === 'DONE' && !seenHashes.has(process.txHash)) {
             seenHashes.add(process.txHash);
-            const explorerUrl = getExplorerUrl(step.action?.fromChainId || 0, process.txHash);
-            pushToast('info', `Transaction: ${process.txHash.slice(0, 8)}...`, 5000, explorerUrl);
+            // Update the appropriate step with transaction hash
+            if (stepDescription.includes('Bridge')) {
+              updateTxStep('bridge', 'completed', process.txHash);
+            } else if (stepDescription.includes('Swap')) {
+              updateTxStep('swap', 'completed', process.txHash);
+            }
           }
         });
       }
@@ -193,7 +275,11 @@ export function LiFiQuoteTest() {
     clearToasts(); // Clear any existing toasts
     
     // Check if it's USDT0 on HyperEVM - use direct deposit
-    if (selectedTokenInfo.tokenSymbol === 'USDT0' && selectedTokenInfo.chainId === CHAIN_IDS.HYPEREVM) {
+    console.log('Selected token info:', selectedTokenInfo);
+    const isUSDT0OnHyperEVM = selectedTokenInfo.tokenSymbol === 'USDT0' && selectedTokenInfo.chainId === CHAIN_IDS.HYPEREVM;
+    console.log('Is USDT0 on HyperEVM?', isUSDT0OnHyperEVM);
+    
+    if (isUSDT0OnHyperEVM) {
       try {
         // Convert USD amount to native token amount
         let fromAmount: string;
@@ -218,7 +304,10 @@ export function LiFiQuoteTest() {
     }
     
     // Otherwise, use Li.Fi for bridging/swapping
-    pushToast('info', 'Starting bridge execution...', 3000);
+    startTxFlow([
+      { id: 'bridge', title: `Bridge ${selectedTokenInfo.tokenSymbol} from ${getChainName(selectedTokenInfo.chainId)}` },
+      { id: 'swap', title: 'Swap to USDT0 on HyperEVM' }
+    ]);
     
     try {
       // Convert USD amount to native token amount
@@ -413,8 +502,8 @@ export function LiFiQuoteTest() {
         }
       }
 
-      // Show success toast
-      pushToast('success', 'Bridge execution completed successfully!', 5000);
+      // Complete transaction flow
+      completeTxFlow();
       
       // Add to executions list
       setExecutions(prev => [...prev, {
@@ -432,7 +521,6 @@ export function LiFiQuoteTest() {
           // Wait for confirmation using wallet provider (faster than public RPC)
           await provider.waitForTransaction(finalTxHash, 1, 20_000).catch(() => null);
           console.log('Transaction confirmed via wallet provider');
-          pushToast('success', 'Transaction confirmed on-chain', 3000);
         } catch (error) {
           console.warn('Wallet transaction monitoring failed:', error);
         }
@@ -444,7 +532,7 @@ export function LiFiQuoteTest() {
       
     } catch (error: any) {
       console.error('Execution failed:', error);
-      pushToast('error', `Bridge execution failed: ${error.message || 'Unknown error'}`, 8000);
+      completeTxFlow();
       
       setExecutions(prev => [...prev, {
         success: false,
@@ -545,8 +633,63 @@ export function LiFiQuoteTest() {
         </div>
       )}
 
-      {/* Toast notifications */}
-      <Toasts toasts={toasts} />
-    </div>
-  );
-}
+        {/* Transaction Flow */}
+        {txFlow.isActive && (
+          <div className="mt-6 bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
+            <h3 className="text-lg font-semibold mb-4 text-[#00295B]">Transaction Progress</h3>
+            <div className="space-y-3">
+              {txFlow.steps.map((step) => (
+                <div key={step.id} className="flex items-center space-x-3">
+                  <div className="flex-shrink-0">
+                    {step.status === 'pending' && (
+                      <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>
+                    )}
+                    {step.status === 'processing' && (
+                      <div className="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
+                    )}
+                    {step.status === 'completed' && (
+                      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    {step.status === 'failed' && (
+                      <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      step.status === 'completed' ? 'text-green-700' :
+                      step.status === 'failed' ? 'text-red-700' :
+                      step.status === 'processing' ? 'text-blue-700' :
+                      'text-gray-600'
+                    }`}>
+                      {step.title}
+                    </p>
+                    {step.txHash && (
+                      <a
+                        href={step.explorerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        View on Explorer: {step.txHash.slice(0, 8)}...
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Toast notifications */}
+        <Toasts toasts={toasts} />
+      </div>
+    );
+  }

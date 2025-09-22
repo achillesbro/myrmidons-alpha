@@ -32,7 +32,7 @@ const CHAIN_INFO = {
   [CHAIN_IDS.BASE]: { name: 'Base', nativeSymbol: 'ETH' },
   [CHAIN_IDS.OPTIMISM]: { name: 'Optimism', nativeSymbol: 'ETH' },
   [CHAIN_IDS.BSC]: { name: 'BSC', nativeSymbol: 'BNB' },
-  [CHAIN_IDS.HYPEREVM]: { name: 'HyperEVM', nativeSymbol: 'USDT0' },
+  [CHAIN_IDS.HYPEREVM]: { name: 'HyperEVM', nativeSymbol: 'HYPE' },
 } as const;
 
 export const LiFiBalanceFetcher = ({ 
