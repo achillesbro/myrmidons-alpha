@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "wagmi";
 import { useEffect, useState } from "react";
 import { Address, getAddress, isAddress } from "viem";
+import { mainnet, arbitrum, base } from "wagmi/chains";
 import {
   metaMaskWallet,
   okxWallet,
@@ -22,12 +23,13 @@ import { apolloClient } from "./service/apollo.client";
 import { VaultAPIView } from "./components/vault-api-view";
 import { AboutView } from "./components/about-view";
 import { SiteFooter } from "./components/site-footer";
+import { LiFiQuoteTest } from "./components/lifi-quote-test";
 import { useTranslation } from 'react-i18next'
 import i18n from "./i18n";
 
 const DEFAULT_VAULT: Address = "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42";
 
-const TABS = ["VAULTINFO", "ABOUT"] as const;
+const TABS = ["VAULTINFO", "ABOUT", "LIFI_TEST"] as const;
 type Tab = typeof TABS[number];
 const TAB_PARAM = "tab";
 const STORAGE_KEY = "myrmidons_activeTab";
@@ -39,6 +41,7 @@ function normalizeTabParam(value: string | null): Tab | null {
   if (v === "SDK" || v === "USERPOSITION") return "VAULTINFO" as Tab;
   if (v === "API" || v === "VAULTINFO") return "VAULTINFO" as Tab;
   if (v === "ABOUT") return "ABOUT" as Tab;
+  if (v === "LIFI_TEST") return "LIFI_TEST" as Tab;
   return null;
 }
 
@@ -98,7 +101,9 @@ const TestInterface = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    const page = activeTab === "VAULTINFO" ? t('tabs.vaultInfo') : t('tabs.about');
+    const page = activeTab === "VAULTINFO" ? t('tabs.vaultInfo') : 
+                 activeTab === "ABOUT" ? t('tabs.about') : 
+                 "Li.Fi Test";
     document.title = `${t('brand')} — ${page}`;
   }, [activeTab, t]);
 
@@ -149,12 +154,25 @@ const TestInterface = () => {
               >
                 {t('tabs.about')}
               </button>
+              <button
+                aria-pressed={activeTab === "LIFI_TEST"}
+                onClick={() => setActiveTab("LIFI_TEST")}
+                className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center border ${
+                  activeTab === "LIFI_TEST"
+                    ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
+                    : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
+                }`}
+              >
+                Li.Fi Test
+              </button>
             </div>
 
             {activeTab === "VAULTINFO" ? (
               <VaultAPIView vaultAddress={vaultAddress} />
-            ) : (
+            ) : activeTab === "ABOUT" ? (
               <AboutView />
+            ) : (
+              <LiFiQuoteTest />
             )}
           </div>
         </div>
@@ -170,7 +188,9 @@ const config = getDefaultConfig({
   appName: i18n.t('brand'),
   projectId: "841b6ddde2826ce0acf2d1b1f81f8582",
   chains: [
-    //mainnet, 
+    mainnet,
+    arbitrum, 
+    base,
     hyperEVM],
   wallets: [
     {
@@ -179,7 +199,9 @@ const config = getDefaultConfig({
     },
   ],
   transports: {
-    //[mainnet.id]: http(),
+    [mainnet.id]: http(),
+    [arbitrum.id]: http(),
+    [base.id]: http(),
     [hyperEVM.id]: http("https://rpc.hyperliquid.xyz/evm"),
   },
 });

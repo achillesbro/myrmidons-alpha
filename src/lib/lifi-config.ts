@@ -1,0 +1,46 @@
+// Li.Fi SDK Configuration
+export const LIFI_CONFIG = {
+  apiKey: 'f6f27ae1-842e-479b-93df-96965d72bffd.ce2dfa79-b4f9-40f9-8420-ca0a3b07b489',
+  integrator: 'earn-basic-app',
+};
+
+// Chain IDs for testing
+export const CHAIN_IDS = {
+  ETHEREUM: 1,
+  ARBITRUM: 42161,
+  BASE: 8453,
+  HYPEREVM: 999,
+} as const;
+
+// Common token addresses for testing
+export const TOKEN_ADDRESSES = {
+  // Ethereum
+  [CHAIN_IDS.ETHEREUM]: {
+    USDC: '0xA0b86a33E6441b8c4C8C0d4Ce8900E5C9B9d4f6', // USDC on Ethereum
+    USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT on Ethereum
+    ETH: '0x0000000000000000000000000000000000000000', // Native ETH
+  },
+  // Arbitrum
+  [CHAIN_IDS.ARBITRUM]: {
+    USDC: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', // USDC on Arbitrum
+    USDT: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', // USDT on Arbitrum
+    ETH: '0x0000000000000000000000000000000000000000', // Native ETH
+  },
+  // Base
+  [CHAIN_IDS.BASE]: {
+    USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base
+    USDT: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb', // USDT on Base
+    ETH: '0x0000000000000000000000000000000000000000', // Native ETH
+  },
+  // HyperEVM (target)
+  [CHAIN_IDS.HYPEREVM]: {
+    USDT0: '0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb', // USDT0 on HyperEVM
+  },
+} as const;
+
+// Test amounts in USD (will be converted to token units)
+export const TEST_AMOUNTS_USD = {
+  SMALL: 10,
+  MEDIUM: 100,
+  LARGE: 1000,
+} as const;
