@@ -837,8 +837,8 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         {/* Deposit Dialog */}
         {depositDialogOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Blurred background */}
-            <div className="absolute inset-0 bg-[#FFFFF5] backdrop-blur-sm"></div>
+            {/* Blurred background - transparent with blur effect */}
+            <div className="absolute inset-0 backdrop-blur-sm"></div>
             
             {/* Dialog container with cropping effect */}
             <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-2xl w-full max-h-[85vh] overflow-hidden shadow-2xl">
