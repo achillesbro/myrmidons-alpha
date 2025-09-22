@@ -216,7 +216,7 @@ export function LiFiQuoteTest({}: LiFiQuoteTestProps = {}) {
             decimals: balance.decimals || 6,
             logoURI: tokenInfo.logoURI,
             priceUSD: tokenInfo.priceUSD,
-            balanceUSD: `$${balanceUSD}`
+            balanceUSD: balanceUSD
           });
         } else {
           setUsdt0Balance(null);
