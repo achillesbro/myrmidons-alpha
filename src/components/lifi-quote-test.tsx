@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { getRoutes, executeRoute } from '@lifi/sdk';
+import { getRoutes, executeRoute, getToken, getTokenBalances } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain, getWalletClient } from '@wagmi/core';
@@ -70,8 +70,15 @@ export function LiFiQuoteTest() {
   
   // USDT0 balance for direct deposits (fetched separately)
   const [usdt0Balance, setUsdt0Balance] = useState<{
+    chainId: number;
+    chainName: string;
+    tokenSymbol: string;
+    tokenAddress: string;
     balance: string;
     balanceFormatted: string;
+    decimals: number;
+    logoURI?: string;
+    priceUSD?: string;
     balanceUSD?: string;
   } | null>(null);
   const [usdt0Loading, setUsdt0Loading] = useState(false);
@@ -173,37 +180,55 @@ export function LiFiQuoteTest() {
     setAmount(enteredAmount);
   };
 
-  // Fetch USDT0 balance directly from HyperEVM
+  // Fetch USDT0 balance using Li.Fi APIs
   const fetchUSDT0Balance = async () => {
     if (!clientW.data?.account?.address) return;
     
     setUsdt0Loading(true);
     try {
       console.log('Fetching USDT0 balance for address:', clientW.data.account.address);
-      const provider = new BrowserProvider((window as any).ethereum);
-      const signer = await provider.getSigner();
-      const token = new Contract(TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0, erc20Abi as any, signer);
       
-      const [balance, decimals] = await Promise.all([
-        token.balanceOf(clientW.data.account.address) as Promise<bigint>,
-        token.decimals() as Promise<number>
-      ]);
+      // Get USDT0 token info from Li.Fi
+      const tokenInfo = await getToken(CHAIN_IDS.HYPEREVM, TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0);
       
-      const balanceFormatted = formatUnits(balance, decimals);
-      const balanceUSD = parseFloat(balanceFormatted).toFixed(2);
+      // Get token balances using Li.Fi (correct API usage)
+      const balances = await getTokenBalances(clientW.data.account.address, [tokenInfo]);
       
-      console.log('USDT0 balance fetched:', {
-        balance: balance.toString(),
-        balanceFormatted,
-        balanceUSD
-      });
-      
-      // Always set balance (even if 0) so the section shows
-      setUsdt0Balance({
-        balance: balance.toString(),
-        balanceFormatted,
-        balanceUSD: `$${balanceUSD}`
-      });
+      if (balances && balances.length > 0) {
+        const balance = balances[0];
+        const amountStr = balance.amount?.toString() || '0';
+        const balanceFormatted = formatUnits(BigInt(amountStr), balance.decimals || 6);
+        const balanceUSD = tokenInfo.priceUSD ? 
+          (parseFloat(balanceFormatted) * parseFloat(tokenInfo.priceUSD)).toFixed(2) : 
+          balanceFormatted;
+        
+        console.log('USDT0 balance fetched:', {
+          balance: amountStr,
+          balanceFormatted,
+          balanceUSD,
+          priceUSD: tokenInfo.priceUSD
+        });
+        
+        // Only set balance if it's greater than 0
+        if (parseFloat(balanceFormatted) > 0) {
+          setUsdt0Balance({
+            chainId: CHAIN_IDS.HYPEREVM,
+            chainName: 'HyperEVM',
+            tokenSymbol: 'USDT0',
+            tokenAddress: TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0,
+            balance: amountStr,
+            balanceFormatted,
+            decimals: balance.decimals || 6,
+            logoURI: tokenInfo.logoURI,
+            priceUSD: tokenInfo.priceUSD,
+            balanceUSD: `$${balanceUSD}`
+          });
+        } else {
+          setUsdt0Balance(null);
+        }
+      } else {
+        setUsdt0Balance(null);
+      }
     } catch (error) {
       console.error('Error fetching USDT0 balance:', error);
       setUsdt0Balance(null);
@@ -212,6 +237,7 @@ export function LiFiQuoteTest() {
     }
   };
 
+  // Direct deposit function using vault-api-view.tsx logic
   const handleDirectDeposit = async (enteredAmount: string) => {
     if (!usdt0Balance || !enteredAmount || parseFloat(enteredAmount) <= 0) return;
     
@@ -220,15 +246,15 @@ export function LiFiQuoteTest() {
       pushToast('info', 'Starting direct deposit...', 3000);
       
       // Convert USD amount to USDT0 amount (assuming 1:1 for USDT0)
-      const usdt0Amount = parseUnits(enteredAmount, 6); // USDT0 has 6 decimals
+      const usdt0Amount = parseUnits(enteredAmount, usdt0Balance.decimals);
       
-      // Use the vault's runDeposit function
+      // Use the vault's runDeposit function logic
       const provider = new BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
       
       // Check if approval is needed
-      const token = new Contract(TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0, erc20Abi as any, signer);
+      const token = new Contract(usdt0Balance.tokenAddress, erc20Abi as any, signer);
       const allowance = await token.allowance(clientW.data?.account?.address, VAULT_ADDRESS);
       
       if (allowance < usdt0Amount) {
@@ -532,64 +558,17 @@ export function LiFiQuoteTest() {
         </div>
       )}
 
-        {/* USDT0 Direct Deposit Section */}
-        {clientW.data?.account?.address && (
-          <div className="p-6 bg-green-50 border-2 border-green-200 rounded-lg mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-800 font-bold text-lg">₮</span>
-                </div>
-                <div>
-                  <div className="font-semibold text-xl text-green-800">USDT0</div>
-                  <div className="text-sm text-green-600">HyperEVM - Direct Deposit</div>
-                </div>
-              </div>
-              <div className="text-right">
-                {usdt0Loading ? (
-                  <div className="text-green-600">Loading balance...</div>
-                ) : usdt0Balance ? (
-                  <>
-                    <div className="font-mono text-xl font-semibold text-green-800">
-                      {parseFloat(usdt0Balance.balanceFormatted).toFixed(6)}
-                    </div>
-                    <div className="text-sm text-green-600">
-                      {usdt0Balance.balanceUSD}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-red-600">Failed to load balance</div>
-                )}
-              </div>
-            </div>
-            <div className="flex space-x-3">
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="Enter amount in USDT0"
-                className="flex-1 px-4 py-3 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-lg"
-              />
-              <button
-                onClick={() => handleDirectDeposit(amount)}
-                disabled={executing || !amount || parseFloat(amount) <= 0 || !usdt0Balance}
-                className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
-              >
-                {executing ? 'Depositing...' : 'Direct Deposit'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Balance Fetcher Component */}
-        <LiFiBalanceFetcher
-          onTokenSelect={handleTokenSelect}
-          onAmountEnter={handleAmountEnter}
-          onExecute={handleExecute}
-          selectedToken={selectedTokenInfo}
-          amount={amount}
-          isExecuting={executing}
-        />
+       {/* Balance Fetcher Component */}
+       <LiFiBalanceFetcher
+         onTokenSelect={handleTokenSelect}
+         onAmountEnter={handleAmountEnter}
+         onExecute={handleExecute}
+         selectedToken={selectedTokenInfo}
+         amount={amount}
+         isExecuting={executing}
+         usdt0Balance={usdt0Balance}
+         usdt0Loading={usdt0Loading}
+       />
 
       {/* Execution Results */}
       {executions.length > 0 && (

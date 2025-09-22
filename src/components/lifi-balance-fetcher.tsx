@@ -24,6 +24,8 @@ interface BalanceFetcherProps {
   selectedToken: TokenBalance | null;
   amount: string;
   isExecuting: boolean;
+  usdt0Balance?: TokenBalance | null;
+  usdt0Loading?: boolean;
 }
 
 const CHAIN_INFO = {
@@ -41,7 +43,9 @@ export const LiFiBalanceFetcher = ({
   onExecute, 
   selectedToken, 
   amount, 
-  isExecuting 
+  isExecuting,
+  usdt0Balance,
+  usdt0Loading
 }: BalanceFetcherProps) => {
   const { address } = useAccount();
   const [balances, setBalances] = useState<TokenBalance[]>([]);
@@ -218,6 +222,58 @@ export const LiFiBalanceFetcher = ({
       {error && (
         <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
           {error}
+        </div>
+      )}
+
+      {/* USDT0 Direct Deposit Section */}
+      {usdt0Balance && (
+        <div className="p-4 border-2 border-green-300 bg-green-50 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-3">
+              {usdt0Balance.logoURI && (
+                <img
+                  src={usdt0Balance.logoURI}
+                  alt={usdt0Balance.tokenSymbol}
+                  className="w-8 h-8 rounded-full"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+              <div>
+                <div className="font-semibold text-lg text-green-800">{usdt0Balance.tokenSymbol}</div>
+                <div className="text-sm text-green-600">{usdt0Balance.chainName} - Direct Deposit</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-lg font-semibold text-green-800">
+                {parseFloat(usdt0Balance.balanceFormatted).toFixed(6)}
+              </div>
+              <div className="text-sm text-green-600">
+                {usdt0Balance.balanceUSD}
+              </div>
+            </div>
+          </div>
+          <div
+            onClick={() => handleTokenClick(usdt0Balance)}
+            className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+              selectedToken?.chainId === usdt0Balance.chainId && 
+              selectedToken?.tokenSymbol === usdt0Balance.tokenSymbol
+                ? 'border-green-500 bg-green-100'
+                : 'border-green-300 hover:border-green-400'
+            }`}
+          >
+            <div className="text-center text-green-700 font-medium">
+              Click to select for direct deposit
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* USDT0 Loading State */}
+      {usdt0Loading && (
+        <div className="p-4 border border-gray-300 bg-gray-50 rounded-lg">
+          <div className="text-center text-gray-600">Loading USDT0 balance...</div>
         </div>
       )}
 
