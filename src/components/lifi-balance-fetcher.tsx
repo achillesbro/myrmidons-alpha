@@ -219,8 +219,28 @@ export const LiFiBalanceFetcher = ({
     onStepChange(2); // Move to step 2 when token is selected
   };
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onAmountEnter(e.target.value);
+
+  // Format number with commas for thousands/millions
+  const formatNumberWithCommas = (value: string) => {
+    // Remove any non-numeric characters except decimal point
+    const numericValue = value.replace(/[^0-9.]/g, '');
+    
+    // Split by decimal point
+    const parts = numericValue.split('.');
+    
+    // Add commas to the integer part
+    if (parts[0]) {
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    }
+    
+    // Join back with decimal point
+    return parts.join('.');
+  };
+
+  // Handle input change with formatting
+  const handleFormattedAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/,/g, ''); // Remove commas for processing
+    onAmountEnter(rawValue);
   };
 
 
@@ -409,17 +429,20 @@ export const LiFiBalanceFetcher = ({
 
           {/* Main Amount Input - This is the large display that acts as input */}
           <div className="text-center mb-4">
-            <input
-              type="text"
-              value={amount || ''}
-              onChange={handleAmountChange}
-              placeholder="0.00"
-              className="text-5xl font-bold text-black mb-2 text-center bg-transparent border-none outline-none w-full"
-              style={{ 
-                WebkitAppearance: 'none',
-                MozAppearance: 'textfield'
-              }}
-            />
+            <div className="relative inline-block">
+              <span className="text-5xl font-bold text-black absolute left-0 top-0 pointer-events-none">$</span>
+              <input
+                type="text"
+                value={formatNumberWithCommas(amount || '')}
+                onChange={handleFormattedAmountChange}
+                placeholder="0.00"
+                className="text-5xl font-bold text-black mb-2 text-center bg-transparent border-none outline-none pl-8"
+                style={{ 
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'textfield'
+                }}
+              />
+            </div>
             <div className="text-lg text-gray-600">
               ↑↓ {selectedToken.priceUSD ? (parseFloat(amount || '0') / parseFloat(selectedToken.priceUSD)).toFixed(6) : '0.000000'} {selectedToken.tokenSymbol}
             </div>
@@ -437,7 +460,7 @@ export const LiFiBalanceFetcher = ({
                         ? parseFloat(selectedToken.balanceFormatted)
                         : parseFloat(selectedToken.balanceUSD || '0');
                       const amountUSD = (maxAmount * percentage / 100).toFixed(2);
-                      handleAmountChange({ target: { value: amountUSD } } as any);
+                      handleFormattedAmountChange({ target: { value: amountUSD } } as any);
                     }}
                     className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
