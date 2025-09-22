@@ -24,6 +24,7 @@ interface BalanceFetcherProps {
   selectedToken: TokenBalance | null;
   amount: string;
   isExecuting: boolean;
+  isUSDT0OnHyperEVM?: boolean;
 }
 
 const CHAIN_INFO = {
@@ -41,7 +42,8 @@ export const LiFiBalanceFetcher = ({
   onExecute, 
   selectedToken, 
   amount, 
-  isExecuting 
+  isExecuting,
+  isUSDT0OnHyperEVM = false
 }: BalanceFetcherProps) => {
   const { address } = useAccount();
   const [balances, setBalances] = useState<TokenBalance[]>([]);
@@ -354,7 +356,12 @@ export const LiFiBalanceFetcher = ({
             disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > (selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)) || isExecuting}
             className="w-full py-3 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isExecuting ? 'Executing...' : 'Execute Bridge to HyperEVM'}
+            {isExecuting 
+              ? 'Executing...' 
+              : isUSDT0OnHyperEVM 
+                ? 'Direct deposit into the vault' 
+                : 'Execute Bridge to HyperEVM'
+            }
           </button>
         </div>
       )}

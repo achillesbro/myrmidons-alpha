@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { getRoutes, executeRoute } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
@@ -7,7 +7,7 @@ import { formatUnits, parseUnits } from 'viem';
 import { BrowserProvider, Contract } from 'ethers';
 import { useLifiConfig } from '../hooks/useLifiConfig';
 import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
-import { Toasts, type Toast, type ToastKind } from './vault-shared';
+import { Toasts, type Toast } from './vault-shared';
 import vaultAbi from '../abis/vault.json';
 import { erc20Abi } from 'viem';
 
@@ -70,7 +70,6 @@ export function LiFiQuoteTest() {
   
   // Toast management
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const toastIdRef = useRef<number>(1);
   
   // Transaction flow state
   const [txFlow, setTxFlow] = useState<{
@@ -95,12 +94,6 @@ export function LiFiQuoteTest() {
   const { isConfigured } = useLifiConfig();
 
   // Toast helper functions
-  const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
-    toastIdRef.current += 1;
-    const id = toastIdRef.current;
-    setToasts((t) => [...t, { id, kind, text, href }]);
-    if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
-  };
 
   const clearToasts = () => {
     setToasts([]);
@@ -268,6 +261,9 @@ export function LiFiQuoteTest() {
     setAmount(enteredAmount);
   };
 
+  // Check if selected token is USDT0 on HyperEVM for direct deposit
+  const isUSDT0OnHyperEVM = selectedTokenInfo?.tokenSymbol === 'USDT0' && selectedTokenInfo?.chainId === CHAIN_IDS.HYPEREVM;
+
   const handleExecute = async () => {
     if (!selectedTokenInfo || !amount) return;
     
@@ -276,7 +272,6 @@ export function LiFiQuoteTest() {
     
     // Check if it's USDT0 on HyperEVM - use direct deposit
     console.log('Selected token info:', selectedTokenInfo);
-    const isUSDT0OnHyperEVM = selectedTokenInfo.tokenSymbol === 'USDT0' && selectedTokenInfo.chainId === CHAIN_IDS.HYPEREVM;
     console.log('Is USDT0 on HyperEVM?', isUSDT0OnHyperEVM);
     
     if (isUSDT0OnHyperEVM) {
@@ -292,11 +287,10 @@ export function LiFiQuoteTest() {
           fromAmount = parseUnits(amount, selectedTokenInfo.decimals).toString();
         }
         
-        pushToast('info', 'Processing direct deposit...', 3000);
         await runDirectDeposit(BigInt(fromAmount));
         return;
       } catch (error: any) {
-        pushToast('error', `Direct deposit failed: ${error.message || 'Unknown error'}`, 8000);
+        console.error('Direct deposit failed:', error);
         return;
       } finally {
         setExecuting(false);
@@ -577,6 +571,7 @@ export function LiFiQuoteTest() {
         selectedToken={selectedTokenInfo}
         amount={amount}
         isExecuting={executing}
+        isUSDT0OnHyperEVM={isUSDT0OnHyperEVM}
       />
 
       {/* Execution Results */}
