@@ -102,11 +102,22 @@ export function LiFiQuoteTest() {
       // Get token addresses
       const fromToken = selectedTokenInfo.tokenAddress;
       const toToken = TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0;
+      
+      // Ensure ETH is properly formatted as zero address
+      const normalizedFromToken = fromToken === '0x0000000000000000000000000000000000000000' 
+        ? '0x0000000000000000000000000000000000000000' 
+        : fromToken;
+      
+      console.log('Token addresses:', {
+        fromToken: normalizedFromToken,
+        toToken: toToken,
+        isNativeToken: normalizedFromToken === '0x0000000000000000000000000000000000000000'
+      });
 
       const routesRequest = {
         fromChainId: selectedTokenInfo.chainId,
         toChainId: CHAIN_IDS.HYPEREVM,
-        fromTokenAddress: fromToken,
+        fromTokenAddress: normalizedFromToken,
         toTokenAddress: toToken,
         fromAmount,
         fromAddress: userAddress,
@@ -119,21 +130,53 @@ export function LiFiQuoteTest() {
         throw new Error('No routes available for this transfer');
       }
 
+      console.log('Available routes:', result.routes.length);
+      result.routes.forEach((route, index) => {
+        console.log(`Route ${index}:`, {
+          id: route.id,
+          fromToken: route.fromToken,
+          toToken: route.toToken,
+          steps: route.steps?.length || 0,
+          gasCostUSD: route.gasCostUSD
+        });
+      });
+
       const route = result.routes[0];
-      console.log('Selected route:', route);
+      console.log('Selected route details:', {
+        id: route.id,
+        fromToken: route.fromToken,
+        toToken: route.toToken,
+        steps: route.steps?.map(step => ({
+          type: step.type,
+          tool: step.toolDetails?.key,
+          fromToken: step.action?.fromToken,
+          toToken: step.action?.toToken,
+          fromChainId: step.action?.fromChainId,
+          toChainId: step.action?.toChainId
+        }))
+      });
 
       // Execute the route
+      console.log('Starting route execution...');
       const executedRoute = await executeRoute(route, {
         updateRouteHook: (updatedRoute) => {
-          console.log('Route update:', updatedRoute);
+          console.log('Route update:', {
+            steps: updatedRoute.steps?.map(step => ({
+              type: step.type,
+              tool: step.toolDetails?.key,
+              txHash: step.execution?.process?.[0]?.txHash
+            }))
+          });
         },
         acceptExchangeRateUpdateHook: async () => {
+          console.log('Exchange rate update requested, accepting...');
           return true; // Accept rate updates automatically
         },
         switchChainHook: async (chainId) => {
           console.log('Switching to chain:', chainId);
           try {
             const chain = await switchChain(wagmiConfig, { chainId });
+            console.log('Successfully switched to chain:', chain.id);
             return getWalletClient(wagmiConfig, { chainId: chain.id });
           } catch (error) {
             console.error('Failed to switch chain:', error);
