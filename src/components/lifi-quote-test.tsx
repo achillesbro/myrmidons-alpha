@@ -562,11 +562,24 @@ export function LiFiQuoteTest() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Li.Fi Bridge to HyperEVM</h2>
-      <p className="text-gray-600 mb-6">
-        Bridge any token from supported chains to USDT0 on HyperEVM (Chain ID: {CHAIN_IDS.HYPEREVM})
-      </p>
+    <div className="space-y-6">
+      {/* Progress Indicator */}
+      <div className="flex items-center justify-center space-x-4 mb-6">
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-[#00295B] text-white flex items-center justify-center text-sm font-semibold">1</div>
+          <span className="text-sm font-medium text-[#00295B]">Select Token</span>
+        </div>
+        <div className="w-8 h-0.5 bg-gray-300"></div>
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center text-sm font-semibold">2</div>
+          <span className="text-sm font-medium text-gray-600">Enter Amount</span>
+        </div>
+        <div className="w-8 h-0.5 bg-gray-300"></div>
+        <div className="flex items-center space-x-2">
+          <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center text-sm font-semibold">3</div>
+          <span className="text-sm font-medium text-gray-600">Confirm</span>
+        </div>
+      </div>
       
       {!isConfigured && (
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
