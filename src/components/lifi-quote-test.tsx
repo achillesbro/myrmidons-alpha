@@ -49,7 +49,11 @@ interface ExecutionResult {
   amount: string;
 }
 
-export function LiFiQuoteTest() {
+interface LiFiQuoteTestProps {
+  onStepChange?: (step: number) => void;
+}
+
+export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
   const [executions, setExecutions] = useState<ExecutionResult[]>([]);
   const [executing, setExecuting] = useState(false);
   
@@ -67,6 +71,7 @@ export function LiFiQuoteTest() {
     balanceUSD?: string;
   } | null>(null);
   const [amount, setAmount] = useState<string>('');
+  const [currentStep, setCurrentStep] = useState(1);
   
   // USDT0 balance for direct deposits (fetched separately)
   const [usdt0Balance, setUsdt0Balance] = useState<{
@@ -174,6 +179,8 @@ export function LiFiQuoteTest() {
   // Handler functions for balance fetcher
   const handleTokenSelect = (tokenInfo: any) => {
     setSelectedTokenInfo(tokenInfo);
+    setCurrentStep(2); // Move to step 2 when token is selected
+    onStepChange?.(2); // Notify parent component
   };
 
   const handleAmountEnter = (enteredAmount: string) => {
@@ -566,18 +573,30 @@ export function LiFiQuoteTest() {
       {/* Progress Indicator */}
       <div className="flex items-center justify-center space-x-4 mb-6">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-[#00295B] text-white flex items-center justify-center text-sm font-semibold">1</div>
-          <span className="text-sm font-medium text-[#00295B]">Select Token</span>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+            currentStep >= 1 ? 'bg-[#00295B] text-white' : 'bg-gray-300 text-gray-600'
+          }`}>1</div>
+          <span className={`text-sm font-medium ${
+            currentStep >= 1 ? 'text-[#00295B]' : 'text-gray-600'
+          }`}>Select Token</span>
         </div>
-        <div className="w-8 h-0.5 bg-gray-300"></div>
+        <div className={`w-8 h-0.5 ${currentStep >= 2 ? 'bg-[#00295B]' : 'bg-gray-300'}`}></div>
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center text-sm font-semibold">2</div>
-          <span className="text-sm font-medium text-gray-600">Enter Amount</span>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+            currentStep >= 2 ? 'bg-[#00295B] text-white' : 'bg-gray-300 text-gray-600'
+          }`}>2</div>
+          <span className={`text-sm font-medium ${
+            currentStep >= 2 ? 'text-[#00295B]' : 'text-gray-600'
+          }`}>Enter Amount</span>
         </div>
-        <div className="w-8 h-0.5 bg-gray-300"></div>
+        <div className={`w-8 h-0.5 ${currentStep >= 3 ? 'bg-[#00295B]' : 'bg-gray-300'}`}></div>
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center text-sm font-semibold">3</div>
-          <span className="text-sm font-medium text-gray-600">Confirm</span>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+            currentStep >= 3 ? 'bg-[#00295B] text-white' : 'bg-gray-300 text-gray-600'
+          }`}>3</div>
+          <span className={`text-sm font-medium ${
+            currentStep >= 3 ? 'text-[#00295B]' : 'text-gray-600'
+          }`}>Confirm</span>
         </div>
       </div>
       
@@ -607,6 +626,11 @@ export function LiFiQuoteTest() {
          isExecuting={executing}
          usdt0Balance={usdt0Balance}
          usdt0Loading={usdt0Loading}
+         currentStep={currentStep}
+         onStepChange={(step) => {
+           setCurrentStep(step);
+           onStepChange?.(step);
+         }}
        />
 
       {/* Execution Results */}

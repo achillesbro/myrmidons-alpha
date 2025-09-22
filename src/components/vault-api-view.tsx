@@ -148,6 +148,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   
   // Deposit dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [currentDepositStep, setCurrentDepositStep] = useState(1);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
@@ -738,7 +739,10 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                     </div>
                     <button
                       type="button"
-                      onClick={() => setDepositDialogOpen(true)}
+                      onClick={() => {
+              setDepositDialogOpen(true);
+              setCurrentDepositStep(1);
+            }}
                       className="w-full px-4 py-3 text-base font-medium rounded-lg bg-[#00295B] text-[#FFFFF5] hover:bg-[#001a3d] transition-colors"
                     >
                       {t("vaultInfo.actions.deposit", { defaultValue: "Deposit" })}
@@ -841,7 +845,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
             <div className="absolute inset-0 backdrop-blur-sm"></div>
             
             {/* Dialog container with cropping effect */}
-            <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-2xl w-full max-h-[85vh] overflow-hidden shadow-2xl">
+            <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl">
               <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
                 <div className="flex items-center space-x-3">
                   <button
@@ -855,7 +859,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                   </h2>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm text-[#101720]/60">Step 1 of 3</span>
+                  <span className="text-sm text-[#101720]/60">Step {currentDepositStep} of 3</span>
                   <button
                     onClick={() => setDepositDialogOpen(false)}
                     className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
@@ -865,7 +869,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                 </div>
               </div>
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-                <LiFiQuoteTest />
+                <LiFiQuoteTest onStepChange={setCurrentDepositStep} />
               </div>
             </div>
           </div>

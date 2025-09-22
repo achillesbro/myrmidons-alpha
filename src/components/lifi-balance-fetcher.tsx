@@ -26,6 +26,8 @@ interface BalanceFetcherProps {
   isExecuting: boolean;
   usdt0Balance?: TokenBalance | null;
   usdt0Loading?: boolean;
+  currentStep: number;
+  onStepChange: (step: number) => void;
 }
 
 const CHAIN_INFO = {
@@ -45,7 +47,9 @@ export const LiFiBalanceFetcher = ({
   amount, 
   isExecuting,
   usdt0Balance,
-  usdt0Loading
+  usdt0Loading,
+  currentStep,
+  onStepChange
 }: BalanceFetcherProps) => {
   const { address } = useAccount();
   const [balances, setBalances] = useState<TokenBalance[]>([]);
@@ -184,17 +188,13 @@ export const LiFiBalanceFetcher = ({
 
   const handleTokenClick = (balance: TokenBalance) => {
     onTokenSelect(balance);
+    onStepChange(2); // Move to step 2 when token is selected
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onAmountEnter(e.target.value);
   };
 
-  const handleExecute = () => {
-    if (selectedToken && amount && parseFloat(amount) > 0) {
-      onExecute();
-    }
-  };
 
   if (!address) {
     return (
@@ -352,10 +352,19 @@ export const LiFiBalanceFetcher = ({
         </div>
       )}
 
-      {/* Selected Token and Amount Input */}
-      {selectedToken && (
+      {/* Selected Token and Amount Input - Only show in step 2 */}
+      {selectedToken && currentStep >= 2 && (
         <div className="p-6 bg-gray-50 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">Selected Token</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Selected Token</h3>
+            <button
+              onClick={() => onStepChange(1)}
+              className="text-sm text-gray-600 hover:text-gray-800 flex items-center space-x-1"
+            >
+              <span>←</span>
+              <span>Back to Token Selection</span>
+            </button>
+          </div>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
               {selectedToken.logoURI && (
@@ -434,12 +443,71 @@ export const LiFiBalanceFetcher = ({
           )}
 
           <button
-            onClick={handleExecute}
+            onClick={() => {
+              if (currentStep === 2) {
+                onStepChange(3); // Move to step 3 for confirmation
+              } else {
+                onExecute(); // Execute the transaction
+              }
+            }}
             disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > (selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)) || isExecuting}
             className="w-full py-3 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isExecuting ? 'Executing...' : 'Continue'}
+            {isExecuting ? 'Executing...' : currentStep === 2 ? 'Continue to Confirmation' : 'Execute Transaction'}
           </button>
+        </div>
+      )}
+
+      {/* Confirmation Step - Step 3 */}
+      {selectedToken && currentStep >= 3 && (
+        <div className="p-6 bg-blue-50 rounded-lg">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-blue-800">Confirm Transaction</h3>
+            <button
+              onClick={() => onStepChange(2)}
+              className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+            >
+              <span>←</span>
+              <span>Back to Amount</span>
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="bg-white p-4 rounded-lg border border-blue-200">
+              <h4 className="font-semibold text-gray-800 mb-3">Transaction Summary</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">From:</span>
+                  <span className="font-medium">{selectedToken.tokenSymbol} on {selectedToken.chainName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">To:</span>
+                  <span className="font-medium">USDT0 on HyperEVM</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Amount:</span>
+                  <span className="font-medium">${amount} USD</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Method:</span>
+                  <span className="font-medium">
+                    {selectedToken.tokenSymbol === 'USDT0' && selectedToken.chainId === 999 
+                      ? 'Direct Deposit' 
+                      : 'Bridge & Swap via Li.Fi'
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <button
+              onClick={onExecute}
+              disabled={isExecuting}
+              className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isExecuting ? 'Executing Transaction...' : 'Confirm & Execute'}
+            </button>
+          </div>
         </div>
       )}
     </div>
