@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { getRoutes, executeRoute } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
@@ -7,6 +7,7 @@ import { formatUnits } from 'viem';
 import { BrowserProvider } from 'ethers';
 import { useLifiConfig } from '../hooks/useLifiConfig';
 import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
+import { Toasts, type Toast, type ToastKind } from './vault-shared';
 
 // Helper functions for chain names and explorer URLs
 const getChainName = (chainId: number): string => {
@@ -62,6 +63,10 @@ export function LiFiQuoteTest() {
   } | null>(null);
   const [amount, setAmount] = useState<string>('');
   
+  // Toast management
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastIdRef = useRef<number>(1);
+  
   const clientW = useWalletClient();
   const wagmiConfig = useConfig();
   const userAddress = clientW.data?.account?.address || '0x552008c0f6870c2f77e5cC1d2eb9bdff03e30Ea0';
@@ -69,6 +74,75 @@ export function LiFiQuoteTest() {
   // Initialize Li.Fi SDK configuration
   const { isConfigured } = useLifiConfig();
 
+  // Toast helper functions
+  const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
+    toastIdRef.current += 1;
+    const id = toastIdRef.current;
+    setToasts((t) => [...t, { id, kind, text, href }]);
+    if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
+  };
+
+  const clearToasts = () => {
+    setToasts([]);
+  };
+
+  // Route monitoring functions based on Li.Fi documentation
+  const getStepStatus = (step: any): string => {
+    if (!step.execution?.process || step.execution.process.length === 0) {
+      return 'Pending';
+    }
+    
+    const latestProcess = step.execution.process[step.execution.process.length - 1];
+    return latestProcess.status || 'Processing';
+  };
+
+  const getStepDescription = (step: any, stepIndex: number): string => {
+    const tool = step.toolDetails?.key || 'Unknown';
+    const fromToken = step.action?.fromToken?.symbol || 'Unknown';
+    const toToken = step.action?.toToken?.symbol || 'Unknown';
+    const fromChain = getChainName(step.action?.fromChainId || 0);
+    const toChain = getChainName(step.action?.toChainId || 0);
+    
+    if (tool.includes('bridge') || tool.includes('glacis') || tool.includes('relay')) {
+      return `Bridge ${fromToken} from ${fromChain} to ${toChain}`;
+    } else if (tool.includes('swap') || tool.includes('uniswap') || tool.includes('1inch')) {
+      return `Swap ${fromToken} to ${toToken} on ${fromChain}`;
+    } else {
+      return `Step ${stepIndex + 1}: ${tool}`;
+    }
+  };
+
+  const monitorRouteExecution = (route: any) => {
+    console.log('Monitoring route execution:', route);
+    
+    route.steps.forEach((step: any, stepIndex: number) => {
+      const stepDescription = getStepDescription(step, stepIndex);
+      const stepStatus = getStepStatus(step);
+      
+      console.log(`Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus}`);
+      
+      // Show toast for each step
+      if (stepStatus === 'DONE') {
+        pushToast('success', `✅ ${stepDescription} completed`, 3000);
+      } else if (stepStatus === 'FAILED') {
+        pushToast('error', `❌ ${stepDescription} failed`, 5000);
+      } else if (stepStatus === 'PENDING') {
+        pushToast('info', `⏳ ${stepDescription} pending...`, 2000);
+      } else if (stepStatus === 'PROCESSING') {
+        pushToast('info', `🔄 ${stepDescription} processing...`, 2000);
+      }
+      
+      // Show transaction hashes for completed steps
+      if (step.execution?.process) {
+        step.execution.process.forEach((process: any) => {
+          if (process.txHash && process.status === 'DONE') {
+            const explorerUrl = getExplorerUrl(step.action?.fromChainId || 0, process.txHash);
+            pushToast('info', `Transaction: ${process.txHash.slice(0, 8)}...`, 5000, explorerUrl);
+          }
+        });
+      }
+    });
+  };
 
   // Handler functions for balance fetcher
   const handleTokenSelect = (tokenInfo: any) => {
@@ -83,6 +157,9 @@ export function LiFiQuoteTest() {
     if (!selectedTokenInfo || !amount) return;
     
     setExecuting(true);
+    clearToasts(); // Clear any existing toasts
+    pushToast('info', '🚀 Starting bridge execution...', 3000);
+    
     try {
       // Convert USD amount to native token amount
       let fromAmount: string;
@@ -235,6 +312,9 @@ export function LiFiQuoteTest() {
             }))
           });
           
+          // Monitor route execution with toasts
+          monitorRouteExecution(updatedRoute);
+          
           // Collect all transaction hashes
           updatedRoute.steps?.forEach(step => {
             if (step.execution?.process) {
@@ -273,7 +353,10 @@ export function LiFiQuoteTest() {
         }
       }
 
-      // Show immediate success toast with clickable transaction hash
+      // Show success toast
+      pushToast('success', '🎉 Bridge execution completed successfully!', 5000);
+      
+      // Add to executions list
       setExecutions(prev => [...prev, {
         success: true,
         txHash: finalTxHash,
@@ -289,6 +372,7 @@ export function LiFiQuoteTest() {
           // Wait for confirmation using wallet provider (faster than public RPC)
           await provider.waitForTransaction(finalTxHash, 1, 20_000).catch(() => null);
           console.log('Transaction confirmed via wallet provider');
+          pushToast('success', '✅ Transaction confirmed on-chain', 3000);
         } catch (error) {
           console.warn('Wallet transaction monitoring failed:', error);
         }
@@ -300,6 +384,8 @@ export function LiFiQuoteTest() {
       
     } catch (error: any) {
       console.error('Execution failed:', error);
+      pushToast('error', `❌ Bridge execution failed: ${error.message || 'Unknown error'}`, 8000);
+      
       setExecutions(prev => [...prev, {
         success: false,
         error: error.message || 'Unknown error',
@@ -398,6 +484,9 @@ export function LiFiQuoteTest() {
           </div>
         </div>
       )}
+
+      {/* Toast notifications */}
+      <Toasts toasts={toasts} />
     </div>
   );
 }
