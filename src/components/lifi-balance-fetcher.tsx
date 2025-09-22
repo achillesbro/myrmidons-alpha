@@ -219,7 +219,6 @@ export const LiFiBalanceFetcher = ({
     onStepChange(2); // Move to step 2 when token is selected
   };
 
-
   // Format number with commas for thousands/millions
   const formatNumberWithCommas = (value: string) => {
     // Remove any non-numeric characters except decimal point
@@ -242,6 +241,7 @@ export const LiFiBalanceFetcher = ({
     const rawValue = e.target.value.replace(/,/g, ''); // Remove commas for processing
     onAmountEnter(rawValue);
   };
+
 
 
 
@@ -455,13 +455,13 @@ export const LiFiBalanceFetcher = ({
                 {[25, 50, 75, 100].map((percentage) => (
                   <button
                     key={percentage}
-                    onClick={() => {
-                      const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
-                        ? parseFloat(selectedToken.balanceFormatted)
-                        : parseFloat(selectedToken.balanceUSD || '0');
-                      const amountUSD = (maxAmount * percentage / 100).toFixed(2);
-                      handleFormattedAmountChange({ target: { value: amountUSD } } as any);
-                    }}
+                      onClick={() => {
+                        const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
+                          ? parseFloat(selectedToken.balanceFormatted)
+                          : parseFloat(selectedToken.balanceUSD || '0');
+                        const amountUSD = (maxAmount * percentage / 100).toFixed(2);
+                        handleFormattedAmountChange({ target: { value: amountUSD } } as any);
+                      }}
                     className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {percentage === 100 ? 'Max' : `${percentage}%`}
