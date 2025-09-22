@@ -21,10 +21,12 @@ interface BalanceFetcherProps {
   onTokenSelect: (tokenInfo: TokenBalance) => void;
   onAmountEnter: (amount: string) => void;
   onExecute: () => void;
+  onDirectDeposit: (amount: string) => void;
+  onBalancesUpdate: (balances: TokenBalance[]) => void;
   selectedToken: TokenBalance | null;
   amount: string;
   isExecuting: boolean;
-  isUSDT0OnHyperEVM?: boolean;
+  usdt0Balance: TokenBalance | null;
 }
 
 const CHAIN_INFO = {
@@ -39,11 +41,13 @@ const CHAIN_INFO = {
 export const LiFiBalanceFetcher = ({ 
   onTokenSelect, 
   onAmountEnter, 
-  onExecute, 
+  onExecute,
+  onDirectDeposit,
+  onBalancesUpdate,
   selectedToken, 
   amount, 
   isExecuting,
-  isUSDT0OnHyperEVM = false
+  usdt0Balance
 }: BalanceFetcherProps) => {
   const { address } = useAccount();
   const [balances, setBalances] = useState<TokenBalance[]>([]);
@@ -167,6 +171,7 @@ export const LiFiBalanceFetcher = ({
     try {
       const allBalances = await fetchAllBalancesWithLifi();
       setBalances(allBalances);
+      onBalancesUpdate(allBalances);
     } catch (error) {
       console.error('Error fetching balances:', error);
       setError('Failed to fetch balances. Please try again.');
@@ -224,9 +229,59 @@ export const LiFiBalanceFetcher = ({
         </div>
       )}
 
-      {/* Balances List */}
+      {/* USDT0 on HyperEVM - Direct Deposit Box */}
+      {usdt0Balance && (
+        <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-3">
+              {usdt0Balance.logoURI && (
+                <img
+                  src={usdt0Balance.logoURI}
+                  alt={usdt0Balance.tokenSymbol}
+                  className="w-8 h-8 rounded-full"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+              <div>
+                <div className="font-semibold text-lg text-green-800">{usdt0Balance.tokenSymbol}</div>
+                <div className="text-sm text-green-600">{usdt0Balance.chainName} - Direct Deposit</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-lg font-semibold text-green-800">
+                {parseFloat(usdt0Balance.balanceFormatted).toFixed(6)}
+              </div>
+              <div className="text-sm text-green-600">
+                {usdt0Balance.balanceUSD ? `$${usdt0Balance.balanceUSD}` : usdt0Balance.tokenSymbol}
+              </div>
+            </div>
+          </div>
+          <div className="flex space-x-2">
+            <input
+              type="number"
+              value={amount}
+              onChange={handleAmountChange}
+              placeholder="Enter amount in USD"
+              className="flex-1 px-3 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              onClick={() => onDirectDeposit(amount)}
+              disabled={isExecuting || !amount || parseFloat(amount) <= 0}
+              className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isExecuting ? 'Depositing...' : 'Direct Deposit'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Balances List (excluding USDT0 on HyperEVM) */}
       <div className="space-y-3">
-        {balances.map((balance, index) => (
+        {balances.filter(balance => 
+          !(balance.tokenSymbol === 'USDT0' && balance.chainId === CHAIN_IDS.HYPEREVM)
+        ).map((balance, index) => (
           <div
             key={`${balance.chainId}-${balance.tokenSymbol}-${index}`}
             onClick={() => handleTokenClick(balance)}
@@ -356,12 +411,7 @@ export const LiFiBalanceFetcher = ({
             disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > (selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)) || isExecuting}
             className="w-full py-3 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isExecuting 
-              ? 'Executing...' 
-              : isUSDT0OnHyperEVM 
-                ? 'Direct deposit into the vault' 
-                : 'Execute Bridge to HyperEVM'
-            }
+            {isExecuting ? 'Executing...' : 'Execute Bridge to HyperEVM'}
           </button>
         </div>
       )}
