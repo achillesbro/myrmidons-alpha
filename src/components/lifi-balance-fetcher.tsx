@@ -199,6 +199,25 @@ export const LiFiBalanceFetcher = ({
     }
   }, [currentStep, selectedToken]);
 
+  // Convert Gwei to USD
+  const convertGweiToUSD = (gwei: number, gasLimit: number = 21000): string => {
+    // Convert Gwei to ETH (1 ETH = 10^9 Gwei)
+    const ethAmount = gwei / 1e9;
+    // Estimate gas cost in ETH (using standard gas limit for simple transfers)
+    const gasCostETH = ethAmount * gasLimit;
+    // Convert to USD (assuming ETH price from selectedToken if available, or use a default)
+    const ethPrice = selectedToken?.priceUSD ? parseFloat(selectedToken.priceUSD) : 2000; // Default ETH price
+    const gasCostUSD = gasCostETH * ethPrice;
+    
+    if (gasCostUSD < 0.01) {
+      return '< $0.01';
+    } else if (gasCostUSD < 1) {
+      return `$${gasCostUSD.toFixed(3)}`;
+    } else {
+      return `$${gasCostUSD.toFixed(2)}`;
+    }
+  };
+
   const handleTokenClick = (balance: TokenBalance) => {
     onTokenSelect(balance);
     onStepChange(2); // Move to step 2 when token is selected
@@ -239,11 +258,6 @@ export const LiFiBalanceFetcher = ({
 
   return (
     <div className="space-y-6">
-      {/* Select Token Section */}
-      <div>
-        <h3 className="text-lg font-semibold text-[#00295B] mb-2">SELECT TOKEN</h3>
-        <p className="text-sm text-[#101720]/70 mb-4">Choose the token you want to deposit</p>
-      </div>
 
       {/* Error Message */}
       {error && (
@@ -340,7 +354,13 @@ export const LiFiBalanceFetcher = ({
             </div>
           ) : (
             <div className="space-y-2">
-              {balances.map((balance, index) => (
+              {balances
+                .sort((a, b) => {
+                  const aUSD = parseFloat(a.balanceUSD || '0');
+                  const bUSD = parseFloat(b.balanceUSD || '0');
+                  return bUSD - aUSD; // Descending order by USD value
+                })
+                .map((balance, index) => (
                 <div
                   key={`${balance.chainId}-${balance.tokenSymbol}-${index}`}
                   onClick={() => handleTokenClick(balance)}
@@ -386,48 +406,30 @@ export const LiFiBalanceFetcher = ({
 
       {/* Selected Token and Amount Input - Only show in step 2 */}
       {selectedToken && currentStep === 2 && (
-        <div className="p-6 bg-gray-50 rounded-lg">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Selected Token</h3>
+        <div className="p-6">
+          {/* Back button */}
+          <div className="flex items-center justify-between mb-8">
             <button
               onClick={() => onStepChange(1)}
-              className="text-sm text-gray-600 hover:text-gray-800 flex items-center space-x-1"
+              className="text-gray-600 hover:text-gray-800 flex items-center space-x-2"
             >
-              <span>←</span>
-              <span>Back to Token Selection</span>
+              <span className="text-xl">←</span>
+              <span>Back</span>
             </button>
           </div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              {selectedToken.logoURI && (
-                <img
-                  src={selectedToken.logoURI}
-                  alt={selectedToken.tokenSymbol}
-                  className="w-10 h-10 rounded-full"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              )}
-              <div>
-                <div className="font-semibold text-lg">{selectedToken.tokenSymbol}</div>
-                <div className="text-sm text-gray-600">{selectedToken.chainName}</div>
-              </div>
+
+          {/* Large Amount Display */}
+          <div className="text-center mb-8">
+            <div className="text-5xl font-bold text-black mb-2">
+              ${amount || '0.00'}
             </div>
-            <div className="text-right">
-              <div className="font-mono text-lg">
-                {parseFloat(selectedToken.balanceFormatted).toFixed(6)} {selectedToken.tokenSymbol}
-              </div>
-              <div className="text-sm text-gray-600">
-                {selectedToken.balanceUSD ? `$${selectedToken.balanceUSD}` : 'USD value unavailable'}
-              </div>
+            <div className="text-lg text-gray-600">
+              ↓ {selectedToken.priceUSD ? (parseFloat(amount || '0') / parseFloat(selectedToken.priceUSD)).toFixed(6) : '0.000000'} {selectedToken.tokenSymbol}
             </div>
           </div>
-          
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Enter Amount (USD)
-            </label>
+
+          {/* Amount Input */}
+          <div className="mb-8">
             <input
               type="number"
               value={amount}
@@ -436,36 +438,25 @@ export const LiFiBalanceFetcher = ({
               step="0.01"
               min="0"
               max={selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-center text-2xl font-semibold py-4 px-4 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
-            <div className="text-xs text-gray-500 mt-1">
-              Available: ${selectedToken.balanceUSD || '0.00'} USD
-              {selectedToken.priceUSD && (
-                <span className="ml-2">
-                  ({parseFloat(selectedToken.balanceFormatted).toFixed(6)} {selectedToken.tokenSymbol})
-                </span>
-              )}
-            </div>
           </div>
 
           {/* Quick Select Buttons */}
           {(selectedToken.balanceUSD || (selectedToken.tokenSymbol === 'USDT0' && selectedToken.balanceFormatted)) && (
-            <div className="mb-4">
-              <div className="text-sm font-medium text-gray-700 mb-2">Quick Select:</div>
-              <div className="flex space-x-2">
+            <div className="mb-8">
+              <div className="flex justify-center space-x-3">
                 {[25, 50, 75, 100].map((percentage) => (
                   <button
                     key={percentage}
                     onClick={() => {
-                      // For USDT0, use balanceFormatted directly since it's 1:1 with USD
-                      // For other tokens, use balanceUSD
                       const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
                         ? parseFloat(selectedToken.balanceFormatted)
                         : parseFloat(selectedToken.balanceUSD || '0');
                       const amountUSD = (maxAmount * percentage / 100).toFixed(2);
                       handleAmountChange({ target: { value: amountUSD } } as any);
                     }}
-                    className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="px-6 py-3 text-lg font-medium bg-white border-2 border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {percentage === 100 ? 'Max' : `${percentage}%`}
                   </button>
@@ -474,18 +465,13 @@ export const LiFiBalanceFetcher = ({
             </div>
           )}
 
+          {/* Continue Button */}
           <button
-            onClick={() => {
-              if (currentStep === 2) {
-                onStepChange(3); // Move to step 3 for confirmation
-              } else {
-                onExecute(); // Execute the transaction
-              }
-            }}
+            onClick={() => onStepChange(3)}
             disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > (selectedToken.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken.balanceFormatted)) || isExecuting}
-            className="w-full py-3 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-6 text-xl font-semibold bg-[#00295B] text-white rounded-lg hover:bg-[#001a3d] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isExecuting ? 'Executing...' : currentStep === 2 ? 'Continue to Confirmation' : 'Execute Transaction'}
+            CONTINUE
           </button>
         </div>
       )}
@@ -505,22 +491,51 @@ export const LiFiBalanceFetcher = ({
           </div>
           
           <div className="space-y-4">
-            <div className="bg-white p-4 rounded-lg border border-blue-200">
-              <h4 className="font-semibold text-gray-800 mb-3">Transaction Summary</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">From:</span>
-                  <span className="font-medium">{selectedToken.tokenSymbol} on {selectedToken.chainName}</span>
+            <div className="bg-white p-6 rounded-lg border border-blue-200">
+              <h4 className="font-semibold text-gray-800 mb-4 text-center">Transaction Summary</h4>
+              
+              {/* Transaction Flow with Logos */}
+              <div className="flex items-center justify-center space-x-4 mb-6">
+                {/* From Token */}
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center space-x-2 mb-2">
+                    {selectedToken.logoURI && (
+                      <img
+                        src={selectedToken.logoURI}
+                        alt={selectedToken.tokenSymbol}
+                        className="w-8 h-8 rounded-full"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <span className="font-semibold text-lg">{selectedToken.tokenSymbol}</span>
+                  </div>
+                  <div className="text-sm text-gray-600">{selectedToken.chainName}</div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">To:</span>
-                  <span className="font-medium">USDT0 on HyperEVM</span>
+
+                {/* Arrow */}
+                <div className="text-2xl text-gray-400">→</div>
+
+                {/* To Token */}
+                <div className="flex flex-col items-center">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+                      <span className="text-white font-bold text-sm">$</span>
+                    </div>
+                    <span className="font-semibold text-lg">USDT0</span>
+                  </div>
+                  <div className="text-sm text-gray-600">HyperEVM</div>
                 </div>
-                <div className="flex justify-between">
+              </div>
+
+              {/* Transaction Details */}
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
                   <span className="text-gray-600">Amount:</span>
-                  <span className="font-medium">${amount} USD</span>
+                  <span className="font-semibold text-lg">${amount} USD</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
                   <span className="text-gray-600">Method:</span>
                   <span className="font-medium">
                     {selectedToken.tokenSymbol === 'USDT0' && selectedToken.chainId === 999 
@@ -530,10 +545,10 @@ export const LiFiBalanceFetcher = ({
                   </span>
                 </div>
                 {gasFees && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600">Gas Fee (Fast):</span>
                     <span className="font-medium">
-                      {gasFees.fast} Gwei
+                      {convertGweiToUSD(gasFees.fast)}
                     </span>
                   </div>
                 )}
