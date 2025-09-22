@@ -17,7 +17,7 @@ import vaultAbi from "../abis/vault.json";
 import { useVaultCurrentApyOnchain } from "../hooks/useVaultCurrentApyOnchain";
 import { useState, useEffect, useRef } from "react";
 import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";
-import { LiFiQuoteTest } from "./lifi-quote-test";
+import { MultiStepDeposit } from "./multi-step-deposit";
 // Inline AllocationList component for on-chain allocations
 
 // Simple error boundary to isolate rendering errors in the API View
@@ -148,6 +148,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   
   // Deposit dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [currentDepositStep, setCurrentDepositStep] = useState(1);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
@@ -728,7 +729,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                   <div className="min-h-[160px] flex flex-col justify-center">
                     <div className="text-center mb-4">
                       <h4 className="text-lg font-semibold text-[#00295B] mb-2">
-                        {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into Hyperbeat USDC" })}
+                        {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
                       </h4>
                       <p className="text-sm text-[#101720]/70">
                         {t("vaultInfo.actions.depositDescription", { 
@@ -836,21 +837,44 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
 
         {/* Deposit Dialog */}
         {depositDialogOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b">
-                <h2 className="text-xl font-semibold text-[#00295B]">
-                  {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into Hyperbeat USDC" })}
-                </h2>
-                <button
-                  onClick={() => setDepositDialogOpen(false)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
-                >
-                  ×
-                </button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Blurred background */}
+            <div className="absolute inset-0 bg-[#FFFFF5] backdrop-blur-sm"></div>
+            
+            {/* Dialog container with cropping effect */}
+            <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-2xl w-full max-h-[85vh] overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setDepositDialogOpen(false)}
+                    className="text-[#101720]/60 hover:text-[#101720] text-xl font-bold"
+                  >
+                    ←
+                  </button>
+                  <h2 className="text-xl font-semibold text-[#00295B]">
+                    {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
+                  </h2>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-[#101720]/60">Step {currentDepositStep} of 3</span>
+                  <button
+                    onClick={() => {
+                      setDepositDialogOpen(false);
+                      setCurrentDepositStep(1);
+                    }}
+                    className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                <LiFiQuoteTest />
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
+                <MultiStepDeposit 
+                  onClose={() => {
+                    setDepositDialogOpen(false);
+                    setCurrentDepositStep(1);
+                  }}
+                />
               </div>
             </div>
           </div>
