@@ -28,6 +28,9 @@ export function LiFiQuoteTest() {
     balance: string;
     balanceFormatted: string;
     decimals: number;
+    logoURI?: string;
+    priceUSD?: string;
+    balanceUSD?: string;
   } | null>(null);
   const [amount, setAmount] = useState<string>('');
   
@@ -64,9 +67,18 @@ export function LiFiQuoteTest() {
     
     setExecuting(true);
     try {
-      // Convert amount to token units
-      const decimals = selectedTokenInfo.tokenSymbol === 'USDC' || selectedTokenInfo.tokenSymbol === 'USDT' ? 6 : 18;
-      const fromAmount = (parseFloat(amount) * Math.pow(10, decimals)).toString();
+      // Convert USD amount to native token amount
+      let fromAmount: string;
+      if (selectedTokenInfo.priceUSD) {
+        // Convert USD to native token amount
+        const usdAmount = parseFloat(amount);
+        const tokenPrice = parseFloat(selectedTokenInfo.priceUSD);
+        const nativeAmount = usdAmount / tokenPrice;
+        fromAmount = (nativeAmount * Math.pow(10, selectedTokenInfo.decimals)).toString();
+      } else {
+        // Fallback: treat amount as native token amount
+        fromAmount = (parseFloat(amount) * Math.pow(10, selectedTokenInfo.decimals)).toString();
+      }
 
       // Get token addresses
       const fromToken = selectedTokenInfo.tokenAddress;
