@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { getRoutes, executeRoute } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
@@ -68,17 +68,10 @@ export function LiFiQuoteTest() {
   } | null>(null);
   const [amount, setAmount] = useState<string>('');
   
-  // USDT0 balance for direct deposits
+  // USDT0 balance for direct deposits (fetched separately)
   const [usdt0Balance, setUsdt0Balance] = useState<{
-    chainId: number;
-    chainName: string;
-    tokenSymbol: string;
-    tokenAddress: string;
     balance: string;
     balanceFormatted: string;
-    decimals: number;
-    logoURI?: string;
-    priceUSD?: string;
     balanceUSD?: string;
   } | null>(null);
   
@@ -107,6 +100,13 @@ export function LiFiQuoteTest() {
   
   // Initialize Li.Fi SDK configuration
   const { isConfigured } = useLifiConfig();
+
+  // Fetch USDT0 balance when wallet connects
+  useEffect(() => {
+    if (clientW.data?.account?.address) {
+      fetchUSDT0Balance();
+    }
+  }, [clientW.data?.account?.address]);
 
   // Toast helper functions
   const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
@@ -148,57 +148,6 @@ export function LiFiQuoteTest() {
     setTxFlow(prev => ({ ...prev, isActive: false }));
   };
 
-  // Direct deposit function for USDT0 on HyperEVM
-  const runDirectDeposit = async (amountWei: bigint) => {
-    try {
-      if (!clientW.data) throw new Error("Connect wallet");
-      
-      // Start transaction flow
-      startTxFlow([
-        { id: 'approve', title: 'Approve USDT0 spending' },
-        { id: 'deposit', title: 'Deposit to vault' }
-      ]);
-      
-      const provider = new BrowserProvider((window as any).ethereum);
-      const signer = await provider.getSigner();
-      const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
-      
-      // Check if approval is needed
-      const token = new Contract(usdt0Balance?.tokenAddress || '', erc20Abi as any, signer);
-      const allowance = await token.allowance(clientW.data.account.address, VAULT_ADDRESS);
-      
-      if (allowance < amountWei) {
-        updateTxStep('approve', 'processing');
-        const approveTx = await token.approve(VAULT_ADDRESS, amountWei);
-        updateTxStep('approve', 'completed', approveTx.hash);
-        
-        // Wait for approval confirmation
-        await provider.waitForTransaction(approveTx.hash, 1, 20_000).catch(() => null);
-      } else {
-        updateTxStep('approve', 'completed');
-      }
-      
-      // Execute deposit
-      updateTxStep('deposit', 'processing');
-      const tx = await vault.deposit(amountWei, clientW.data.account.address);
-      updateTxStep('deposit', 'completed', tx.hash);
-      
-      // Wait for confirmation
-      await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
-      
-      // Complete flow
-      completeTxFlow();
-      pushToast('success', 'Deposit successful');
-      
-      // Reset form
-      setAmount('');
-      
-    } catch (e: any) {
-      updateTxStep('deposit', 'failed');
-      completeTxFlow();
-      pushToast('error', `Deposit failed: ${e.message || 'Unknown error'}`, 8000);
-    }
-  };
 
   // Route monitoring functions based on Li.Fi documentation
   const getStepStatus = (step: any): string => {
@@ -277,33 +226,80 @@ export function LiFiQuoteTest() {
     setSelectedTokenInfo(tokenInfo);
   };
 
-  // Update USDT0 balance when balances change
-  const updateUSDT0Balance = (balances: any[]) => {
-    const usdt0 = balances.find(balance => 
-      balance.tokenSymbol === 'USDT0' && balance.chainId === CHAIN_IDS.HYPEREVM
-    );
-    setUsdt0Balance(usdt0 || null);
+  // Fetch USDT0 balance directly from HyperEVM
+  const fetchUSDT0Balance = async () => {
+    if (!clientW.data?.account?.address) return;
+    
+    try {
+      const provider = new BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const token = new Contract(TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0, erc20Abi as any, signer);
+      
+      const [balance, decimals] = await Promise.all([
+        token.balanceOf(clientW.data.account.address) as Promise<bigint>,
+        token.decimals() as Promise<number>
+      ]);
+      
+      const balanceFormatted = formatUnits(balance, decimals);
+      const balanceUSD = parseFloat(balanceFormatted).toFixed(2);
+      
+      setUsdt0Balance({
+        balance: balance.toString(),
+        balanceFormatted,
+        balanceUSD: `$${balanceUSD}`
+      });
+    } catch (error) {
+      console.error('Error fetching USDT0 balance:', error);
+      setUsdt0Balance(null);
+    }
   };
 
   const handleAmountEnter = (enteredAmount: string) => {
     setAmount(enteredAmount);
   };
 
-  const handleDirectDeposit = (enteredAmount: string) => {
+  const handleDirectDeposit = async (enteredAmount: string) => {
     if (!usdt0Balance || !enteredAmount || parseFloat(enteredAmount) <= 0) return;
     
-    // Convert USD amount to native token amount
-    let fromAmount: string;
-    if (usdt0Balance.priceUSD) {
-      const usdAmount = parseFloat(enteredAmount);
-      const tokenPrice = parseFloat(usdt0Balance.priceUSD);
-      const nativeAmount = usdAmount / tokenPrice;
-      fromAmount = Math.round(nativeAmount * Math.pow(10, usdt0Balance.decimals)).toString();
-    } else {
-      fromAmount = parseUnits(enteredAmount, usdt0Balance.decimals).toString();
+    try {
+      setExecuting(true);
+      
+      // Convert USD amount to USDT0 amount (assuming 1:1 for USDT0)
+      const usdt0Amount = parseUnits(enteredAmount, 6); // USDT0 has 6 decimals
+      
+      // Use the vault's runDeposit function
+      const provider = new BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+      const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+      
+      // Check if approval is needed
+      const token = new Contract(TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0, erc20Abi as any, signer);
+      const allowance = await token.allowance(clientW.data?.account?.address, VAULT_ADDRESS);
+      
+      if (allowance < usdt0Amount) {
+        pushToast('info', 'Approving USDT0 spending...', 3000);
+        const approveTx = await token.approve(VAULT_ADDRESS, usdt0Amount);
+        await provider.waitForTransaction(approveTx.hash, 1, 20_000).catch(() => null);
+        pushToast('success', 'Approval confirmed', 3000);
+      }
+      
+      // Execute deposit
+      pushToast('info', 'Depositing to vault...', 3000);
+      const tx = await vault.deposit(usdt0Amount, clientW.data?.account?.address);
+      pushToast('info', `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
+      
+      await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
+      pushToast('success', 'Deposit successful', 5000);
+      
+      // Refresh USDT0 balance
+      await fetchUSDT0Balance();
+      setAmount('');
+      
+    } catch (error: any) {
+      pushToast('error', `Deposit failed: ${error.message || 'Unknown error'}`, 8000);
+    } finally {
+      setExecuting(false);
     }
-    
-    runDirectDeposit(BigInt(fromAmount));
   };
 
   const handleExecute = async () => {
@@ -581,17 +577,55 @@ export function LiFiQuoteTest() {
         </div>
       )}
 
+      {/* USDT0 Direct Deposit Section */}
+      {usdt0Balance && (
+        <div className="p-6 bg-green-50 border-2 border-green-200 rounded-lg mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-green-800 font-bold text-lg">₮</span>
+              </div>
+              <div>
+                <div className="font-semibold text-xl text-green-800">USDT0</div>
+                <div className="text-sm text-green-600">HyperEVM - Direct Deposit</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="font-mono text-xl font-semibold text-green-800">
+                {parseFloat(usdt0Balance.balanceFormatted).toFixed(6)}
+              </div>
+              <div className="text-sm text-green-600">
+                {usdt0Balance.balanceUSD}
+              </div>
+            </div>
+          </div>
+          <div className="flex space-x-3">
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Enter amount in USDT0"
+              className="flex-1 px-4 py-3 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-lg"
+            />
+            <button
+              onClick={() => handleDirectDeposit(amount)}
+              disabled={executing || !amount || parseFloat(amount) <= 0}
+              className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
+            >
+              {executing ? 'Depositing...' : 'Direct Deposit'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Balance Fetcher Component */}
         <LiFiBalanceFetcher
           onTokenSelect={handleTokenSelect}
           onAmountEnter={handleAmountEnter}
           onExecute={handleExecute}
-          onDirectDeposit={handleDirectDeposit}
-          onBalancesUpdate={updateUSDT0Balance}
           selectedToken={selectedTokenInfo}
           amount={amount}
           isExecuting={executing}
-          usdt0Balance={usdt0Balance}
         />
 
       {/* Execution Results */}
