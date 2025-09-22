@@ -3,6 +3,7 @@ import { getRoutes, executeRoute } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain, getWalletClient } from '@wagmi/core';
+import { formatUnits } from 'viem';
 import { useLifiConfig } from '../hooks/useLifiConfig';
 import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
 
@@ -77,13 +78,18 @@ export function LiFiQuoteTest() {
         // Round to ensure we get a whole number for the smallest token units
         fromAmount = Math.round(nativeAmount * Math.pow(10, selectedTokenInfo.decimals)).toString();
         
-        console.log('USD to Native conversion:', {
-          usdAmount,
-          tokenPrice,
-          nativeAmount,
-          decimals: selectedTokenInfo.decimals,
-          fromAmount
-        });
+      console.log('USD to Native conversion:', {
+        usdAmount,
+        tokenPrice,
+        nativeAmount,
+        decimals: selectedTokenInfo.decimals,
+        fromAmount
+      });
+
+      // Warn about very small amounts for ETH
+      if (selectedTokenInfo.tokenSymbol === 'ETH' && parseFloat(amount) < 50) {
+        console.warn('⚠️ Very small ETH amount detected. ETH bridges often have higher minimum amounts. Consider trying with at least $50-100 USD.');
+      }
       } else {
         // Fallback: treat amount as native token amount
         fromAmount = Math.round(parseFloat(amount) * Math.pow(10, selectedTokenInfo.decimals)).toString();
@@ -152,9 +158,32 @@ export function LiFiQuoteTest() {
           fromToken: step.action?.fromToken,
           toToken: step.action?.toToken,
           fromChainId: step.action?.fromChainId,
-          toChainId: step.action?.toChainId
+          toChainId: step.action?.toChainId,
+          fromAmount: step.action?.fromAmount,
+          toAmount: (step.action as any)?.toAmount,
+          minAmount: (step.action as any)?.minAmount,
+          maxAmount: (step.action as any)?.maxAmount
         }))
       });
+
+      // Check for minimum amount requirements
+      if (route.steps && route.steps.length > 0) {
+        const firstStep = route.steps[0];
+        const action = firstStep.action as any;
+        if (action?.minAmount) {
+          const minAmount = BigInt(action.minAmount);
+          const fromAmountBigInt = BigInt(fromAmount);
+          console.log('Minimum amount check:', {
+            required: minAmount.toString(),
+            provided: fromAmountBigInt.toString(),
+            meetsMinimum: fromAmountBigInt >= minAmount
+          });
+          
+          if (fromAmountBigInt < minAmount) {
+            throw new Error(`Amount too small. Minimum required: ${formatUnits(minAmount, selectedTokenInfo.decimals)} ${selectedTokenInfo.tokenSymbol}`);
+          }
+        }
+      }
 
       // Execute the route
       console.log('Starting route execution...');
