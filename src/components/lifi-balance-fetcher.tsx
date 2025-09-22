@@ -472,7 +472,7 @@ export const LiFiBalanceFetcher = ({
           )}
 
           {/* Transaction Flow Indicator */}
-          <div className="flex items-center justify-center space-x-4 mb-4 text-sm">
+          <div className="flex items-center justify-center space-x-4 mb-2 text-sm">
             <div className="flex items-center space-x-2">
               {selectedToken.logoURI && (
                 <img
@@ -527,7 +527,7 @@ export const LiFiBalanceFetcher = ({
             </button>
           </div>
           
-          <div className="bg-white p-4 rounded-lg border border-blue-200 mb-4">
+          <div className="bg-white p-4 rounded-lg border border-blue-200 mb-2">
             {/* Transaction Flow with Logos */}
             <div className="flex items-center justify-center space-x-3 mb-4">
               {/* From Token */}
