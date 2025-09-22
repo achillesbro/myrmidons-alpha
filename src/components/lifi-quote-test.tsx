@@ -74,6 +74,7 @@ export function LiFiQuoteTest() {
     balanceFormatted: string;
     balanceUSD?: string;
   } | null>(null);
+  const [usdt0Loading, setUsdt0Loading] = useState(false);
   
   // Toast management
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -176,7 +177,9 @@ export function LiFiQuoteTest() {
   const fetchUSDT0Balance = async () => {
     if (!clientW.data?.account?.address) return;
     
+    setUsdt0Loading(true);
     try {
+      console.log('Fetching USDT0 balance for address:', clientW.data.account.address);
       const provider = new BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const token = new Contract(TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0, erc20Abi as any, signer);
@@ -189,19 +192,23 @@ export function LiFiQuoteTest() {
       const balanceFormatted = formatUnits(balance, decimals);
       const balanceUSD = parseFloat(balanceFormatted).toFixed(2);
       
-      // Only set balance if it's greater than 0
-      if (parseFloat(balanceFormatted) > 0) {
-        setUsdt0Balance({
-          balance: balance.toString(),
-          balanceFormatted,
-          balanceUSD: `$${balanceUSD}`
-        });
-      } else {
-        setUsdt0Balance(null);
-      }
+      console.log('USDT0 balance fetched:', {
+        balance: balance.toString(),
+        balanceFormatted,
+        balanceUSD
+      });
+      
+      // Always set balance (even if 0) so the section shows
+      setUsdt0Balance({
+        balance: balance.toString(),
+        balanceFormatted,
+        balanceUSD: `$${balanceUSD}`
+      });
     } catch (error) {
       console.error('Error fetching USDT0 balance:', error);
       setUsdt0Balance(null);
+    } finally {
+      setUsdt0Loading(false);
     }
   };
 
@@ -526,7 +533,7 @@ export function LiFiQuoteTest() {
       )}
 
         {/* USDT0 Direct Deposit Section */}
-        {usdt0Balance && (
+        {clientW.data?.account?.address && (
           <div className="p-6 bg-green-50 border-2 border-green-200 rounded-lg mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -539,12 +546,20 @@ export function LiFiQuoteTest() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="font-mono text-xl font-semibold text-green-800">
-                  {parseFloat(usdt0Balance.balanceFormatted).toFixed(6)}
-                </div>
-                <div className="text-sm text-green-600">
-                  {usdt0Balance.balanceUSD}
-                </div>
+                {usdt0Loading ? (
+                  <div className="text-green-600">Loading balance...</div>
+                ) : usdt0Balance ? (
+                  <>
+                    <div className="font-mono text-xl font-semibold text-green-800">
+                      {parseFloat(usdt0Balance.balanceFormatted).toFixed(6)}
+                    </div>
+                    <div className="text-sm text-green-600">
+                      {usdt0Balance.balanceUSD}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-red-600">Failed to load balance</div>
+                )}
               </div>
             </div>
             <div className="flex space-x-3">
@@ -557,7 +572,7 @@ export function LiFiQuoteTest() {
               />
               <button
                 onClick={() => handleDirectDeposit(amount)}
-                disabled={executing || !amount || parseFloat(amount) <= 0}
+                disabled={executing || !amount || parseFloat(amount) <= 0 || !usdt0Balance}
                 className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
               >
                 {executing ? 'Depositing...' : 'Direct Deposit'}
