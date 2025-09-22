@@ -244,7 +244,6 @@ export const LiFiBalanceFetcher = ({
 
 
 
-
   if (!address) {
     return (
       <div className="p-6 bg-gray-100 rounded-lg">
@@ -453,8 +452,8 @@ export const LiFiBalanceFetcher = ({
             <div className="mb-4">
               <div className="flex justify-center space-x-2">
                 {[25, 50, 75, 100].map((percentage) => (
-                  <button
-                    key={percentage}
+                    <button
+                      key={percentage}
                       onClick={() => {
                         const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
                           ? parseFloat(selectedToken.balanceFormatted)
@@ -462,8 +461,8 @@ export const LiFiBalanceFetcher = ({
                         const amountUSD = (maxAmount * percentage / 100).toFixed(2);
                         handleFormattedAmountChange({ target: { value: amountUSD } } as any);
                       }}
-                    className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
+                      className="px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
                     {percentage === 100 ? 'Max' : `${percentage}%`}
                   </button>
                 ))}
