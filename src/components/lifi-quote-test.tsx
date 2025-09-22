@@ -8,8 +8,8 @@ import { BrowserProvider, Contract } from 'ethers';
 import { useLifiConfig } from '../hooks/useLifiConfig';
 import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
-import vaultAbi from '../abis/vault.json';
 import { erc20Abi } from 'viem';
+import vaultAbi from '../abis/vault.json';
 
 // Vault address for direct deposits
 const VAULT_ADDRESS = '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42' as `0x${string}`;
@@ -75,21 +75,6 @@ export function LiFiQuoteTest() {
     balanceUSD?: string;
   } | null>(null);
   
-  // Transaction flow state
-  const [txFlow, setTxFlow] = useState<{
-    isActive: boolean;
-    steps: Array<{
-      id: string;
-      title: string;
-      status: 'pending' | 'processing' | 'completed' | 'failed';
-      txHash?: string;
-      explorerUrl?: string;
-    }>;
-  }>({
-    isActive: false,
-    steps: []
-  });
-  
   // Toast management
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef<number>(1);
@@ -119,35 +104,6 @@ export function LiFiQuoteTest() {
   const clearToasts = () => {
     setToasts([]);
   };
-
-  // Transaction flow helpers
-  const startTxFlow = (steps: Array<{ id: string; title: string }>) => {
-    setTxFlow({
-      isActive: true,
-      steps: steps.map(step => ({ ...step, status: 'pending' as const }))
-    });
-  };
-
-  const updateTxStep = (stepId: string, status: 'processing' | 'completed' | 'failed', txHash?: string) => {
-    setTxFlow(prev => ({
-      ...prev,
-      steps: prev.steps.map(step => 
-        step.id === stepId 
-          ? { 
-              ...step, 
-              status, 
-              txHash,
-              explorerUrl: txHash ? getExplorerUrl(selectedTokenInfo?.chainId || 0, txHash) : undefined
-            }
-          : step
-      )
-    }));
-  };
-
-  const completeTxFlow = () => {
-    setTxFlow(prev => ({ ...prev, isActive: false }));
-  };
-
 
   // Route monitoring functions based on Li.Fi documentation
   const getStepStatus = (step: any): string => {
@@ -184,37 +140,23 @@ export function LiFiQuoteTest() {
       
       console.log(`Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus}`);
       
-      // Update transaction flow instead of toasts
-      if (stepStatus === 'PROCESSING') {
-        if (stepDescription.includes('Bridge')) {
-          updateTxStep('bridge', 'processing');
-        } else if (stepDescription.includes('Swap')) {
-          updateTxStep('swap', 'processing');
-        }
-      } else if (stepStatus === 'DONE') {
-        if (stepDescription.includes('Bridge')) {
-          updateTxStep('bridge', 'completed');
-        } else if (stepDescription.includes('Swap')) {
-          updateTxStep('swap', 'completed');
-        }
+      // Show toast for each step
+      if (stepStatus === 'DONE') {
+        pushToast('success', `${stepDescription} completed`, 3000);
       } else if (stepStatus === 'FAILED') {
-        if (stepDescription.includes('Bridge')) {
-          updateTxStep('bridge', 'failed');
-        } else if (stepDescription.includes('Swap')) {
-          updateTxStep('swap', 'failed');
-        }
+        pushToast('error', `${stepDescription} failed`, 5000);
+      } else if (stepStatus === 'PENDING') {
+        pushToast('info', `${stepDescription} pending...`, 2000);
+      } else if (stepStatus === 'PROCESSING') {
+        pushToast('info', `${stepDescription} processing...`, 2000);
       }
       
-      // Collect transaction hashes for completed steps
+      // Show transaction hashes for completed steps
       if (step.execution?.process) {
         step.execution.process.forEach((process: any) => {
           if (process.txHash && process.status === 'DONE') {
-            // Update the appropriate step with transaction hash
-            if (stepDescription.includes('Bridge')) {
-              updateTxStep('bridge', 'completed', process.txHash);
-            } else if (stepDescription.includes('Swap')) {
-              updateTxStep('swap', 'completed', process.txHash);
-            }
+            const explorerUrl = getExplorerUrl(step.action?.fromChainId || 0, process.txHash);
+            pushToast('info', `Transaction: ${process.txHash.slice(0, 8)}...`, 5000, explorerUrl);
           }
         });
       }
@@ -224,6 +166,10 @@ export function LiFiQuoteTest() {
   // Handler functions for balance fetcher
   const handleTokenSelect = (tokenInfo: any) => {
     setSelectedTokenInfo(tokenInfo);
+  };
+
+  const handleAmountEnter = (enteredAmount: string) => {
+    setAmount(enteredAmount);
   };
 
   // Fetch USDT0 balance directly from HyperEVM
@@ -243,19 +189,20 @@ export function LiFiQuoteTest() {
       const balanceFormatted = formatUnits(balance, decimals);
       const balanceUSD = parseFloat(balanceFormatted).toFixed(2);
       
-      setUsdt0Balance({
-        balance: balance.toString(),
-        balanceFormatted,
-        balanceUSD: `$${balanceUSD}`
-      });
+      // Only set balance if it's greater than 0
+      if (parseFloat(balanceFormatted) > 0) {
+        setUsdt0Balance({
+          balance: balance.toString(),
+          balanceFormatted,
+          balanceUSD: `$${balanceUSD}`
+        });
+      } else {
+        setUsdt0Balance(null);
+      }
     } catch (error) {
       console.error('Error fetching USDT0 balance:', error);
       setUsdt0Balance(null);
     }
-  };
-
-  const handleAmountEnter = (enteredAmount: string) => {
-    setAmount(enteredAmount);
   };
 
   const handleDirectDeposit = async (enteredAmount: string) => {
@@ -263,6 +210,7 @@ export function LiFiQuoteTest() {
     
     try {
       setExecuting(true);
+      pushToast('info', 'Starting direct deposit...', 3000);
       
       // Convert USD amount to USDT0 amount (assuming 1:1 for USDT0)
       const usdt0Amount = parseUnits(enteredAmount, 6); // USDT0 has 6 decimals
@@ -279,6 +227,7 @@ export function LiFiQuoteTest() {
       if (allowance < usdt0Amount) {
         pushToast('info', 'Approving USDT0 spending...', 3000);
         const approveTx = await token.approve(VAULT_ADDRESS, usdt0Amount);
+        pushToast('info', `Approval tx: ${approveTx.hash}`, 7000, `https://hyperevmscan.io/tx/${approveTx.hash}`);
         await provider.waitForTransaction(approveTx.hash, 1, 20_000).catch(() => null);
         pushToast('success', 'Approval confirmed', 3000);
       }
@@ -305,14 +254,15 @@ export function LiFiQuoteTest() {
   const handleExecute = async () => {
     if (!selectedTokenInfo || !amount) return;
     
+    // Check if selected token is USDT0 on HyperEVM - use direct deposit
+    if (selectedTokenInfo.tokenSymbol === 'USDT0' && selectedTokenInfo.chainId === CHAIN_IDS.HYPEREVM) {
+      await handleDirectDeposit(amount);
+      return;
+    }
+    
     setExecuting(true);
     clearToasts(); // Clear any existing toasts
-    
-    // Start transaction flow for Li.Fi bridging
-    startTxFlow([
-      { id: 'bridge', title: `Bridge ${selectedTokenInfo.tokenSymbol} from ${getChainName(selectedTokenInfo.chainId)}` },
-      { id: 'swap', title: 'Swap to USDT0 on HyperEVM' }
-    ]);
+    pushToast('info', 'Starting bridge execution...', 3000);
     
     try {
       // Convert USD amount to native token amount
@@ -507,8 +457,7 @@ export function LiFiQuoteTest() {
         }
       }
 
-      // Complete transaction flow
-      completeTxFlow();
+      // Show success toast
       pushToast('success', 'Bridge execution completed successfully!', 5000);
       
       // Add to executions list
@@ -539,7 +488,6 @@ export function LiFiQuoteTest() {
       
     } catch (error: any) {
       console.error('Execution failed:', error);
-      completeTxFlow();
       pushToast('error', `Bridge execution failed: ${error.message || 'Unknown error'}`, 8000);
       
       setExecutions(prev => [...prev, {
@@ -577,48 +525,48 @@ export function LiFiQuoteTest() {
         </div>
       )}
 
-      {/* USDT0 Direct Deposit Section */}
-      {usdt0Balance && (
-        <div className="p-6 bg-green-50 border-2 border-green-200 rounded-lg mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-green-800 font-bold text-lg">₮</span>
+        {/* USDT0 Direct Deposit Section */}
+        {usdt0Balance && (
+          <div className="p-6 bg-green-50 border-2 border-green-200 rounded-lg mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-green-800 font-bold text-lg">₮</span>
+                </div>
+                <div>
+                  <div className="font-semibold text-xl text-green-800">USDT0</div>
+                  <div className="text-sm text-green-600">HyperEVM - Direct Deposit</div>
+                </div>
               </div>
-              <div>
-                <div className="font-semibold text-xl text-green-800">USDT0</div>
-                <div className="text-sm text-green-600">HyperEVM - Direct Deposit</div>
+              <div className="text-right">
+                <div className="font-mono text-xl font-semibold text-green-800">
+                  {parseFloat(usdt0Balance.balanceFormatted).toFixed(6)}
+                </div>
+                <div className="text-sm text-green-600">
+                  {usdt0Balance.balanceUSD}
+                </div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="font-mono text-xl font-semibold text-green-800">
-                {parseFloat(usdt0Balance.balanceFormatted).toFixed(6)}
-              </div>
-              <div className="text-sm text-green-600">
-                {usdt0Balance.balanceUSD}
-              </div>
+            <div className="flex space-x-3">
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Enter amount in USDT0"
+                className="flex-1 px-4 py-3 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-lg"
+              />
+              <button
+                onClick={() => handleDirectDeposit(amount)}
+                disabled={executing || !amount || parseFloat(amount) <= 0}
+                className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
+              >
+                {executing ? 'Depositing...' : 'Direct Deposit'}
+              </button>
             </div>
           </div>
-          <div className="flex space-x-3">
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="Enter amount in USDT0"
-              className="flex-1 px-4 py-3 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-lg"
-            />
-            <button
-              onClick={() => handleDirectDeposit(amount)}
-              disabled={executing || !amount || parseFloat(amount) <= 0}
-              className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg"
-            >
-              {executing ? 'Depositing...' : 'Direct Deposit'}
-            </button>
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* Balance Fetcher Component */}
+        {/* Balance Fetcher Component */}
         <LiFiBalanceFetcher
           onTokenSelect={handleTokenSelect}
           onAmountEnter={handleAmountEnter}
@@ -676,61 +624,6 @@ export function LiFiQuoteTest() {
                     Error: {execution.error}
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Transaction Flow */}
-      {txFlow.isActive && (
-        <div className="mt-6 bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
-          <h3 className="text-lg font-semibold mb-4 text-[#00295B]">Transaction Progress</h3>
-          <div className="space-y-3">
-            {txFlow.steps.map((step) => (
-              <div key={step.id} className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  {step.status === 'pending' && (
-                    <div className="w-6 h-6 rounded-full border-2 border-gray-300"></div>
-                  )}
-                  {step.status === 'processing' && (
-                    <div className="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
-                  )}
-                  {step.status === 'completed' && (
-                    <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  )}
-                  {step.status === 'failed' && (
-                    <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${
-                    step.status === 'completed' ? 'text-green-700' :
-                    step.status === 'failed' ? 'text-red-700' :
-                    step.status === 'processing' ? 'text-blue-700' :
-                    'text-gray-600'
-                  }`}>
-                    {step.title}
-                  </p>
-                  {step.txHash && (
-                    <a
-                      href={step.explorerUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline"
-                    >
-                      View on Explorer: {step.txHash.slice(0, 8)}...
-                    </a>
-                  )}
-                </div>
               </div>
             ))}
           </div>
