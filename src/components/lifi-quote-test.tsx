@@ -92,12 +92,12 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   // Initialize Li.Fi SDK configuration
   const { isConfigured, isLoading: sdkLoading, hasError: sdkError } = useLifiConfig();
 
-  // Fetch USDT0 balance when wallet connects
+  // Fetch USDT0 balance when wallet connects and SDK is configured
   useEffect(() => {
-    if (clientW.data?.account?.address) {
+    if (clientW.data?.account?.address && isConfigured) {
       fetchUSDT0Balance();
     }
-  }, [clientW.data?.account?.address]);
+  }, [clientW.data?.account?.address, isConfigured]);
 
   // Cleanup on component unmount
   useEffect(() => {
