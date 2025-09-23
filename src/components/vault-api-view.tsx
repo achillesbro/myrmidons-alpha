@@ -896,7 +896,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                     setDepositDialogOpen(false);
                     window.location.reload();
                   }}
-                  onToast={pushToast}
                 />
               </div>
             </div>

@@ -625,7 +625,10 @@ export const LiFiBalanceFetcher = ({
             {/* Success Message */}
             <h3 className="text-2xl font-bold text-green-800 mb-2">Transaction Successful!</h3>
             <p className="text-gray-600 mb-6">
-              Your deposit has been completed successfully. The funds have been added to your vault position.
+              {selectedToken?.tokenSymbol === 'USDT0' && selectedToken?.chainId === 999
+                ? 'Your USDT0 has been deposited successfully into the vault. The funds have been added to your vault position.'
+                : 'Your tokens have been bridged and swapped to USDT0 successfully. The funds have been added to your vault position.'
+              }
             </p>
             
             {/* Debug info - remove in production */}

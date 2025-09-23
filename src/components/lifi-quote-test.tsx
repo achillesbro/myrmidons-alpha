@@ -43,10 +43,9 @@ const getExplorerUrl = (chainId: number, txHash: string): string => {
 
 interface LiFiQuoteTestProps {
   onSuccess?: () => void;
-  onToast?: (kind: ToastKind, text: string, ttl?: number, href?: string) => void;
 }
 
-export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
+export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   const [executing, setExecuting] = useState(false);
   
   // New state for balance fetcher
@@ -101,21 +100,12 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
 
   // Toast helper functions
   const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
-    // Use parent toast system if available (for success toasts that need to persist)
-    if (onToast && kind === 'success') {
-      onToast(kind, text, ttl, href);
-      // Go to step 4 instead of closing immediately
-      setTransactionSuccess(true);
-      setCurrentStep(4);
-      return;
-    }
-    
-    // Use local toast system for other toasts
+    // Use local toast system for info and error toasts only
     toastIdRef.current += 1;
     const id = toastIdRef.current;
     
     // Always clear old toasts before showing new ones to prevent accumulation
-    if (kind === 'info' || kind === 'success' || kind === 'error') {
+    if (kind === 'info' || kind === 'error') {
       setToasts([]);
     }
     
@@ -125,11 +115,12 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
     if (ttl > 0 && kind !== 'info') {
       setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
     }
-    
-    // Auto-close dialog on success
-    if (kind === 'success' && onSuccess) {
-      onSuccess();
-    }
+  };
+
+  // Success handler - goes directly to step 4 without toasts
+  const handleSuccess = () => {
+    setTransactionSuccess(true);
+    setCurrentStep(4);
   };
 
   const clearToasts = () => {
@@ -203,7 +194,7 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
     
     // Only show success when ALL steps are complete (USDT0 received)
     if (allStepsComplete && !hasFailedStep) {
-      pushToast('success', 'Bridge execution completed successfully!', 5000);
+      handleSuccess();
     }
   };
 
@@ -321,7 +312,7 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
           const approveTx = await token.approve(VAULT_ADDRESS, usdt0Amount);
           pushToast('info', `Approval tx: ${approveTx.hash}`, 7000, `https://hyperevmscan.io/tx/${approveTx.hash}`);
           await provider.waitForTransaction(approveTx.hash, 1, 20_000).catch(() => null);
-          pushToast('success', 'Approval confirmed', 3000);
+          pushToast('info', 'Approval confirmed', 3000);
         } catch (error: any) {
           console.log('Approval failed, proceeding without approval:', error.message);
           pushToast('info', 'Skipping approval (token may not require it)', 3000);
@@ -334,7 +325,9 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
       pushToast('info', `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
       
       await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
-      pushToast('success', 'Deposit successful', 5000);
+      
+      // Show success - go directly to step 4
+      handleSuccess();
       
       // Refresh USDT0 balance
       await fetchUSDT0Balance();
@@ -557,10 +550,6 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
         }
       }
 
-      // Show success toast
-      pushToast('success', 'Bridge execution completed successfully!', 5000);
-      
-
       // Monitor transaction using wallet provider for faster confirmation
       if (finalTxHash !== 'Unknown') {
         try {
@@ -568,7 +557,6 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
           // Wait for confirmation using wallet provider (faster than public RPC)
           await provider.waitForTransaction(finalTxHash, 1, 20_000).catch(() => null);
           console.log('Transaction confirmed via wallet provider');
-          pushToast('success', 'Transaction confirmed on-chain', 3000);
         } catch (error) {
           console.warn('Wallet transaction monitoring failed:', error);
         }
