@@ -628,21 +628,39 @@ export const LiFiBalanceFetcher = ({
               Your deposit has been completed successfully. The funds have been added to your vault position.
             </p>
             
+            {/* Debug info - remove in production */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-400 mb-2">
+                Debug: selectedToken = {JSON.stringify(selectedToken, null, 2)}
+              </div>
+            )}
+            
             {/* Transaction Details */}
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
               <div className="flex items-center justify-center space-x-3 mb-2">
-                {selectedToken?.logoURI && (
-                  <img
-                    src={selectedToken.logoURI}
-                    alt={selectedToken.tokenSymbol}
-                    className="w-6 h-6 rounded-full"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                )}
-                <span className="font-semibold">{selectedToken?.tokenSymbol}</span>
+                {/* Origin Token */}
+                <div className="flex items-center space-x-2">
+                  {selectedToken?.logoURI && (
+                    <img
+                      src={selectedToken.logoURI}
+                      alt={selectedToken.tokenSymbol}
+                      className="w-6 h-6 rounded-full"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <span className="font-semibold">
+                    {selectedToken?.tokenSymbol || 'Unknown Token'}
+                  </span>
+                  {selectedToken?.chainName && (
+                    <span className="text-xs text-gray-500">({selectedToken.chainName})</span>
+                  )}
+                </div>
+                
                 <div className="text-gray-400">→</div>
+                
+                {/* Destination Token */}
                 <div className="flex items-center space-x-2">
                   {usdt0Balance?.logoURI && (
                     <img
@@ -655,10 +673,14 @@ export const LiFiBalanceFetcher = ({
                     />
                   )}
                   <span className="font-semibold">USDT0</span>
+                  <span className="text-xs text-gray-500">(HyperEVM)</span>
                 </div>
               </div>
               <div className="text-sm text-gray-600">
-                Amount: {amount} USDT0
+                Amount: {selectedToken?.tokenSymbol === 'USDT0' && selectedToken?.chainId === 999 
+                  ? `${parseFloat(amount).toFixed(6)} USDT0`
+                  : `${amount} USDT0`
+                }
               </div>
             </div>
             

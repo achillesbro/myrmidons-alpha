@@ -114,9 +114,9 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
     toastIdRef.current += 1;
     const id = toastIdRef.current;
     
-    // If this is a success or error toast, remove all pending (info) toasts first
-    if (kind === 'success' || kind === 'error') {
-      setToasts((t) => t.filter((toast) => toast.kind !== 'info'));
+    // Always clear old toasts before showing new ones to prevent accumulation
+    if (kind === 'info' || kind === 'success' || kind === 'error') {
+      setToasts([]);
     }
     
     setToasts((t) => [...t, { id, kind, text, href }]);
@@ -171,16 +171,18 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
   const monitorRouteExecution = (route: any) => {
     console.log('Monitoring route execution:', route);
     
+    // Check if all steps are complete
+    const allStepsComplete = route.steps.every((step: any) => getStepStatus(step) === 'DONE');
+    const hasFailedStep = route.steps.some((step: any) => getStepStatus(step) === 'FAILED');
+    
     route.steps.forEach((step: any, stepIndex: number) => {
       const stepDescription = getStepDescription(step, stepIndex);
       const stepStatus = getStepStatus(step);
       
       console.log(`Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus}`);
       
-      // Show toast for each step
-      if (stepStatus === 'DONE') {
-        pushToast('success', `${stepDescription} completed`, 3000);
-      } else if (stepStatus === 'FAILED') {
+      // Show toast for each step (but not success for individual steps)
+      if (stepStatus === 'FAILED') {
         pushToast('error', `${stepDescription} failed`, 5000);
       } else if (stepStatus === 'PENDING') {
         pushToast('info', `${stepDescription} pending...`, 2000);
@@ -198,6 +200,11 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
         });
       }
     });
+    
+    // Only show success when ALL steps are complete (USDT0 received)
+    if (allStepsComplete && !hasFailedStep) {
+      pushToast('success', 'Bridge execution completed successfully!', 5000);
+    }
   };
 
   // Handler functions for balance fetcher
@@ -642,6 +649,13 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
          transactionSuccess={transactionSuccess}
          onClose={handleClose}
        />
+       
+       {/* Debug info - remove in production */}
+       {process.env.NODE_ENV === 'development' && (
+         <div className="text-xs text-gray-400 mt-2">
+           Debug: selectedTokenInfo = {JSON.stringify(selectedTokenInfo, null, 2)}
+         </div>
+       )}
 
 
       {/* Toast notifications */}
