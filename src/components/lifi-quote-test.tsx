@@ -64,6 +64,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   const [amount, setAmount] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(1);
   const [transactionSuccess, setTransactionSuccess] = useState(false);
+  const [monitoringInterval, setMonitoringInterval] = useState<NodeJS.Timeout | null>(null);
   
   // USDT0 balance for direct deposits (fetched separately)
   const [usdt0Balance, setUsdt0Balance] = useState<{
@@ -97,6 +98,13 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       fetchUSDT0Balance();
     }
   }, [clientW.data?.account?.address]);
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      stopRouteMonitoring();
+    };
+  }, []);
 
   // Toast helper functions
   const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
@@ -133,14 +141,52 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
     }
   };
 
-  // Route monitoring functions based on Li.Fi documentation
+  // Enhanced route monitoring functions based on Li.Fi documentation
   const getStepStatus = (step: any): string => {
     if (!step.execution?.process || step.execution.process.length === 0) {
-      return 'Pending';
+      return 'PENDING';
     }
     
-    const latestProcess = step.execution.process[step.execution.process.length - 1];
-    return latestProcess.status || 'Processing';
+    // Check all processes in the array to determine overall step status
+    const processes = step.execution.process;
+    const hasFailed = processes.some((process: any) => process.status === 'FAILED');
+    const hasDone = processes.some((process: any) => process.status === 'DONE');
+    const hasPending = processes.some((process: any) => process.status === 'PENDING');
+    
+    if (hasFailed) return 'FAILED';
+    if (hasDone && !hasPending) return 'DONE';
+    if (hasPending) return 'PENDING';
+    
+    return 'PROCESSING';
+  };
+
+  // Get transaction hashes from all processes in a step
+  const getStepTransactionHashes = (step: any): string[] => {
+    if (!step.execution?.process) return [];
+    
+    return step.execution.process
+      .filter((process: any) => process.txHash)
+      .map((process: any) => process.txHash);
+  };
+
+  // Check if a step is the final step (receiving USDT0 on HyperEVM)
+  const isFinalStep = (step: any): boolean => {
+    return step.action?.toToken?.symbol === 'USDT0' && 
+           step.action?.toChainId === CHAIN_IDS.HYPEREVM;
+  };
+
+  // Enhanced process monitoring based on Li.Fi documentation
+  const getProcessDetails = (step: any, stepIndex: number) => {
+    if (!step.execution?.process) return [];
+    
+    return step.execution.process.map((process: any, processIndex: number) => ({
+      stepIndex,
+      processIndex,
+      type: process.type,
+      status: process.status,
+      txHash: process.txHash,
+      description: `${process.type} - ${process.status}`
+    }));
   };
 
   const getStepDescription = (step: any, stepIndex: number): string => {
@@ -159,27 +205,47 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
     }
   };
 
+  // Enhanced route execution monitoring based on Li.Fi documentation
   const monitorRouteExecution = (route: any) => {
-    console.log('Monitoring route execution:', route);
+    console.log('🔍 Monitoring route execution:', {
+      routeId: route.id,
+      stepsCount: route.steps?.length,
+      steps: route.steps?.map((step: any, index: number) => ({
+        index,
+        type: step.type,
+        tool: step.toolDetails?.key,
+        status: getStepStatus(step),
+        processes: getProcessDetails(step, index)
+      }))
+    });
     
-    // Track completion status more carefully
+    if (!route.steps || route.steps.length === 0) {
+      console.log('⚠️ No steps found in route');
+      return;
+    }
+    
+    // Track overall execution status
     let allStepsComplete = true;
     let hasFailedStep = false;
-    let lastCompletedStepIndex = -1;
+    let finalStepComplete = false;
     
+    // Monitor each step and its processes
     route.steps.forEach((step: any, stepIndex: number) => {
-      const stepDescription = getStepDescription(step, stepIndex);
       const stepStatus = getStepStatus(step);
+      const stepDescription = getStepDescription(step, stepIndex);
+      const isFinal = isFinalStep(step);
       
-      console.log(`Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus}`);
+      console.log(`📊 Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus} ${isFinal ? '(FINAL)' : ''}`);
       
-      // Track completion status
+      // Track step completion
       if (stepStatus === 'FAILED') {
         hasFailedStep = true;
         allStepsComplete = false;
         pushToast('error', `${stepDescription} failed`, 5000);
       } else if (stepStatus === 'DONE') {
-        lastCompletedStepIndex = stepIndex;
+        if (isFinal) {
+          finalStepComplete = true;
+        }
         pushToast('info', `${stepDescription} completed`, 3000);
       } else if (stepStatus === 'PENDING') {
         allStepsComplete = false;
@@ -191,31 +257,84 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
         allStepsComplete = false;
       }
       
-      // Show transaction hashes for completed steps
+      // Monitor individual processes and show transaction hashes
       if (step.execution?.process) {
-        step.execution.process.forEach((process: any) => {
-          if (process.txHash && process.status === 'DONE') {
+        step.execution.process.forEach((process: any, processIndex: number) => {
+          if (process.txHash) {
             const explorerUrl = getExplorerUrl(step.action?.fromChainId || 0, process.txHash);
-            pushToast('info', `Transaction: ${process.txHash.slice(0, 8)}...`, 5000, explorerUrl);
+            console.log(`🔗 Process ${processIndex + 1} (${process.type}): ${process.txHash} - ${process.status}`);
+            
+            if (process.status === 'DONE') {
+              pushToast('info', `Transaction: ${process.txHash.slice(0, 8)}...`, 5000, explorerUrl);
+            }
           }
         });
       }
     });
     
-    // Only show success when:
-    // 1. All steps are complete
-    // 2. No steps have failed
-    // 3. The last step (which should be receiving USDT0 on HyperEVM) is DONE
-    // 4. We haven't already shown success for this route
-    if (allStepsComplete && !hasFailedStep && lastCompletedStepIndex === route.steps.length - 1) {
-      const lastStep = route.steps[lastCompletedStepIndex];
-      const isReceivingUSDT0 = lastStep.action?.toToken?.symbol === 'USDT0' && 
-                               lastStep.action?.toChainId === CHAIN_IDS.HYPEREVM;
+    // Success detection: All steps complete AND final step (USDT0 received) is done
+    if (allStepsComplete && !hasFailedStep && finalStepComplete) {
+      console.log('✅ Bridge execution completed - USDT0 received on HyperEVM');
+      handleSuccess();
+    } else if (hasFailedStep) {
+      console.log('❌ Route execution failed');
+    } else {
+      console.log('⏳ Route execution in progress...');
+    }
+  };
+
+  // Active route management based on Li.Fi documentation
+  const getActiveRouteInfo = () => {
+    try {
+      // Import getActiveRoutes dynamically to avoid build issues
+      const { getActiveRoutes } = require('@lifi/sdk');
+      const activeRoutes = getActiveRoutes();
       
-      if (isReceivingUSDT0) {
-        console.log('✅ Bridge execution completed - USDT0 received on HyperEVM');
-        handleSuccess();
-      }
+      console.log('📋 Active routes:', activeRoutes.map((route: any) => ({
+        id: route.id,
+        status: route.status,
+        stepsCount: route.steps?.length
+      })));
+      
+      return activeRoutes;
+    } catch (error) {
+      console.warn('⚠️ Could not get active routes:', error);
+      return [];
+    }
+  };
+
+  // Enhanced route monitoring with active route tracking
+  const monitorActiveRoutes = () => {
+    const activeRoutes = getActiveRouteInfo();
+    
+    if (activeRoutes.length > 0) {
+      console.log('🔄 Monitoring active routes...');
+      activeRoutes.forEach((route: any) => {
+        monitorRouteExecution(route);
+      });
+    }
+  };
+
+  // Start periodic monitoring for active routes
+  const startRouteMonitoring = () => {
+    if (monitoringInterval) {
+      clearInterval(monitoringInterval);
+    }
+    
+    const interval = setInterval(() => {
+      monitorActiveRoutes();
+    }, 2000); // Check every 2 seconds
+    
+    setMonitoringInterval(interval);
+    console.log('🔄 Started periodic route monitoring');
+  };
+
+  // Stop periodic monitoring
+  const stopRouteMonitoring = () => {
+    if (monitoringInterval) {
+      clearInterval(monitoringInterval);
+      setMonitoringInterval(null);
+      console.log('⏹️ Stopped periodic route monitoring');
     }
   };
 
@@ -516,34 +635,43 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       // Execute the route
       console.log('Starting route execution...');
       
+      // Start monitoring active routes
+      startRouteMonitoring();
+      
       // Track transaction hashes for wallet monitoring
       const txHashes: string[] = [];
       let finalTxHash = 'Unknown';
       
       const executedRoute = await executeRoute(selectedRoute, {
         updateRouteHook: (updatedRoute) => {
-          console.log('Route update:', {
-            steps: updatedRoute.steps?.map(step => ({
+          console.log('🔄 Route update received:', {
+            routeId: updatedRoute.id,
+            steps: updatedRoute.steps?.map((step: any, index: number) => ({
+              index,
               type: step.type,
               tool: step.toolDetails?.key,
-              txHash: step.execution?.process?.[0]?.txHash
+              status: getStepStatus(step),
+              processes: getProcessDetails(step, index)
             }))
           });
           
-          // Monitor route execution with toasts
+          // Enhanced monitoring with process-level tracking
           monitorRouteExecution(updatedRoute);
           
-          // Collect all transaction hashes
-          updatedRoute.steps?.forEach(step => {
-            if (step.execution?.process) {
-              step.execution.process.forEach(process => {
-                if (process.txHash && !txHashes.includes(process.txHash)) {
-                  txHashes.push(process.txHash);
-                  finalTxHash = process.txHash; // Keep the latest one
-                }
-              });
-            }
+          // Collect all transaction hashes with better tracking
+          updatedRoute.steps?.forEach((step: any, stepIndex: number) => {
+            const stepHashes = getStepTransactionHashes(step);
+            stepHashes.forEach(txHash => {
+              if (!txHashes.includes(txHash)) {
+                txHashes.push(txHash);
+                finalTxHash = txHash; // Keep the latest one
+                console.log(`📝 Collected tx hash from step ${stepIndex + 1}: ${txHash}`);
+              }
+            });
           });
+          
+          // Also monitor any active routes for comprehensive tracking
+          monitorActiveRoutes();
         },
         acceptExchangeRateUpdateHook: async () => {
           console.log('Exchange rate update requested, accepting...');
@@ -591,6 +719,8 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       console.error('Execution failed:', error);
       pushToast('error', `Bridge execution failed: ${error.message || 'Unknown error'}`, 8000);
     } finally {
+      // Stop monitoring when execution completes or fails
+      stopRouteMonitoring();
       setExecuting(false);
     }
   };
