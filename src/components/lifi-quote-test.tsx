@@ -33,6 +33,24 @@ const getStatus = async (txHash: string, fromChainId?: number, toChainId?: numbe
   }
 };
 
+// Test Li.Fi API connectivity
+const testLifiApiConnectivity = async () => {
+  try {
+    console.log('Testing Li.Fi API connectivity...');
+    const response = await fetch('https://li.quest/v1/chains');
+    if (response.ok) {
+      console.log('✅ Li.Fi API is accessible');
+      return true;
+    } else {
+      console.log('❌ Li.Fi API returned error:', response.status, response.statusText);
+      return false;
+    }
+  } catch (error) {
+    console.log('❌ Li.Fi API connectivity test failed:', error);
+    return false;
+  }
+};
+
 
 interface LiFiQuoteTestProps {
   onSuccess?: () => void;
@@ -411,7 +429,28 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       };
 
       console.log('Routes request:', routesRequest);
-      const result = await getRoutes(routesRequest);
+      
+      // Test API connectivity first
+      const isApiAccessible = await testLifiApiConnectivity();
+      if (!isApiAccessible) {
+        throw new Error('Li.Fi API is not accessible. Please check your internet connection and try again.');
+      }
+      
+      // Add error handling for network issues
+      let result;
+      try {
+        result = await getRoutes(routesRequest);
+      } catch (error: any) {
+        console.error('getRoutes failed:', error);
+        
+        // Check if it's a network error
+        if (error.message?.includes('Failed to fetch')) {
+          throw new Error('Network error: Unable to connect to Li.Fi API. Please check your internet connection and try again.');
+        }
+        
+        // Re-throw other errors
+        throw error;
+      }
       
       if (!result.routes || result.routes.length === 0) {
         throw new Error('No routes available for this transfer');
