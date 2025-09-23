@@ -162,9 +162,10 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   const monitorRouteExecution = (route: any) => {
     console.log('Monitoring route execution:', route);
     
-    // Check if all steps are complete
-    const allStepsComplete = route.steps.every((step: any) => getStepStatus(step) === 'DONE');
-    const hasFailedStep = route.steps.some((step: any) => getStepStatus(step) === 'FAILED');
+    // Track completion status more carefully
+    let allStepsComplete = true;
+    let hasFailedStep = false;
+    let lastCompletedStepIndex = -1;
     
     route.steps.forEach((step: any, stepIndex: number) => {
       const stepDescription = getStepDescription(step, stepIndex);
@@ -172,13 +173,22 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       
       console.log(`Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus}`);
       
-      // Show toast for each step (but not success for individual steps)
+      // Track completion status
       if (stepStatus === 'FAILED') {
+        hasFailedStep = true;
+        allStepsComplete = false;
         pushToast('error', `${stepDescription} failed`, 5000);
+      } else if (stepStatus === 'DONE') {
+        lastCompletedStepIndex = stepIndex;
+        pushToast('info', `${stepDescription} completed`, 3000);
       } else if (stepStatus === 'PENDING') {
+        allStepsComplete = false;
         pushToast('info', `${stepDescription} pending...`, 2000);
       } else if (stepStatus === 'PROCESSING') {
+        allStepsComplete = false;
         pushToast('info', `${stepDescription} processing...`, 2000);
+      } else {
+        allStepsComplete = false;
       }
       
       // Show transaction hashes for completed steps
@@ -192,9 +202,20 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       }
     });
     
-    // Only show success when ALL steps are complete (USDT0 received)
-    if (allStepsComplete && !hasFailedStep) {
-      handleSuccess();
+    // Only show success when:
+    // 1. All steps are complete
+    // 2. No steps have failed
+    // 3. The last step (which should be receiving USDT0 on HyperEVM) is DONE
+    // 4. We haven't already shown success for this route
+    if (allStepsComplete && !hasFailedStep && lastCompletedStepIndex === route.steps.length - 1) {
+      const lastStep = route.steps[lastCompletedStepIndex];
+      const isReceivingUSDT0 = lastStep.action?.toToken?.symbol === 'USDT0' && 
+                               lastStep.action?.toChainId === CHAIN_IDS.HYPEREVM;
+      
+      if (isReceivingUSDT0) {
+        console.log('✅ Bridge execution completed - USDT0 received on HyperEVM');
+        handleSuccess();
+      }
     }
   };
 
@@ -331,7 +352,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       
       // Refresh USDT0 balance
       await fetchUSDT0Balance();
-      setAmount('');
+      // Note: Don't clear amount here as it's needed for step 4 display
       
     } catch (error: any) {
       pushToast('error', `Deposit failed: ${error.message || 'Unknown error'}`, 8000);
@@ -637,14 +658,6 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
          transactionSuccess={transactionSuccess}
          onClose={handleClose}
        />
-       
-       {/* Debug info - remove in production */}
-       {process.env.NODE_ENV === 'development' && (
-         <div className="text-xs text-gray-400 mt-2">
-           Debug: selectedTokenInfo = {JSON.stringify(selectedTokenInfo, null, 2)}
-         </div>
-       )}
-
 
       {/* Toast notifications */}
       <Toasts toasts={toasts} />

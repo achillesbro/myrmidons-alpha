@@ -303,18 +303,6 @@ export function useVaultAllocationsOnchain(vaultAddress: Address) {
 
         const withPct = itemsEnriched.map((r) => ({ ...r, pct: pctOf(r.assets) }));
 
-        // Debug allocation rows to inspect "Idle" entries
-        for (const row of withPct) {
-          console.log("ALLOC ROW:", {
-            id: row.id,
-            label: row.label,
-            assets: row.assets.toString(),
-            pct: row.pct,
-            usd: row.usd,
-            supplyApy: row.supplyApy,
-          });
-        }
-
         // Dust threshold based on share of total (no USD dependency)
         const DUST_PCT = 0.01; // 0.01%
         const filtered = withPct.filter((r) => {
