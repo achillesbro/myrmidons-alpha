@@ -30,9 +30,6 @@ interface BalanceFetcherProps {
   onStepChange: (step: number) => void;
   transactionSuccess?: boolean;
   onClose?: () => void;
-  isSdkConfigured?: boolean;
-  isSdkLoading?: boolean;
-  hasSdkError?: boolean;
 }
 
 const CHAIN_INFO = {
@@ -56,10 +53,7 @@ export const LiFiBalanceFetcher = ({
   currentStep,
   onStepChange,
   transactionSuccess = false,
-  onClose,
-  isSdkConfigured = true,
-  isSdkLoading = false,
-  hasSdkError = false
+  onClose
 }: BalanceFetcherProps) => {
   const { address } = useAccount();
   const [balances, setBalances] = useState<TokenBalance[]>([]);
@@ -177,37 +171,15 @@ export const LiFiBalanceFetcher = ({
   const fetchAllBalances = async () => {
     if (!address) return;
 
-    // Check SDK configuration first
-    if (!isSdkConfigured) {
-      if (isSdkLoading) {
-        setError('Initializing Li.Fi SDK...');
-      } else if (hasSdkError) {
-        setError('Li.Fi SDK failed to initialize. Please refresh the page and try again.');
-      } else {
-        setError('Li.Fi SDK is not configured. Please wait...');
-      }
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      console.log('🔄 Fetching balances for address:', address);
       const allBalances = await fetchAllBalancesWithLifi();
-      console.log('✅ Fetched balances:', allBalances.length);
       setBalances(allBalances);
-    } catch (error: any) {
-      console.error('❌ Error fetching balances:', error);
-      
-      // Check if it's an SDK configuration error
-      if (error.message && error.message.includes('SDK Token Provider')) {
-        setError('Li.Fi SDK is not properly configured. Please refresh the page and try again.');
-      } else if (error.message && error.message.includes('Failed to fetch')) {
-        setError('Network error. Please check your connection and try again.');
-      } else {
-        setError('Failed to fetch balances. Please try again.');
-      }
+    } catch (error) {
+      console.error('Error fetching balances:', error);
+      setError('Failed to fetch balances. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -217,11 +189,11 @@ export const LiFiBalanceFetcher = ({
     if (address) {
       fetchAllBalances();
     }
-  }, [address, isSdkConfigured]);
+  }, [address]);
 
-  // Auto-refresh balances every 60 seconds (only when SDK is configured)
+  // Auto-refresh balances every 60 seconds
   useEffect(() => {
-    if (address && isSdkConfigured) {
+    if (address) {
       const interval = setInterval(() => {
         fetchAllBalances();
       }, 60000); // 60 seconds
@@ -234,7 +206,7 @@ export const LiFiBalanceFetcher = ({
         }
       };
     }
-  }, [address, isSdkConfigured]);
+  }, [address]);
 
   // Cleanup interval on unmount
   useEffect(() => {
@@ -643,68 +615,72 @@ export const LiFiBalanceFetcher = ({
       {transactionSuccess && currentStep === 4 && (
         <div className="p-4">
           <div className="text-center">
-            {/* Success Icon - Smaller */}
-            <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-3">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Success Icon */}
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
             
-            {/* Success Message - Compressed */}
-            <h3 className="text-xl font-bold text-green-800 mb-2">Transaction Successful!</h3>
-            <p className="text-sm text-gray-600 mb-4">
+            {/* Success Message */}
+            <h3 className="text-2xl font-bold text-green-800 mb-2">Transaction Successful!</h3>
+            <p className="text-gray-600 mb-6">
               {selectedToken?.tokenSymbol === 'USDT0' && selectedToken?.chainId === 999
-                ? 'USDT0 deposited successfully into vault.'
-                : 'Tokens bridged and swapped to USDT0 successfully.'
+                ? 'Your USDT0 has been deposited successfully into the vault. The funds have been added to your vault position.'
+                : 'Your tokens have been bridged and swapped to USDT0 successfully. The funds have been added to your vault position.'
               }
             </p>
             
-            {/* Transaction Details - Compressed */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-              <div className="flex items-center justify-center space-x-2 mb-2">
+            {/* Transaction Details */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-center space-x-3 mb-2">
                 {/* Origin Token */}
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-2">
                   {selectedToken?.logoURI && (
                     <img
                       src={selectedToken.logoURI}
                       alt={selectedToken.tokenSymbol}
-                      className="w-5 h-5 rounded-full"
+                      className="w-6 h-6 rounded-full"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                       }}
                     />
                   )}
-                  <span className="text-sm font-semibold">
+                  <span className="font-semibold">
                     {selectedToken?.tokenSymbol || 'Unknown Token'}
                   </span>
+                  {selectedToken?.chainName && (
+                    <span className="text-xs text-gray-500">({selectedToken.chainName})</span>
+                  )}
                 </div>
                 
-                <div className="text-gray-400 text-sm">→</div>
+                <div className="text-gray-400">→</div>
                 
                 {/* Destination Token */}
-                <div className="flex items-center space-x-1">
+                <div className="flex items-center space-x-2">
                   {usdt0Balance?.logoURI && (
                     <img
                       src={usdt0Balance.logoURI}
                       alt="USDT0"
-                      className="w-5 h-5 rounded-full"
+                      className="w-6 h-6 rounded-full"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                       }}
                     />
                   )}
-                  <span className="text-sm font-semibold">USDT0</span>
+                  <span className="font-semibold">USDT0</span>
+                  <span className="text-xs text-gray-500">(HyperEVM)</span>
                 </div>
               </div>
-              <div className="text-xs text-gray-600">
+              <div className="text-sm text-gray-600">
                 Amount: {selectedToken?.tokenSymbol === 'USDT0' && selectedToken?.chainId === 999 
-                  ? `${amount ? parseFloat(amount).toFixed(6) : '0.000000'} USDT0`
-                  : `${amount || '0'} USDT0`
+                  ? `${parseFloat(amount).toFixed(6)} USDT0`
+                  : `${amount} USDT0`
                 }
               </div>
             </div>
             
-            {/* Close Button - Matches other step buttons */}
+            {/* Close Button */}
             <button
               onClick={onClose}
               className="w-full py-3 px-4 text-lg font-semibold bg-[#00295B] text-white rounded-lg hover:bg-[#001a3d] transition-colors"

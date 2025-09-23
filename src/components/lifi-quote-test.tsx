@@ -64,7 +64,6 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   const [amount, setAmount] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(1);
   const [transactionSuccess, setTransactionSuccess] = useState(false);
-  const [monitoringInterval, setMonitoringInterval] = useState<NodeJS.Timeout | null>(null);
   
   // USDT0 balance for direct deposits (fetched separately)
   const [usdt0Balance, setUsdt0Balance] = useState<{
@@ -90,21 +89,14 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   const userAddress = clientW.data?.account?.address || '0x552008c0f6870c2f77e5cC1d2eb9bdff03e30Ea0';
   
   // Initialize Li.Fi SDK configuration
-  const { isConfigured, isLoading: sdkLoading, hasError: sdkError } = useLifiConfig();
+  const { isConfigured } = useLifiConfig();
 
-  // Fetch USDT0 balance when wallet connects and SDK is configured
+  // Fetch USDT0 balance when wallet connects
   useEffect(() => {
-    if (clientW.data?.account?.address && isConfigured) {
+    if (clientW.data?.account?.address) {
       fetchUSDT0Balance();
     }
-  }, [clientW.data?.account?.address, isConfigured]);
-
-  // Cleanup on component unmount
-  useEffect(() => {
-    return () => {
-      stopRouteMonitoring();
-    };
-  }, []);
+  }, [clientW.data?.account?.address]);
 
   // Toast helper functions
   const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
@@ -147,17 +139,25 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       return 'PENDING';
     }
     
-    // Check all processes in the array to determine overall step status
+    // Check ALL processes in the step (as per Li.Fi docs)
     const processes = step.execution.process;
     const hasFailed = processes.some((process: any) => process.status === 'FAILED');
     const hasDone = processes.some((process: any) => process.status === 'DONE');
     const hasPending = processes.some((process: any) => process.status === 'PENDING');
+    const hasProcessing = processes.some((process: any) => process.status === 'PROCESSING');
     
     if (hasFailed) return 'FAILED';
-    if (hasDone && !hasPending) return 'DONE';
+    if (hasDone && !hasPending && !hasProcessing) return 'DONE';
     if (hasPending) return 'PENDING';
+    if (hasProcessing) return 'PROCESSING';
     
-    return 'PROCESSING';
+    return 'PENDING';
+  };
+
+  // Check if a step is the final step (receiving USDT0 on HyperEVM)
+  const isFinalStep = (step: any): boolean => {
+    return step.action?.toToken?.symbol === 'USDT0' && 
+           step.action?.toChainId === CHAIN_IDS.HYPEREVM;
   };
 
   // Get transaction hashes from all processes in a step (as per Li.Fi docs)
@@ -177,21 +177,6 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
     });
     
     return transactionHashes;
-  };
-
-  // Check if a step is the final step (receiving USDT0 on HyperEVM)
-  const isFinalStep = (step: any): boolean => {
-    const isFinal = step.action?.toToken?.symbol === 'USDT0' && 
-                   step.action?.toChainId === CHAIN_IDS.HYPEREVM;
-    
-    console.log('🔍 Checking if final step:', {
-      toTokenSymbol: step.action?.toToken?.symbol,
-      toChainId: step.action?.toChainId,
-      expectedChainId: CHAIN_IDS.HYPEREVM,
-      isFinal
-    });
-    
-    return isFinal;
   };
 
   // Enhanced process monitoring based on Li.Fi documentation
@@ -225,7 +210,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   };
 
   // Enhanced route execution monitoring based on Li.Fi documentation
-  const monitorRouteExecution = (route: any) => {
+  const monitorRouteExecution = (route: RouteExtended) => {
     console.log('🔍 Monitoring route execution:', {
       routeId: route.id,
       stepsCount: route.steps?.length,
@@ -346,29 +331,6 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
     }
   };
 
-  // Start periodic monitoring for active routes
-  const startRouteMonitoring = () => {
-    if (monitoringInterval) {
-      clearInterval(monitoringInterval);
-    }
-    
-    const interval = setInterval(() => {
-      monitorActiveRoutes();
-    }, 2000); // Check every 2 seconds
-    
-    setMonitoringInterval(interval);
-    console.log('🔄 Started periodic route monitoring');
-  };
-
-  // Stop periodic monitoring
-  const stopRouteMonitoring = () => {
-    if (monitoringInterval) {
-      clearInterval(monitoringInterval);
-      setMonitoringInterval(null);
-      console.log('⏹️ Stopped periodic route monitoring');
-    }
-  };
-
   // Handler functions for balance fetcher
   const handleTokenSelect = (tokenInfo: any) => {
     setSelectedTokenInfo(tokenInfo);
@@ -385,14 +347,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
     
     setUsdt0Loading(true);
     try {
-      console.log('🔄 Fetching USDT0 balance for address:', clientW.data.account.address);
-      
-      // Check if SDK is configured first
-      if (!isConfigured) {
-        console.warn('⚠️ Li.Fi SDK not configured, skipping USDT0 balance fetch');
-        setUsdt0Balance(null);
-        return;
-      }
+      console.log('Fetching USDT0 balance for address:', clientW.data.account.address);
       
       // Get USDT0 token info from Li.Fi
       const tokenInfo = await getToken(CHAIN_IDS.HYPEREVM, TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0);
@@ -408,7 +363,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
           (parseFloat(balanceFormatted) * parseFloat(tokenInfo.priceUSD)).toFixed(2) : 
           balanceFormatted;
         
-        console.log('✅ USDT0 balance fetched:', {
+        console.log('USDT0 balance fetched:', {
           balance: amountStr,
           balanceFormatted,
           balanceUSD,
@@ -435,14 +390,8 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       } else {
         setUsdt0Balance(null);
       }
-    } catch (error: any) {
-      console.error('❌ Error fetching USDT0 balance:', error);
-      
-      // Check if it's an SDK configuration error
-      if (error.message && error.message.includes('SDK Token Provider')) {
-        console.warn('⚠️ SDK Token Provider not found, Li.Fi SDK may not be properly configured');
-      }
-      
+    } catch (error) {
+      console.error('Error fetching USDT0 balance:', error);
       setUsdt0Balance(null);
     } finally {
       setUsdt0Loading(false);
@@ -515,7 +464,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       
       // Refresh USDT0 balance
       await fetchUSDT0Balance();
-      // Note: Don't clear amount here as it's needed for step 4 display
+      setAmount('');
       
     } catch (error: any) {
       pushToast('error', `Deposit failed: ${error.message || 'Unknown error'}`, 8000);
@@ -679,9 +628,6 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       // Execute the route
       console.log('Starting route execution...');
       
-      // Start monitoring active routes
-      startRouteMonitoring();
-      
       // Track transaction hashes for wallet monitoring
       const txHashes: string[] = [];
       let finalTxHash = 'Unknown';
@@ -761,8 +707,6 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       console.error('Execution failed:', error);
       pushToast('error', `Bridge execution failed: ${error.message || 'Unknown error'}`, 8000);
     } finally {
-      // Stop monitoring when execution completes or fails
-      stopRouteMonitoring();
       setExecuting(false);
     }
   };
@@ -802,7 +746,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       {!isConfigured && (
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
           <p className="text-blue-800">
-            <strong>Initializing Li.Fi SDK:</strong> {sdkLoading ? 'Loading chain configurations... This may take a moment.' : sdkError ? 'Failed to initialize. Please refresh the page.' : 'Please wait...'}
+            <strong>Initializing Li.Fi SDK:</strong> Loading chain configurations... This may take a moment.
           </p>
         </div>
       )}
@@ -829,9 +773,6 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
          onStepChange={setCurrentStep}
          transactionSuccess={transactionSuccess}
          onClose={handleClose}
-         isSdkConfigured={isConfigured}
-         isSdkLoading={sdkLoading}
-         hasSdkError={sdkError}
        />
 
       {/* Toast notifications */}
