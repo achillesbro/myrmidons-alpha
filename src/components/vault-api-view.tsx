@@ -129,8 +129,18 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
     toastIdRef.current += 1;
     const id = toastIdRef.current;
+    
+    // If this is a success or error toast, remove all pending (info) toasts first
+    if (kind === 'success' || kind === 'error') {
+      setToasts((t) => t.filter((toast) => toast.kind !== 'info'));
+    }
+    
     setToasts((t) => [...t, { id, kind, text, href }]);
-    if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
+    
+    // Only auto-remove non-pending toasts
+    if (ttl > 0 && kind !== 'info') {
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
+    }
   };
 
   // User state (HyperEVM tx path only)
@@ -857,7 +867,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                 </button>
               </div>
             </div>
-              <div className="p-6 overflow-y-auto max-h-[calc(85vh-100px)]">
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
                 <LiFiQuoteTest onSuccess={() => {
                   setDepositDialogOpen(false);
                   window.location.reload();

@@ -101,8 +101,23 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
     toastIdRef.current += 1;
     const id = toastIdRef.current;
+    
+    // If this is a success or error toast, remove all pending (info) toasts first
+    if (kind === 'success' || kind === 'error') {
+      setToasts((t) => t.filter((toast) => toast.kind !== 'info'));
+    }
+    
     setToasts((t) => [...t, { id, kind, text, href }]);
-    if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
+    
+    // Only auto-remove non-pending toasts
+    if (ttl > 0 && kind !== 'info') {
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
+    }
+    
+    // Auto-close dialog on success
+    if (kind === 'success' && onSuccess) {
+      onSuccess();
+    }
   };
 
   const clearToasts = () => {
@@ -299,11 +314,6 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       // Refresh USDT0 balance
       await fetchUSDT0Balance();
       setAmount('');
-      
-      // Close dialog and refresh page
-      if (onSuccess) {
-        onSuccess();
-      }
       
     } catch (error: any) {
       pushToast('error', `Deposit failed: ${error.message || 'Unknown error'}`, 8000);
@@ -538,11 +548,6 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       // Reset form
       setSelectedTokenInfo(null);
       setAmount('');
-      
-      // Close dialog and refresh page
-      if (onSuccess) {
-        onSuccess();
-      }
       
     } catch (error: any) {
       console.error('Execution failed:', error);
