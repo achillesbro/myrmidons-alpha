@@ -217,11 +217,11 @@ export const LiFiBalanceFetcher = ({
     if (address) {
       fetchAllBalances();
     }
-  }, [address]);
+  }, [address, isSdkConfigured]);
 
-  // Auto-refresh balances every 60 seconds
+  // Auto-refresh balances every 60 seconds (only when SDK is configured)
   useEffect(() => {
-    if (address) {
+    if (address && isSdkConfigured) {
       const interval = setInterval(() => {
         fetchAllBalances();
       }, 60000); // 60 seconds
@@ -234,7 +234,7 @@ export const LiFiBalanceFetcher = ({
         }
       };
     }
-  }, [address]);
+  }, [address, isSdkConfigured]);
 
   // Cleanup interval on unmount
   useEffect(() => {

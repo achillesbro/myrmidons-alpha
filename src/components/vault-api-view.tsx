@@ -15,7 +15,7 @@ import {
 import { hyperPublicClient } from "../viem/clients";
 import vaultAbi from "../abis/vault.json";
 import { useVaultCurrentApyOnchain } from "../hooks/useVaultCurrentApyOnchain";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";
 import { LiFiQuoteTest } from "./lifi-quote-test";
 // Inline AllocationList component for on-chain allocations
@@ -711,7 +711,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
               <OnchainAllocations
                 key={allocRefreshKey}
                 vaultAddress={VAULT_ADDRESS as `0x${string}`}
-                onSettled={useCallback((ts: number) => setLastUpdated(ts), [])}
+                onSettled={(ts) => setLastUpdated(ts)}
               />
             </div>
           </div>
