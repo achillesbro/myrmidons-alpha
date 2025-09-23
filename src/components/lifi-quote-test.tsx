@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { getRoutes, executeRoute, getToken, getTokenBalances, getActiveRoutes } from '@lifi/sdk';
+import { getRoutes, executeRoute, getToken, getTokenBalances, getActiveRoutes, RouteExtended } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain, getWalletClient } from '@wagmi/core';
@@ -160,13 +160,23 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
     return 'PROCESSING';
   };
 
-  // Get transaction hashes from all processes in a step
-  const getStepTransactionHashes = (step: any): string[] => {
-    if (!step.execution?.process) return [];
+  // Get transaction hashes from all processes in a step (as per Li.Fi docs)
+  const getTransactionLinks = (route: RouteExtended) => {
+    const transactionHashes: string[] = [];
     
-    return step.execution.process
-      .filter((process: any) => process.txHash)
-      .map((process: any) => process.txHash);
+    route.steps.forEach((step, index) => {
+      step.execution?.process.forEach((process) => {
+        if (process.txHash) {
+          console.log(
+            `Transaction Hash for Step ${index + 1}, Process ${process.type}:`,
+            process.txHash
+          );
+          transactionHashes.push(process.txHash);
+        }
+      });
+    });
+    
+    return transactionHashes;
   };
 
   // Check if a step is the final step (receiving USDT0 on HyperEVM)
@@ -680,15 +690,13 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
           monitorRouteExecution(updatedRoute);
           
           // Collect all transaction hashes with better tracking
-          updatedRoute.steps?.forEach((step: any, stepIndex: number) => {
-            const stepHashes = getStepTransactionHashes(step);
-            stepHashes.forEach(txHash => {
-              if (!txHashes.includes(txHash)) {
-                txHashes.push(txHash);
-                finalTxHash = txHash; // Keep the latest one
-                console.log(`📝 Collected tx hash from step ${stepIndex + 1}: ${txHash}`);
-              }
-            });
+          const stepHashes = getTransactionLinks(updatedRoute);
+          stepHashes.forEach(txHash => {
+            if (!txHashes.includes(txHash)) {
+              txHashes.push(txHash);
+              finalTxHash = txHash; // Keep the latest one
+              console.log(`📝 Collected tx hash: ${txHash}`);
+            }
           });
           
           // Also monitor any active routes for comprehensive tracking
