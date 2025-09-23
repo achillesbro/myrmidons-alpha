@@ -64,6 +64,7 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
   } | null>(null);
   const [amount, setAmount] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(1);
+  const [transactionSuccess, setTransactionSuccess] = useState(false);
   
   // USDT0 balance for direct deposits (fetched separately)
   const [usdt0Balance, setUsdt0Balance] = useState<{
@@ -103,10 +104,9 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
     // Use parent toast system if available (for success toasts that need to persist)
     if (onToast && kind === 'success') {
       onToast(kind, text, ttl, href);
-      // Auto-close dialog on success
-      if (onSuccess) {
-        onSuccess();
-      }
+      // Go to step 4 instead of closing immediately
+      setTransactionSuccess(true);
+      setCurrentStep(4);
       return;
     }
     
@@ -134,6 +134,12 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
 
   const clearToasts = () => {
     setToasts([]);
+  };
+
+  const handleClose = () => {
+    if (onSuccess) {
+      onSuccess();
+    }
   };
 
   // Route monitoring functions based on Li.Fi documentation
@@ -407,6 +413,10 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
         toTokenAddress: toToken,
         fromAmount,
         fromAddress: userAddress,
+        options: {
+          slippageTolerance: 0.03, // 3% slippage tolerance to prevent 409 errors
+          integrator: 'earn-basic-app'
+        }
       };
 
       console.log('Routes request:', routesRequest);
@@ -629,6 +639,8 @@ export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
          usdt0Loading={usdt0Loading}
          currentStep={currentStep}
          onStepChange={setCurrentStep}
+         transactionSuccess={transactionSuccess}
+         onClose={handleClose}
        />
 
 

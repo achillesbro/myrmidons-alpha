@@ -152,12 +152,27 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const [userShares, setUserShares] = useState<bigint>(0n);
   const [userAssets, setUserAssets] = useState<bigint>(0n);
   const [depAmount, setDepAmount] = useState<string>("");
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [wdAmount, setWdAmount] = useState<string>("");
   const [pending, setPending] = useState<"approve" | "deposit" | "withdraw" | null>(null);
   const [txMode, setTxMode] = useState<"deposit" | "withdraw">("deposit");
-  
-  // Deposit dialog state
-  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+
+  // Handle escape key to close deposit dialog
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && depositDialogOpen) {
+        setDepositDialogOpen(false);
+      }
+    };
+
+    if (depositDialogOpen) {
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [depositDialogOpen]);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
@@ -848,7 +863,15 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
 
         {/* Deposit Dialog */}
         {depositDialogOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={(e) => {
+              // Close dialog when clicking on the backdrop
+              if (e.target === e.currentTarget) {
+                setDepositDialogOpen(false);
+              }
+            }}
+          >
             {/* Blurred background - transparent with blur effect */}
             <div className="absolute inset-0 backdrop-blur-sm"></div>
             

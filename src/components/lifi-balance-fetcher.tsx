@@ -28,6 +28,8 @@ interface BalanceFetcherProps {
   usdt0Loading?: boolean;
   currentStep: number;
   onStepChange: (step: number) => void;
+  transactionSuccess?: boolean;
+  onClose?: () => void;
 }
 
 const CHAIN_INFO = {
@@ -49,7 +51,9 @@ export const LiFiBalanceFetcher = ({
   usdt0Balance,
   usdt0Loading,
   currentStep,
-  onStepChange
+  onStepChange,
+  transactionSuccess = false,
+  onClose
 }: BalanceFetcherProps) => {
   const { address } = useAccount();
   const [balances, setBalances] = useState<TokenBalance[]>([]);
@@ -604,6 +608,68 @@ export const LiFiBalanceFetcher = ({
           >
             {isExecuting ? 'Executing Transaction...' : 'Confirm & Execute'}
           </button>
+        </div>
+      )}
+
+      {/* Transaction Success Step - Step 4 */}
+      {transactionSuccess && currentStep === 4 && (
+        <div className="p-4">
+          <div className="text-center">
+            {/* Success Icon */}
+            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            
+            {/* Success Message */}
+            <h3 className="text-2xl font-bold text-green-800 mb-2">Transaction Successful!</h3>
+            <p className="text-gray-600 mb-6">
+              Your deposit has been completed successfully. The funds have been added to your vault position.
+            </p>
+            
+            {/* Transaction Details */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-center space-x-3 mb-2">
+                {selectedToken?.logoURI && (
+                  <img
+                    src={selectedToken.logoURI}
+                    alt={selectedToken.tokenSymbol}
+                    className="w-6 h-6 rounded-full"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                )}
+                <span className="font-semibold">{selectedToken?.tokenSymbol}</span>
+                <div className="text-gray-400">→</div>
+                <div className="flex items-center space-x-2">
+                  {usdt0Balance?.logoURI && (
+                    <img
+                      src={usdt0Balance.logoURI}
+                      alt="USDT0"
+                      className="w-6 h-6 rounded-full"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <span className="font-semibold">USDT0</span>
+                </div>
+              </div>
+              <div className="text-sm text-gray-600">
+                Amount: {amount} USDT0
+              </div>
+            </div>
+            
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="w-full py-3 px-4 text-lg font-semibold bg-[#00295B] text-white rounded-lg hover:bg-[#001a3d] transition-colors"
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
     </div>
