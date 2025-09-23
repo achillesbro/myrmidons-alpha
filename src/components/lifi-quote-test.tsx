@@ -90,7 +90,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   const userAddress = clientW.data?.account?.address || '0x552008c0f6870c2f77e5cC1d2eb9bdff03e30Ea0';
   
   // Initialize Li.Fi SDK configuration
-  const { isConfigured } = useLifiConfig();
+  const { isConfigured, isLoading: sdkLoading, hasError: sdkError } = useLifiConfig();
 
   // Fetch USDT0 balance when wallet connects
   useEffect(() => {
@@ -385,7 +385,14 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
     
     setUsdt0Loading(true);
     try {
-      console.log('Fetching USDT0 balance for address:', clientW.data.account.address);
+      console.log('🔄 Fetching USDT0 balance for address:', clientW.data.account.address);
+      
+      // Check if SDK is configured first
+      if (!isConfigured) {
+        console.warn('⚠️ Li.Fi SDK not configured, skipping USDT0 balance fetch');
+        setUsdt0Balance(null);
+        return;
+      }
       
       // Get USDT0 token info from Li.Fi
       const tokenInfo = await getToken(CHAIN_IDS.HYPEREVM, TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0);
@@ -401,7 +408,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
           (parseFloat(balanceFormatted) * parseFloat(tokenInfo.priceUSD)).toFixed(2) : 
           balanceFormatted;
         
-        console.log('USDT0 balance fetched:', {
+        console.log('✅ USDT0 balance fetched:', {
           balance: amountStr,
           balanceFormatted,
           balanceUSD,
@@ -428,8 +435,14 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       } else {
         setUsdt0Balance(null);
       }
-    } catch (error) {
-      console.error('Error fetching USDT0 balance:', error);
+    } catch (error: any) {
+      console.error('❌ Error fetching USDT0 balance:', error);
+      
+      // Check if it's an SDK configuration error
+      if (error.message && error.message.includes('SDK Token Provider')) {
+        console.warn('⚠️ SDK Token Provider not found, Li.Fi SDK may not be properly configured');
+      }
+      
       setUsdt0Balance(null);
     } finally {
       setUsdt0Loading(false);
@@ -789,7 +802,7 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       {!isConfigured && (
         <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
           <p className="text-blue-800">
-            <strong>Initializing Li.Fi SDK:</strong> Loading chain configurations... This may take a moment.
+            <strong>Initializing Li.Fi SDK:</strong> {sdkLoading ? 'Loading chain configurations... This may take a moment.' : sdkError ? 'Failed to initialize. Please refresh the page.' : 'Please wait...'}
           </p>
         </div>
       )}
@@ -816,6 +829,9 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
          onStepChange={setCurrentStep}
          transactionSuccess={transactionSuccess}
          onClose={handleClose}
+         isSdkConfigured={isConfigured}
+         isSdkLoading={sdkLoading}
+         hasSdkError={sdkError}
        />
 
       {/* Toast notifications */}

@@ -30,6 +30,9 @@ interface BalanceFetcherProps {
   onStepChange: (step: number) => void;
   transactionSuccess?: boolean;
   onClose?: () => void;
+  isSdkConfigured?: boolean;
+  isSdkLoading?: boolean;
+  hasSdkError?: boolean;
 }
 
 const CHAIN_INFO = {
@@ -53,7 +56,10 @@ export const LiFiBalanceFetcher = ({
   currentStep,
   onStepChange,
   transactionSuccess = false,
-  onClose
+  onClose,
+  isSdkConfigured = true,
+  isSdkLoading = false,
+  hasSdkError = false
 }: BalanceFetcherProps) => {
   const { address } = useAccount();
   const [balances, setBalances] = useState<TokenBalance[]>([]);
@@ -171,15 +177,37 @@ export const LiFiBalanceFetcher = ({
   const fetchAllBalances = async () => {
     if (!address) return;
 
+    // Check SDK configuration first
+    if (!isSdkConfigured) {
+      if (isSdkLoading) {
+        setError('Initializing Li.Fi SDK...');
+      } else if (hasSdkError) {
+        setError('Li.Fi SDK failed to initialize. Please refresh the page and try again.');
+      } else {
+        setError('Li.Fi SDK is not configured. Please wait...');
+      }
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
+      console.log('🔄 Fetching balances for address:', address);
       const allBalances = await fetchAllBalancesWithLifi();
+      console.log('✅ Fetched balances:', allBalances.length);
       setBalances(allBalances);
-    } catch (error) {
-      console.error('Error fetching balances:', error);
-      setError('Failed to fetch balances. Please try again.');
+    } catch (error: any) {
+      console.error('❌ Error fetching balances:', error);
+      
+      // Check if it's an SDK configuration error
+      if (error.message && error.message.includes('SDK Token Provider')) {
+        setError('Li.Fi SDK is not properly configured. Please refresh the page and try again.');
+      } else if (error.message && error.message.includes('Failed to fetch')) {
+        setError('Network error. Please check your connection and try again.');
+      } else {
+        setError('Failed to fetch balances. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
