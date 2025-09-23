@@ -868,10 +868,13 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
               </div>
             </div>
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
-                <LiFiQuoteTest onSuccess={() => {
-                  setDepositDialogOpen(false);
-                  window.location.reload();
-                }} />
+                <LiFiQuoteTest 
+                  onSuccess={() => {
+                    setDepositDialogOpen(false);
+                    window.location.reload();
+                  }}
+                  onToast={pushToast}
+                />
               </div>
             </div>
           </div>

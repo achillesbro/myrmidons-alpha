@@ -43,9 +43,10 @@ const getExplorerUrl = (chainId: number, txHash: string): string => {
 
 interface LiFiQuoteTestProps {
   onSuccess?: () => void;
+  onToast?: (kind: ToastKind, text: string, ttl?: number, href?: string) => void;
 }
 
-export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
+export function LiFiQuoteTest({ onSuccess, onToast }: LiFiQuoteTestProps = {}) {
   const [executing, setExecuting] = useState(false);
   
   // New state for balance fetcher
@@ -99,6 +100,17 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
 
   // Toast helper functions
   const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
+    // Use parent toast system if available (for success toasts that need to persist)
+    if (onToast && kind === 'success') {
+      onToast(kind, text, ttl, href);
+      // Auto-close dialog on success
+      if (onSuccess) {
+        onSuccess();
+      }
+      return;
+    }
+    
+    // Use local toast system for other toasts
     toastIdRef.current += 1;
     const id = toastIdRef.current;
     
