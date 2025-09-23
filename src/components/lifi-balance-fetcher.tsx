@@ -590,9 +590,7 @@ export const LiFiBalanceFetcher = ({
                   <span className="font-medium text-sm">
                     {selectedToken.tokenSymbol === 'USDT0' && selectedToken.chainId === 999 
                       ? `${parseFloat(amount || '0').toFixed(6)} USDT0`
-                      : selectedToken.priceUSD 
-                        ? `${(parseFloat(amount || '0') / parseFloat(selectedToken.priceUSD)).toFixed(6)} USDT0`
-                        : '0.000000 USDT0'
+                      : `${parseFloat(amount || '0').toFixed(6)} USDT0`
                     }
                   </span>
                 </div>

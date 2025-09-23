@@ -41,9 +41,11 @@ const getExplorerUrl = (chainId: number, txHash: string): string => {
 };
 
 
-interface LiFiQuoteTestProps {}
+interface LiFiQuoteTestProps {
+  onSuccess?: () => void;
+}
 
-export function LiFiQuoteTest({}: LiFiQuoteTestProps = {}) {
+export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   const [executing, setExecuting] = useState(false);
   
   // New state for balance fetcher
@@ -298,6 +300,11 @@ export function LiFiQuoteTest({}: LiFiQuoteTestProps = {}) {
       await fetchUSDT0Balance();
       setAmount('');
       
+      // Close dialog and refresh page
+      if (onSuccess) {
+        onSuccess();
+      }
+      
     } catch (error: any) {
       pushToast('error', `Deposit failed: ${error.message || 'Unknown error'}`, 8000);
     } finally {
@@ -531,6 +538,11 @@ export function LiFiQuoteTest({}: LiFiQuoteTestProps = {}) {
       // Reset form
       setSelectedTokenInfo(null);
       setAmount('');
+      
+      // Close dialog and refresh page
+      if (onSuccess) {
+        onSuccess();
+      }
       
     } catch (error: any) {
       console.error('Execution failed:', error);
