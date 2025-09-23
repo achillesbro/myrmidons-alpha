@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { getRoutes, executeRoute, getToken, getTokenBalances } from '@lifi/sdk';
+import { getRoutes, executeRoute, getToken, getTokenBalances, getActiveRoutes } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain, getWalletClient } from '@wagmi/core';
@@ -171,8 +171,17 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
 
   // Check if a step is the final step (receiving USDT0 on HyperEVM)
   const isFinalStep = (step: any): boolean => {
-    return step.action?.toToken?.symbol === 'USDT0' && 
-           step.action?.toChainId === CHAIN_IDS.HYPEREVM;
+    const isFinal = step.action?.toToken?.symbol === 'USDT0' && 
+                   step.action?.toChainId === CHAIN_IDS.HYPEREVM;
+    
+    console.log('🔍 Checking if final step:', {
+      toTokenSymbol: step.action?.toToken?.symbol,
+      toChainId: step.action?.toChainId,
+      expectedChainId: CHAIN_IDS.HYPEREVM,
+      isFinal
+    });
+    
+    return isFinal;
   };
 
   // Enhanced process monitoring based on Li.Fi documentation
@@ -237,6 +246,14 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
       
       console.log(`📊 Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus} ${isFinal ? '(FINAL)' : ''}`);
       
+      // Debug step structure
+      console.log('🔍 Step structure:', {
+        stepIndex: stepIndex + 1,
+        action: step.action,
+        toolDetails: step.toolDetails,
+        isFinal
+      });
+      
       // Track step completion
       if (stepStatus === 'FAILED') {
         hasFailedStep = true;
@@ -273,6 +290,13 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
     });
     
     // Success detection: All steps complete AND final step (USDT0 received) is done
+    console.log('🎯 Success detection check:', {
+      allStepsComplete,
+      hasFailedStep,
+      finalStepComplete,
+      shouldTriggerSuccess: allStepsComplete && !hasFailedStep && finalStepComplete
+    });
+    
     if (allStepsComplete && !hasFailedStep && finalStepComplete) {
       console.log('✅ Bridge execution completed - USDT0 received on HyperEVM');
       handleSuccess();
@@ -286,13 +310,10 @@ export function LiFiQuoteTest({ onSuccess }: LiFiQuoteTestProps = {}) {
   // Active route management based on Li.Fi documentation
   const getActiveRouteInfo = () => {
     try {
-      // Import getActiveRoutes dynamically to avoid build issues
-      const { getActiveRoutes } = require('@lifi/sdk');
       const activeRoutes = getActiveRoutes();
       
       console.log('📋 Active routes:', activeRoutes.map((route: any) => ({
         id: route.id,
-        status: route.status,
         stepsCount: route.steps?.length
       })));
       
