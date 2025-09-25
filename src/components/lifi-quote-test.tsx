@@ -76,6 +76,7 @@ interface StepInfo {
     vaultSharesMinted: string | null;
     vaultSharesBefore: string | null; // Track shares before deposit to calculate newly minted
     currentStep: number;
+    transactionSubsteps: Array<{label: string, status: 'pending' | 'processing' | 'completed' | 'failed', txHash?: string, chainId?: number}>;
   }
 
 export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}) {
@@ -91,6 +92,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     vaultSharesMinted: null,
     vaultSharesBefore: null,
     currentStep: 1,
+    transactionSubsteps: [],
   });
   
   // Legacy state for backward compatibility (will be removed)
@@ -241,6 +243,47 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       console.error('Failed to fetch token logo:', error);
       return null;
     }
+  };
+
+  // Transaction substep progress component
+  const renderTransactionSubsteps = (substeps: Array<{label: string, status: 'pending' | 'processing' | 'completed' | 'failed', txHash?: string, chainId?: number}>) => {
+    return (
+      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+        <h4 className="text-sm font-semibold text-gray-700 mb-3">Transaction Progress</h4>
+        <div className="space-y-2">
+          {substeps.map((substep, index) => (
+            <div key={index} className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className={`w-3 h-3 rounded-full ${
+                  substep.status === 'completed' ? 'bg-green-500' :
+                  substep.status === 'processing' ? 'bg-blue-500 animate-pulse' :
+                  substep.status === 'failed' ? 'bg-red-500' :
+                  'bg-gray-300'
+                }`}></div>
+                <span className={`text-sm ${
+                  substep.status === 'completed' ? 'text-green-700' :
+                  substep.status === 'processing' ? 'text-blue-700' :
+                  substep.status === 'failed' ? 'text-red-700' :
+                  'text-gray-500'
+                }`}>
+                  {substep.label}
+                </span>
+              </div>
+              {substep.txHash && substep.chainId && (
+                <a
+                  href={getExplorerUrl(substep.chainId, substep.txHash)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:text-blue-800 font-mono"
+                >
+                  {substep.txHash.slice(0, 8)}...{substep.txHash.slice(-6)}
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   // Li.Fi Transaction Monitoring System
@@ -429,9 +472,32 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         needsApproval = false;
       }
       
+      let approveTx: any = null;
       if (needsApproval) {
-        const approveTx = await token.approve(VAULT_ADDRESS, amountWei);
+        // Update substeps for approval
+        updateDepositState({
+          transactionSubsteps: [
+            { label: 'Approve USDT0 spending', status: 'processing' as const, chainId: CHAIN_IDS.HYPEREVM }
+          ]
+        });
+        
+        approveTx = await token.approve(VAULT_ADDRESS, amountWei);
+        
+        // Update substeps with transaction hash
+        updateDepositState({
+          transactionSubsteps: [
+            { label: 'Approve USDT0 spending', status: 'processing' as const, txHash: approveTx.hash, chainId: CHAIN_IDS.HYPEREVM }
+          ]
+        });
+        
         await provider.waitForTransaction(approveTx.hash, 1, 20_000).catch(() => null);
+        
+        // Mark approval as completed
+        updateDepositState({
+          transactionSubsteps: [
+            { label: 'Approve USDT0 spending', status: 'completed' as const, txHash: approveTx.hash, chainId: CHAIN_IDS.HYPEREVM }
+          ]
+        });
       }
       
       // Get shares before deposit
@@ -439,12 +505,74 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       const sharesBefore = await vaultBefore.balanceOf(clientW.data?.account?.address);
       const sharesBeforeFormatted = formatUnits(sharesBefore, 18);
       
+      // Update substeps for deposit
+      const depositSubsteps = [];
+      if (needsApproval && approveTx) {
+        depositSubsteps.push({ 
+          label: 'Approve USDT0 spending', 
+          status: 'completed' as const, 
+          txHash: approveTx.hash, 
+          chainId: CHAIN_IDS.HYPEREVM 
+        });
+      }
+      depositSubsteps.push({ 
+        label: 'Deposit to vault', 
+        status: 'processing' as const, 
+        chainId: CHAIN_IDS.HYPEREVM 
+      });
+      
+      updateDepositState({
+        transactionSubsteps: depositSubsteps
+      });
+      
       // Execute deposit
       const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
       const tx = await vault.deposit(amountWei, clientW.data?.account?.address);
       
+      // Update substeps with deposit transaction hash
+      const processingSubsteps = [];
+      if (needsApproval && approveTx) {
+        processingSubsteps.push({ 
+          label: 'Approve USDT0 spending', 
+          status: 'completed' as const, 
+          txHash: approveTx.hash, 
+          chainId: CHAIN_IDS.HYPEREVM 
+        });
+      }
+      processingSubsteps.push({ 
+        label: 'Deposit to vault', 
+        status: 'processing' as const, 
+        txHash: tx.hash, 
+        chainId: CHAIN_IDS.HYPEREVM 
+      });
+      
+      updateDepositState({
+        transactionSubsteps: processingSubsteps
+      });
+      
       // Wait for confirmation using wallet provider
       await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
+      
+      // Mark deposit as completed
+      const completedSubsteps = [];
+      if (needsApproval && approveTx) {
+        completedSubsteps.push({ 
+          label: 'Approve USDT0 spending', 
+          status: 'completed' as const, 
+          txHash: approveTx.hash, 
+          chainId: CHAIN_IDS.HYPEREVM 
+        });
+      }
+      completedSubsteps.push({ 
+        label: 'Deposit to vault', 
+        status: 'completed' as const, 
+        txHash: tx.hash, 
+        chainId: CHAIN_IDS.HYPEREVM 
+      });
+      
+      updateDepositState({
+        transactionSubsteps: completedSubsteps
+      });
       
       // Get vault shares after deposit
       const vaultAfter = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
@@ -1126,7 +1254,6 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           <div className="p-6 bg-blue-50 rounded-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-blue-800">Confirm USDT0 Deposit</h3>
-              <div className="text-sm text-gray-500">No back button - bridge already completed</div>
             </div>
             
             <div className="space-y-4">
@@ -1139,7 +1266,15 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">To:</span>
-                    <span className="font-medium">USDT0 PHALANX Vault on HyperEVM</span>
+                    <div className="flex items-center space-x-2">
+                      <img
+                        src="/Myrmidons-logo-dark-no-bg.png"
+                        alt="Myrmidons Vault"
+                        className="w-5 h-5 rounded-full"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      <span className="font-medium">USDT0 PHALANX</span>
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Amount:</span>
@@ -1151,6 +1286,9 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                   </div>
                 </div>
               </div>
+              
+              {/* Transaction substeps */}
+              {depositState.transactionSubsteps.length > 0 && renderTransactionSubsteps(depositState.transactionSubsteps)}
               
               <button
                 onClick={handlePathBStep5}
@@ -1346,7 +1484,15 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">To:</span>
-                    <span className="font-bold text-gray-900">USDT0 PHALANX Vault on HyperEVM</span>
+                    <div className="flex items-center space-x-2">
+                      <img
+                        src="/Myrmidons-logo-dark-no-bg.png"
+                        alt="Myrmidons Vault"
+                        className="w-5 h-5 rounded-full"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      <span className="font-bold text-gray-900">USDT0 PHALANX</span>
+                    </div>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Amount:</span>
@@ -1358,6 +1504,9 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                   </div>
                 </div>
               </div>
+              
+              {/* Transaction substeps */}
+              {depositState.transactionSubsteps.length > 0 && renderTransactionSubsteps(depositState.transactionSubsteps)}
               
               {/* Enhanced confirm button */}
               <button
