@@ -209,11 +209,16 @@ export const LiFiBalanceFetcher = ({
     onAmountEnter(e.target.value);
   };
 
-  // Sort balances: USDT0 first, then by USD amount descending
-  const sortedBalances = balances.sort((a, b) => {
-    // USDT0 always first
-    if (a.tokenSymbol === 'USDT0') return -1;
-    if (b.tokenSymbol === 'USDT0') return 1;
+  // Filter and sort balances: exclude USDT0 from HyperEVM in bridge flow, then sort
+  const filteredBalances = balances.filter(balance => {
+    // Exclude USDT0 from HyperEVM to avoid duplication in bridge flow
+    return !(balance.tokenSymbol === 'USDT0' && balance.chainId === CHAIN_IDS.HYPEREVM);
+  });
+  
+  const sortedBalances = filteredBalances.sort((a, b) => {
+    // USDT0 from other chains first
+    if (a.tokenSymbol === 'USDT0' && a.chainId !== CHAIN_IDS.HYPEREVM) return -1;
+    if (b.tokenSymbol === 'USDT0' && b.chainId !== CHAIN_IDS.HYPEREVM) return 1;
     
     // Then sort by USD amount descending
     const aUSD = parseFloat(a.balanceUSD || '0');
