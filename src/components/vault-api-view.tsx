@@ -18,6 +18,7 @@ import { useVaultCurrentApyOnchain } from "../hooks/useVaultCurrentApyOnchain";
 import { useState, useEffect, useRef } from "react";
 import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";
 import { LiFiQuoteTest } from "./lifi-quote-test";
+import { WithdrawalDialog } from "./withdrawal-dialog";
 // Inline AllocationList component for on-chain allocations
 
 // Simple error boundary to isolate rendering errors in the API View
@@ -940,10 +941,12 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                 </div>
               </div>
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-                {/* WithdrawalDialog component will be added here */}
-                <div className="text-center py-8">
-                  <p className="text-[#101720]/70">Withdrawal dialog component coming soon...</p>
-                </div>
+                <WithdrawalDialog 
+                  onClose={handleWithdrawalClose}
+                  userShares={userShares}
+                  shareDecimals={onchainData?.shareDecimals || 18}
+                  underlyingDecimals={onchainData?.underlyingDecimals || 6}
+                />
               </div>
             </div>
           </div>
