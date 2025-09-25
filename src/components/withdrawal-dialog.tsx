@@ -188,8 +188,23 @@ export function WithdrawalDialog({
         ]
       });
       
-      // Wait for transaction confirmation
-      await provider.waitForTransaction(tx.hash, 1, 20_000);
+      // Wait for transaction confirmation with longer timeout
+      try {
+        await provider.waitForTransaction(tx.hash, 1, 60_000);
+      } catch (timeoutError) {
+        // If timeout occurs, check if transaction was actually successful
+        console.warn('Transaction wait timed out, checking if successful...');
+        try {
+          const receipt = await provider.getTransactionReceipt(tx.hash);
+          if (!receipt) {
+            throw timeoutError; // Re-throw if no receipt found
+          }
+          // Transaction was successful despite timeout
+          console.log('Transaction confirmed despite timeout');
+        } catch {
+          throw timeoutError; // Re-throw if we can't verify success
+        }
+      }
       
       // Mark withdrawal as completed
       updateWithdrawalState({
@@ -244,7 +259,7 @@ export function WithdrawalDialog({
       pushToast('error', 'Please enter a valid amount');
       return;
     }
-    if (parseFloat(withdrawalState.amount) > parseFloat(withdrawalState.selectedToken?.balanceFormatted || '0')) {
+    if (parseFloat(withdrawalState.amount) > parseFloat(formatUnits(userShares, shareDecimals))) {
       pushToast('error', 'Amount exceeds available vault shares');
       return;
     }
@@ -383,7 +398,7 @@ export function WithdrawalDialog({
                 placeholder="0.00"
                 step="0.000001"
                 min="0"
-                max={withdrawalState.selectedToken ? parseFloat(withdrawalState.selectedToken.balanceFormatted) : 0}
+                max={parseFloat(formatUnits(userShares, shareDecimals))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               
@@ -393,7 +408,7 @@ export function WithdrawalDialog({
                   <button
                     key={percentage}
                     onClick={() => {
-                      const maxAmount = withdrawalState.selectedToken ? parseFloat(withdrawalState.selectedToken.balanceFormatted) : 0;
+                      const maxAmount = parseFloat(formatUnits(userShares, shareDecimals));
                       const amount = (maxAmount * percentage / 100).toString();
                       handleAmountEnter(amount);
                     }}
@@ -407,7 +422,7 @@ export function WithdrawalDialog({
 
             <button
               onClick={handleStep1}
-              disabled={!withdrawalState.amount || parseFloat(withdrawalState.amount) <= 0 || parseFloat(withdrawalState.amount) > (withdrawalState.selectedToken ? parseFloat(withdrawalState.selectedToken.balanceFormatted) : 0)}
+              disabled={!withdrawalState.amount || parseFloat(withdrawalState.amount) <= 0 || parseFloat(withdrawalState.amount) > parseFloat(formatUnits(userShares, shareDecimals))}
               className="w-full py-3 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continue to Confirmation
