@@ -143,8 +143,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const [userShares, setUserShares] = useState<bigint>(0n);
   const [userAssets, setUserAssets] = useState<bigint>(0n);
   const [depAmount, setDepAmount] = useState<string>("");
-  const [wdAmount, setWdAmount] = useState<string>("");
-  const [pending, setPending] = useState<"approve" | "deposit" | "withdraw" | null>(null);
+  const [pending, setPending] = useState<"approve" | "deposit" | null>(null);
   
   // Deposit dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
@@ -458,62 +457,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
     }
   };
 
-  const runWithdraw = async (full = false) => {
-    try {
-      if (!clientW.data) throw new Error("Connect wallet");
-      const provider = new BrowserProvider((window as any).ethereum);
-      const signer = await provider.getSigner();
-      const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
-      setPending("withdraw");
-      let tx: any;
-      if (full) {
-        const shares = await hyperPublicClient.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "balanceOf", args: [clientW.data.account.address] }) as bigint;
-        const assetsOut = await hyperPublicClient.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "previewRedeem", args: [shares] }) as bigint;
-        tx = await vault.withdraw(assetsOut, clientW.data.account.address, clientW.data.account.address);
-      } else {
-        const amt = parseUnits(wdAmount, assetDecimals);
-        if (amt <= 0n) throw new Error("Enter amount");
-        tx = await vault.withdraw(amt, clientW.data.account.address, clientW.data.account.address);
-      }
-      pushToast("info", `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
-      // Use wallet provider to wait for confirmation — typically faster than public RPCs
-      await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
-      pushToast("success", "Withdraw successful");
-      setPending(null);
-      // Use wallet RPC for freshest reads
-      const provider2 = new BrowserProvider((window as any).ethereum);
-      const signer2 = await provider2.getSigner();
-      const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer2);
-      const tokenR = new Contract(underlyingAddress!, erc20Abi as any, signer2);
-
-      const [bal, shares2, totalA2, totalS2] = await Promise.all([
-        tokenR.balanceOf(clientW.data.account.address) as Promise<bigint>,
-        vaultR.balanceOf(clientW.data.account.address) as Promise<bigint>,
-        vaultR.totalAssets() as Promise<bigint>,
-        vaultR.totalSupply() as Promise<bigint>,
-      ]);
-      const assets2 = (await vaultR.convertToAssets(shares2)) as bigint;
-
-      setOnchainBalance(bal);
-      setUserShares(shares2);
-      setUserAssets(assets2);
-
-      // Update TVL immediately
-      setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA2, totalSupply: totalS2 } : prev));
-
-      // Force allocations refresh
-      setAllocRefreshKey((k) => k + 1);
-
-      // Extra: immediate + delayed TVL refresh via wallet RPC
-      await refreshVaultTotalsFast();
-      setTimeout(() => { refreshVaultTotalsFast(); }, 2000);
-
-      setWdAmount("");
-    } catch (e) {
-      setPending(null);
-      pushToast("error", friendlyError(e));
-    }
-  };
 
   useEffect(() => {
     let cancelled = false;
