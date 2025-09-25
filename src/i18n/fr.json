@@ -1,162 +1,238 @@
 {
   "brand": "Myrmidons Strategies",
-  "tabs": {
-    "user": "Position",
-    "vault": "Informations du Vault",
-    "about": "À propos"
-  },
-
+  "tabs": { "user": "Position Utilisateur", "vault": "Informations du Vault", "about": "À propos" },
   "common": {
     "lastUpdated": "Mis à jour il y a {{timeAgo}}"
   },
-
-  "vaultInfo": {
-    "about": {
-      "title": "À propos",
-      "body": "MYRMIDONS USDT0 PHALANX répartit des liquidités sur des marchés Morpho sur l'HyperEVM afin de capter un rendement tout en respectant des contraintes de risque exigeantes."
-    },
-    "metrics": {
-      "title": "Indicateurs clés",
-      "tvlUsd": "Encours total (USD)",
-      "sharePrice": "Prix de part (USD)",
-      "yield": "Rendement actuel",
-      "yieldHint": "Le rendement est calculé on‑chain et peut varier.",
-      "performanceFee": "Commission de performance",
-      "recipient": "Bénéficiaire"
-    },
-    "allocations": {
-      "title": "Répartition",
-      "columns": {
-        "market": "Marché",
-        "share": "Part",
-        "usd": "USD",
-        "supplyApy": "Rendement de dépôt"
-      },
-      "otherDust": "Autres (montants négligeables)",
-      "loading": "Chargement des allocations…",
-      "error": "Échec du chargement des allocations : {{error}}",
-      "empty": "Aucune allocation."
-    },
-    "actions": {
-      "bridgeCta": "Besoin de fonds sur HyperEVM ? Transférez depuis Arbitrum via Jumper",
-      "title": "Opérations",
-      "deposit": "Déposer",
-      "withdraw": "Retirer",
-      "placeholderAmount": "0,00",
-      "balance": "Solde",
-      "max": "Max",
-      "exceedsBalance": "Montant supérieur au solde",
-      "approving": "Approbation…",
-      "depositing": "Dépôt…",
-      "approve": "Approuver",
-      "maxWithdrawable": "Retrait maximal",
-      "withdrawing": "Retrait…",
-      "approveTitle": "Approuver {{symbol}}",
-      "approveBody": "Autoriser le dépôt de {{amount}} {{symbol}}.",
-      "cancel": "Annuler"
-    },
-    "position": {
-      "title": "Position actuelle",
-      "connectToView": "Connecter un wallet pour afficher la position.",
-      "shares": "Parts du Vault",
-      "usdValue": "Valeur USD"
-    }
-  },
-
   "aboutView": {
     "title": "À propos de Myrmidons Strategies",
-    "motto": "« L’excellence forgée dans la chaleur du combat. »",
-    "p1": "Myrmidons Strategies déploie des stratégies d’investissement sur les actifs cryptographiques, avec une attention particulière sur l’écosystème Hyperliquid.",
-    "p2": "L’ambition est d’offrir une exposition diversifiée et sélectionnée à la DeFi via des Vaults ERC‑4626, afin de maximiser le rendement ajusté du risque tout en conservant une discipline rigoureuse de gestion et de transparence. La plateforme s’adresse autant aux praticiens aguerris qu’aux nouveaux entrants.",
-    "bullets": {
-      "curated": "Sélection de cryptoactifs dans un univers DeFi.",
-      "hyperliquid": "Univers d’opportunités centré sur Hyperliquid.",
-      "risk": "Ingénierie et suivi avec primauté du risque."
-      },
-    "strategy": {
-      "title": "Notre stratégie",
-      "p1": "La vault recherche un rendement systématique et maîtrisé sur HyperEVM en allouant aux marchés Morpho sélectionnés. La construction privilégie la liquidité, la préservation du capital sur l’ensemble du cycle, et la capitalisation des gains lorsque cela est pertinent.",
-      "p2": "L’univers inclut HYPE, BTC, ETH, des actifs indexés sur l'USD, et des Principal Tokens lorsque leur sous-jacent et leur maturité sont attractifs. Les pondérations s’ajustent selon les conditions de marché, les différentiels de taux, l’utilisation et les récompenses.",
+    "motto": "\"L'excellence forgée dans la chaleur du combat.\"",
+    "p1": "Myrmidons Strategies conçoit et gère des vaults ERC-4626 qui allouent des liquidités sur des marchés Morpho sélectionnés sur HyperEVM (Hyperliquid). L'objectif est simple : offrir des rendements crypto-natifs diversifiés avec une gestion des risques disciplinée et transparente.",
+    "whatWeDo": {
+      "title": "Ce que nous faisons",
       "bullets": {
-        "risk": "Taille de l'investissement pilotée par le risque : plafonds d’apport (« caps »), LLTV prudents, suivi continu des drawdowns et liquidations.",
-        "liquidity": "Discipline de liquidité : préférence pour des marchés forts liquides et une capacité de rachat claire.",
-        "rebalance": "Rééquilibrages dynamiques : réponse aux changements de taux, à l’utilisation et aux récompenses en limitant les mouvements inutiles.",
-        "transparency": "Transparence : les allocations et la performance sont observables on-chain et reflétés en direct."
+        "curated": "Exposition DeFi sélectionnée : Concentrée sur l'écosystème Hyperliquid, où la liquidité et l'activité sont les plus profondes pour notre cas d'usage.",
+        "risk": "Ingénierie axée sur les risques : Le dimensionnement des positions et la sélection des marchés respectent les contraintes LLTV, les plafonds d'utilisation et la profondeur de liquidité.",
+        "oversight": "Surveillance quotidienne : Les marchés sont examinés et les allocations peuvent être mises à jour chaque jour.",
+        "ux": "UX simple : Déposez en quelques clics depuis les chains supportées ; retirez à tout moment. Pas de minimum/maximum strict."
+      }
+    },
+    "howItWorks": {
+      "title": "Comment fonctionne le vault",
+      "bullets": {
+        "underlying": "Sous-jacent : USDT0 sur HyperEVM.",
+        "allocation": "Allocation : Le vault fournit des liquidités à un ensemble de marchés Morpho pré-sélectionnés qui répondent à nos standards de liquidités, d'utilisation et de marge LLTV.",
+        "accrual": "Accumulation : La performance se reflète dans le prix des parts du vault ; votre position est visible à tout moment sur la page Information du Vault.",
+        "access": "Accès : Pas de blocage. Les retraits sont disponibles à tout moment, sous réserve des conditions on-chain."
+      }
+    },
+    "securityTrust": {
+      "title": "Sécurité et confiance",
+      "bullets": {
+        "custodial": "Non-custodial par conception : Vos actifs restent dans votre wallet et dans des smart contracts audités ; Myrmidons Strategies ne détient jamais vos actifs.",
+        "morpho": "Construit sur Morpho : Les vaults utilisent les contrats open-source et largement audités de Morpho ainsi que ses paramètres de risque sur HyperEVM.",
+        "transparency": "Transparence totale : Toutes les positions, transactions et circulation des parts sont vérifiables on-chain."
+      }
+    },
+    "notes": "Notes : Aucun rendement garanti. La crypto et la DeFi impliquent des risques (smart-contract, marché/liquidité, oracle/paramètre, et stablecoin/bridge). Les frais et autres détails opérationnels sont décrits dans la FAQ.",
+    "strategy": {
+      "title": "Notre Stratégie",
+      "p1": "Le vault poursuit des rendements systématiques et gérés par les risques sur HyperEVM en allouant sur des marchés Morpho sélectionnés. Le positionnement est construit pour favoriser la liquidité, préserver le principal sur des cycles complets, et capitaliser les rendements.",
+      "p2": "L'univers investissable inclut HYPE, BTC, ETH, des actifs liés à l'USD, et des tokens principaux où les rendements à échéance sont attractifs. Les tailles d'allocation s'adaptent aux conditions de marché, aux différentiels de taux, à l'utilisation et aux récompenses des protocoles.",
+      "bullets": {
+        "risk": "Dimensionnement axé sur les risques : plafonds d'approvisionnement, contraintes LLTV conservatrices, et surveillance continue des drawdowns et liquidations.",
+        "liquidity": "Discipline de liquidité : préférence pour les marchés à liquidité profonde et capacité de rachat ordonnée.",
+        "rebalance": "Rééquilibrage dynamique : répondre aux taux, à l'utilisation et aux récompenses tout en minimisant les mouvements inutiles.",
+        "transparency": "Transparence : l'état et la performance sont observables on-chain et reflétés dans les métriques en direct."
       },
-      "p3": "Ambition : des rendements compétitifs et durables, ajustés du risque, dans le temps. Ceci ne constitue pas une garantie de performance."
+      "p3": "Objectif : des rendements durables, compétitifs et ajustés au risque dans le temps. Ceci n'est pas une garantie de performance.",
+      "deepLiquidity": {
+        "title": "Ce que signifient les \"marchés à liquidité profonde\"",
+        "p1": "Nous n'allouons qu'aux marchés avec :",
+        "bullets": {
+          "1": "Une liquidité spot/dérivés élevée sur Hyperliquid (majors comme BTC/ETH, HYPE et dérivés, et paires adossées au dollar comme hbUSD/USDT0). Une profonde liquidité améliore l'exécution des emprunteurs et la fiabilité des liquidations.",
+          "2": "Une demande d'emprunt soutenue dans les marchés Morpho où l'utilisation d'emprunt USDT0 est constamment significative.",
+          "3": "Des écarts serrés / profondeur robuste autour des bandes de liquidation pour réduire le slippage lors des liquidations ou réallocations."
+        }
+      },
+      "lltv": {
+        "title": "Contraintes LLTV (comment nous gérons le risque de collatéral)",
+        "p1": "LLTV (Liquidation Loan-to-Value) définit la dette maximale vs. la valeur du collatéral avant liquidation. Nous :",
+        "bullets": {
+          "1": "Préférons les marchés LLTV conservateurs et maintenons une marge (distance au LLTV) pour absorber la volatilité.",
+          "2": "Plafonnons l'exposition par marché et rééquilibrons quand les conditions de volatilité, d'utilisation ou de liquidité changent.",
+          "3": "Évitons les marchés où LLTV combiné avec une faible profondeur pourrait forcer de mauvais résultats de liquidation."
+        }
+      },
+      "usdt0": {
+        "title": "Pourquoi USDT0 spécifiquement ?",
+        "bullets": {
+          "1": "Il s'agit de l'actif de cotation de base pour une grande partie de l'activité Hyperliquid/HyperEVM, concentrant la liquidité et la demande d'emprunt.",
+          "2": "Le routage omnichain via LayerZero rend le mouvement vers/depuis HyperEVM efficace, soutenant des opérations de vault plus fluides.",
+          "3": "Couverture de marché : Les marchés les plus diversifiés et actifs que nous ciblons sont dénommés en USDT0, améliorant l'efficacité du capital."
+        }
+      }
+    },
+    "security": {
+      "title": "Sécurité et Confiance",
+      "p1": "Vos actifs ne sont jamais détenus par Myrmidons Strategies. Ce vault est non-custodial, ce qui signifie que vous gardez le contrôle total de vos fonds à tout moment.",
+      "p2": "Les smart contracts du vault sont construits sur Morpho, un protocole DeFi gérant à travers ses contrats plus de 9 milliards de dollars, et qui a été audité 27 fois par des firmes de sécurité de premier plan. Vos fonds sont confiés à une infrastructure testée au combat et de niveau institutionnel.",
+      "p3": "Toutes les opérations du vault sont transparentes et vérifiables on-chain. Vous pouvez surveiller votre position, suivre la performance et vérifier toutes les transactions indépendamment."
     },
     "howNew": {
       "title": "Comment déposer",
       "setup": {
-        "title": "A) Mise en place (une seule fois)",
+        "title": "A) Configuration unique (premier dépôt)",
         "items": {
-          "1": "Installez un wallet en auto-garde. Recommandation : <rabby>Rabby Wallet</rabby>. Téléchargez toujours depuis le site officiel pour éviter l’hameçonnage.",
-          "2": "Créez un compte sur un échange réputé (par exemple <kraken>Kraken</kraken>) et achetez de l’ETH.",
-          "3": "Retirer des fonds en ETH vers Arbitrum One depuis votre plateforme d'échange (frais faibles, confirmation rapide) sur votre adresse Rabby Wallet.",
-          "4": "Sur Rabby Wallet, sur Arbitrum, conserver un petit solde d’ETH pour les frais, puis se préparer à passer sur le réseau du vault : HyperEVM.",
-          "5": "Pour cela, utilisez un agrégateur de bridge/échange fiable comme <jumper>Jumper Exchange</jumper> : échangez de l’ETH sur Arbitrum contre de l’USDT0 sur HyperEVM (l’actif sous-jacent du vault). Prévoyez également un petit montant de HYPE (≈ 10 $) pour les frais sur HyperEVM.",
-          "6": "Sur HyperEVM, conserver ~10 $ de HYPE pour le gas (HYPE est le token de gas natif)."
+          "1": "Installez un wallet auto-custodial. Recommandé : <rabby>Rabby Wallet</rabby>. Téléchargez uniquement depuis le site officiel.",
+          "2": "Achetez de l'ETH sur un exchange réputé. Recommandé : <kraken>Kraken</kraken>.",
+          "3": "Retirez de l'ETH de Kraken vers votre adresse Rabby Wallet via Arbitrum One ou Base. Ces L2s permettent des transactions rapides à faibles frais, les rendant efficaces comme réseaux sources pour les dépôts cross-chain."
         }
       },
       "flow": {
-        "title": "B) À chaque dépôt",
+        "title": "B) Dépôt (tout token/chain supporté)",
         "items": {
-          "1": "Connecter le portefeuille.",
-          "2": "Sélectionner le réseau HyperEVM et vérifier l’adresse du vault.",
-          "3": "Saisir le montant d’USDT0 à déposer.",
-          "4": "Si nécessaire, approuver l’utilisation d’USDT0 par le vault (autorisation).",
-          "5": "Confirmer la transaction de dépôt dans le portefeuille et attendre la confirmation."
+          "1": "Allez sur la page Information du Vault et cliquez sur Déposer.",
+          "2": "Dans le dialogue, sélectionnez le token que vous voulez utiliser pour déposer.",
+          "3": "Entrez le montant. L'app route automatiquement bridge + swap → USDT0 sur HyperEVM → dépôt vault.",
+          "4": "Approuvez les tokens si demandé (token source et USDT0 pour le vault).",
+          "5": "Confirmez. La route s'exécute de bout en bout. Après confirmation finale sur HyperEVM, vos parts et position apparaissent sous Position Actuelle."
         }
       },
       "pitfalls": {
-        "title": "C) Pièges courants",
+        "title": "C) Pièges courants et vérifications rapides",
         "items": {
-          "1": "Frais de réseau : ETH paie les frais sur Arbitrum ; HYPE paie les frais sur HyperEVM. Garder un petit solde sur chaque réseau.",
-          "2": "Réseau incorrect : si la transaction échoue immédiatement, vérifier que le portefeuille est bien sur HyperEVM.",
-          "3": "Montant non reçu : en cas de bridge, attendre la finalisation ; actualiser ensuite la page.",
-          "4": "Autorisation insuffisante : si le dépôt est refusé, augmenter l’allowance d’USDT0 (exacte ou illimitée selon préférence)."
+          "1": "Si une approbation est en attente, attendez la confirmation avant de continuer.",
+          "2": "Gardez un petit buffer HYPE pour le gas HyperEVM (~10$).",
+          "3": "Si une route échoue, essayez un montant légèrement plus petit ou un token source plus liquide (ex: ETH/USDC sur Arbitrum/Base).",
+          "4": "Si vous changez manuellement de réseau, assurez-vous que l'UI montre la chain From prévue.",
+          "5": "Si une transaction échoue, revérifiez : approbation du token source, gas source-chain, balance HYPE HyperEVM, et (si affiché) paramètres de slippage."
         }
-      }
+      },
+      "note": "Note : Le vault n'a pas de montants de dépôt minimum/maximum stricts ; les limites pratiques sont les coûts de gas et les contraintes on-chain."
     },
     "fees": {
       "title": "Frais",
-      "body": "Le Vault applique une commission de performance sur le rendement. Le taux en vigueur et le bénéficiaire sont affichés en temps réel sur la page « Informations du Vault » ; les valeurs font foi on‑chain."
+      "body": "Ce vault prend une commission de performance sur le rendement (le cas échéant). Le taux actuel et le bénéficiaire sont affichés en direct sur la page Information du Vault. Cette section explique comment fonctionnent les frais à haut niveau ; les valeurs réelles sont lues on‑chain."
     },
     "risks": {
       "title": "Risques",
       "items": {
-        "contract": "Risque de smart‑contract et risque protocolaire.",
-        "market": "Risque de marché et de liquidité des cryptoactifs.",
-        "infrastructure": "Dépendances d’infrastructure (chaîne/RPC) et indisponibilités potentielles.",
-        "operational": "Gestion des clés et risques opérationnels."
+        "contract": "Vulnérabilités de smart contract ou risque protocolaire.",
+        "market": "Risque de marché/liquidité sur les positions sous-jacentes.",
+        "infrastructure": "Pannes de chain/RPC et dépendances d'infrastructure.",
+        "operational": "Gestion wallet/clés et erreurs opérationnelles."
       }
     },
     "faq": {
       "title": "FAQ",
       "q1": {
-        "title": "Comment fonctionnent les Vaults ERC‑4626 ?",
-        "p1": "Un Vault ERC‑4626 s’apparente à un fonds d’investissement ou à un ETF : les déposants apportent le cryptoactif sous‑jacent (ex. WHYPE ou USDT0) et reçoivent des parts représentant une propriété proportionnelle.",
-        "depositLabel": "Dépôts",
-        "deposit": "Le sous‑jacent est déposé et des parts sont émises à due proportion.",
-        "earningsLabel": "Gains",
-        "earnings": "À mesure que la stratégie performe, la valeur économique par part tend à augmenter. Le nombre de parts reste en général inchangé hors nouveaux dépôts/retraits.",
-        "withdrawalsLabel": "Retraits",
-        "withdrawals": "Des parts sont brûlées pour racheter le montant correspondant de sous‑jacent.",
-        "p2": "Exemple : un dépôt de 100 jetons avec ~5 % de performance positive se rachètera ultérieurement autour de 105 jetons (moins frais éventuels et arrondis). Une performance négative réduit la valeur de rachat.",
-        "p3": "Le rendement est variable et dépend des conditions de marché et de l’allocation. La valeur de part reflète la performance du Vault dans le temps."
+        "title": "Qu'est-ce que USDT0 ?",
+        "body": "USDT0 est un stablecoin indexé sur l'USD utilisé nativement sur les réseaux Hyperliquid (HyperEVM / Hypercore). Il est intégré via LayerZero pour les transferts omnichain et largement utilisé comme actif de cotation sur les venues Hyperliquid. Sur HyperEVM, le contrat canonique avec lequel vous interagirez dans notre app correspond au token USDT0 communément référencé."
       },
       "q2": {
-        "title": "Quels wallets sont pris en charge ?",
-        "body": "MetaMask, Rabby, OKX (via RainbowKit)."
+        "title": "À quelle fréquence les allocations sont-elles mises à jour ?",
+        "body": "Quotidiennement. Nous examinons les marchés et ajustons les positions chaque jour."
       },
       "q3": {
-        "title": "Quand le rendement est‑il mis à jour ?",
-        "body": "Le rendement est directement calculé on‑chain ; il varie avec l’évolution des marchés et le rendement individuel de chaque sous‑jacent."
+        "title": "Quels sont les montants de dépôt minimum/maximum ?",
+        "body": "Aucun. Il n'y a pas de minimum ou maximum codé en dur. (Les limites pratiques sont uniquement les coûts de gas et les limites on-chain.)"
       },
       "q4": {
-        "title": "Comment retirer ?",
-        "body": "Les retraits s’effectuent depuis « Opérations » dans l'onglet Informations du Vault : saisir un montant ou choisir Max, puis confirmer dans le wallet."
+        "title": "Comment suivre la performance de ma position ?",
+        "body": "Sur la page Information du Vault. Connectez votre wallet pour voir vos parts, prix des parts et votre position actuelle."
+      },
+      "q5": {
+        "title": "Que se passe-t-il si je veux retirer ?",
+        "body": "Vous pouvez retirer à tout moment. Il n'y a pas de blocage ou délai de retrait."
+      },
+      "q6": {
+        "title": "Frais",
+        "body": "Commission de performance de 20%, évaluée au retrait sur les profits réalisés. Aucun autre frais n'est facturé par le vault."
+      },
+      "q7": {
+        "title": "Risques",
+        "body": "La DeFi comporte des risques. Les facteurs clés pour ce vault incluent :",
+        "risks": {
+          "contract": "Risque smart-contract : Morpho, HyperEVM, et toute dépendance pourrait avoir des bugs ou être exploitée.",
+          "market": "Risque marché/liquidité : Des mouvements rapides ou une liquidité faible peuvent altérer les liquidations d'emprunteurs et ralentir le rééquilibrage.",
+          "stablecoin": "Risque stablecoin/bridge : L'indexation USDT0 ou le transport bridge/omnichain pourrait échouer ou se désindexer sous stress.",
+          "oracle": "Risque oracle/paramètre : Les liquidations et seuils LLTV dépendent des paramètres de protocole et feeds de prix ; des mauvaises configurations ou délais peuvent augmenter la sévérité des pertes.",
+          "utilization": "Risque d'utilisation : Si l'utilisation d'un marché augmente, un retrait complet immédiat pourrait nécessiter de brefs dénouements on-chain."
+        },
+        "disclaimer": "Ce produit est non-custodial et on-chain ; les utilisateurs sont responsables des risques de transaction et de protocole."
       }
+    }
+  },
+  "vaultInfo": {
+    "about": {
+      "title": "À propos",
+      "body": "MYRMIDONS USDT0 PHALANX répartit des liquidités sur des marchés Morpho sélectionnés sur HyperEVM pour capturer des rendements tout en respectant des limites de risque strictes."
+    },
+    "vaultHeader": {
+      "address": "Adresse Vault :",
+      "description": "MYRMIDONS USDT0 PHALANX alloue des liquidités sur des marchés Morpho sélectionnés sur HyperEVM pour capturer des rendements tout en respectant des limites de risque strictes."
+    },
+    "metrics": {
+      "title": "Métriques Clés",
+      "tvlUsd": "Valeur Totale",
+      "sharePrice": "Prix des Parts",
+      "yield": "Rendement Actuel",
+      "yieldHint": "Le rendement est calculé on-chain et peut varier.",
+      "performanceFee": "Frais de performance",
+      "recipient": "Bénéficiaire"
+    },
+    "allocations": {
+      "title": "Allocations",
+      "subtitle": "Stratégie d'allocation actuelle du vault sur les marchés Morpho",
+      "columns": {
+        "market": "Marché",
+        "share": "Part",
+        "usd": "Valeur USD",
+        "supplyApy": "Rendement"
+      },
+      "otherDust": "Autre (poussière)",
+      "loading": "Chargement des allocations…",
+      "error": "Échec du chargement des allocations : {{error}}",
+      "empty": "Aucune allocation trouvée."
+    },
+    "actions": {
+      "bridgeCta": "Besoin de fonds sur HyperEVM ? Bridge depuis Arbitrum via Jumper",
+      "title": "Actions",
+      "deposit": "Déposer",
+      "depositTitle": "Déposer dans USDT0 PHALANX",
+      "depositDescription": "Déposez depuis n'importe quelle chaine",
+      "withdraw": "Retirer",
+      "withdrawTitle": "Retirer de USDT0 PHALANX",
+      "withdrawDescription": "Retirez vos parts vault vers USDT0",
+      "placeholderAmount": "0,00",
+      "balance": "Solde",
+      "max": "Max",
+      "exceedsBalance": "Le montant dépasse le solde",
+      "approving": "Approbation en cours…",
+      "depositing": "Dépôt en cours…",
+      "approve": "Approuver",
+      "maxWithdrawable": "Max retirable",
+      "withdrawing": "Retrait en cours…",
+      "approveTitle": "Approuver {{symbol}}",
+      "approveBody": "Approuvez {{amount}} {{symbol}} pour que le vault puisse dépenser.",
+      "cancel": "Annuler"
+    },
+    "position": {
+      "title": "Position Actuelle",
+      "connectToView": "Connectez votre wallet pour voir votre position.",
+      "shares": "Parts du Vault",
+      "usdValue": "Valeur USD"
+    },
+    "errors": {
+      "connectWallet": "Connecter un wallet",
+      "tokenUnknown": "Token inconnu",
+      "enterAmount": "Entrez le montant",
+      "insufficientBalance": "Solde insuffisant",
+      "approvalConfirmed": "Approbation confirmée",
+      "depositSuccessful": "Dépôt réussi",
+      "approvalTimeout": "Délai d'attente de réception d'approbation dépassé",
+      "error": "Erreur"
     }
   }
 }

@@ -49,6 +49,9 @@ export const TOKEN_ADDRESSES = {
   // HyperEVM (target)
   [CHAIN_IDS.HYPEREVM]: {
     USDT0: '0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb', // USDT0 on HyperEVM
+    USDC: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on HyperEVM (if available)
+    USDT: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9', // USDT on HyperEVM (if available)
+    WETH: '0x4200000000000000000000000000000000000006', // WETH on HyperEVM (if available)
   },
 } as const;
 

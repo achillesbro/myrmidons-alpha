@@ -5,25 +5,178 @@
     "lastUpdated": "Updated {{timeAgo}} ago"
   },
   "aboutView": {
-  "howNew": {
-    "setup": {
+    "title": "About Myrmidons Strategies",
+    "motto": "\"Excellence forged in the heat of battle.\"",
+    "p1": "Myrmidons Strategies designs and curates ERC-4626 vaults that allocate across selected Morpho markets on HyperEVM (Hyperliquid). The goal is straightforward: deliver diversified, crypto-native yield with disciplined, transparent risk management.",
+    "whatWeDo": {
+      "title": "What we do",
+      "bullets": {
+        "curated": "Curated DeFi exposure: Concentrated on Hyperliquid's ecosystem, where liquidity and activity are deepest for our use-case.",
+        "risk": "Risk-first engineering: Position sizing and market selection respect LLTV constraints, utilization caps, and liquidity depth.",
+        "oversight": "Daily oversight: Markets are reviewed and allocations can be updated every day.",
+        "ux": "Simple UX: Deposit in a few clicks from supported chains; withdraw anytime. No hard min/max."
+      }
+    },
+    "howItWorks": {
+      "title": "How the vault works (high level)",
+      "bullets": {
+        "underlying": "Underlying: USDT0 on HyperEVM.",
+        "allocation": "Allocation: The vault supplies liquidity to a set of pre-screened Morpho markets that meet our standards for depth, utilization, and LLTV headroom.",
+        "accrual": "Accrual: Performance is reflected in the ERC-4626 share price; your position is visible at all times in the Vault Information page.",
+        "access": "Access: No lockups. Withdrawals are available anytime, subject to on-chain conditions."
+      }
+    },
+    "securityTrust": {
+      "title": "Security & trust",
+      "bullets": {
+        "custodial": "Non-custodial by design: Your assets remain in your wallet and in audited smart contracts; Myrmidons Strategies never takes custody.",
+        "morpho": "Built on Morpho: The vaults use Morpho's open-source, extensively audited contracts and risk parameters on HyperEVM.",
+        "transparency": "Full transparency: All positions, transactions, and share accounting are verifiable on-chain."
+      }
+    },
+    "notes": "Notes: No guaranteed returns. Crypto and DeFi involve risk (smart-contract, market/liquidity, oracle/parameter, and stablecoin/bridge risks). Fees and other operational details are outlined in the FAQ.",
+    "strategy": {
+      "title": "Our Strategy",
+      "p1": "The vault pursues systematic, risk‑managed yield on HyperEVM by allocating across selected Morpho markets. Positioning is constructed to favour liquidity, preserve principal over full cycles, and compound returns where prudent.",
+      "p2": "The investable universe includes HYPE, BTC, ETH, USD‑linked assets, and principal tokens where carry and maturity profiles are attractive. Allocation weights adapt to market conditions, rate differentials, utilisation, and incentives.",
+      "bullets": {
+        "risk": "Risk‑first sizing: supply caps, conservative LLTV constraints, and ongoing monitoring of drawdowns and liquidations.",
+        "liquidity": "Liquidity discipline: preference for deep‑liquidity markets and orderly redemption capacity.",
+        "rebalance": "Dynamic rebalancing: respond to rates, utilisation, and incentives while minimising unnecessary churn.",
+        "transparency": "Transparency: state and performance are observable on‑chain and reflected in live metrics."
+      },
+      "p3": "Objective: durable, competitive, risk‑adjusted returns over time. This is not a guarantee of performance.",
+      "deepLiquidity": {
+        "title": "What \"deep-liquidity markets\" means",
+        "p1": "We allocate only to markets with:",
+        "bullets": {
+          "1": "High spot/derivatives liquidity on Hyperliquid (majors like BTC/ETH, ecosystem names like HYPE, and core stable pairs such as USDT0/USDC or USDT0/USDe). Deep liquidity improves borrower execution and liquidation reliability.",
+          "2": "Sustained borrow demand in Morpho markets where USDT0 borrow utilization is consistently meaningful.",
+          "3": "Tight spreads / robust depth around liquidation bands to reduce slippage during liquidations or reallocations."
+        }
+      },
+      "lltv": {
+        "title": "LLTV constraints (how we manage collateral risk)",
+        "p1": "LLTV (Liquidation Loan-to-Value) sets the maximum debt vs. collateral value before liquidation. We:",
+        "bullets": {
+          "1": "Prefer conservative LLTV markets and maintain headroom (distance to LLTV) to absorb volatility.",
+          "2": "Cap per-market exposure and rebalance when volatility, utilization, or liquidity conditions change.",
+          "3": "Avoid markets where LLTV combined with weak depth could force poor liquidation outcomes."
+        }
+      },
+      "usdt0": {
+        "title": "Why USDT0 specifically?",
+        "bullets": {
+          "1": "It's the base quote asset for much of Hyperliquid/HyperEVM activity, concentrating liquidity and borrow demand.",
+          "2": "Omnichain routing via LayerZero makes movement into/out of HyperEVM efficient, supporting smoother vault operations.",
+          "3": "Market coverage: The most diverse and active markets we target are denominated in USDT0, improving capital efficiency."
+        }
+      }
+    },
+    "security": {
+      "title": "Security & Trust",
+      "p1": "Your assets are never held by Myrmidons Strategies. This vault is non-custodial, meaning you maintain full control of your funds at all times.",
+      "p2": "The vault's smart contracts are built on Morpho, a $9 billion DeFi protocol that has been audited 27 times by leading security firms. Your funds are entrusted to battle-tested, institutional-grade infrastructure.",
+      "p3": "All vault operations are transparent and verifiable on-chain. You can monitor your position, track performance, and verify all transactions independently."
+    },
+    "howNew": {
+      "title": "How to deposit",
+      "setup": {
+        "title": "A) One-time setup (first deposit)",
+        "items": {
+          "1": "Install a self-custodial wallet. Recommended: <rabby>Rabby Wallet</rabby>. Only download from the official site.",
+          "2": "Buy ETH on a reputable exchange. Recommended: <kraken>Kraken</kraken>.",
+          "3": "Withdraw ETH from Kraken to your Rabby Wallet address through Arbitrum One or Base. These L2s are cheap and fast, making them efficient source networks for cross-chain deposits."
+        }
+      },
+      "flow": {
+        "title": "B) Per-deposit flow (any supported token/chain)",
+        "items": {
+          "1": "Go to the Vault Information page and click Deposit.",
+          "2": "In the dialog, select the token you want to use to deposit.",
+          "3": "Enter the amount. The app automatically routes bridge + swap → USDT0 on HyperEVM → vault deposit.",
+          "4": "Approve tokens if prompted (source-chain token and USDT0 for the vault).",
+          "5": "Confirm. The route executes end-to-end. After final confirmation on HyperEVM, your shares and position appear under Current Position."
+        }
+      },
+      "pitfalls": {
+        "title": "C) Common pitfalls & quick checks",
+        "items": {
+          "1": "If an approval is pending, wait for confirmation before proceeding.",
+          "2": "Keep a small HYPE buffer for HyperEVM gas (~$10).",
+          "3": "If a route errors, try a slightly smaller amount or a more liquid source token (e.g., ETH/USDC on Arbitrum/Base).",
+          "4": "If you manually switch networks, ensure the UI shows the intended From chain.",
+          "5": "If a transaction fails, re-check: source token approval, source-chain gas, HyperEVM HYPE balance, and (if shown) slippage settings."
+        }
+      },
+      "note": "Note: The vault has no hard minimum/maximum deposit amounts; practical limits are gas costs and on-chain constraints."
+    },
+    "fees": {
+      "title": "Fees",
+      "body": "This vault takes a performance fee on yield (if any). The current fee and recipient are shown live on the Vault Information page. This section explains how fees work at a high level; actual values are read on‑chain."
+    },
+    "risks": {
+      "title": "Risks",
       "items": {
-        "1": "Install a self-custodial wallet. Recommended: <rabby>Rabby Wallet</rabby>. Always download from the official site to avoid phishing.",
-        "2": "Create an account on a reputable exchange (recommended: <kraken>Kraken</kraken>) and purchase ETH.",
-        "5": "Bridge & swap using a trusted aggregator such as <jumper>Jumper Exchange</jumper>: swap from ETH on Arbitrum to USDT0 on HyperEVM (the vault’s underlying). Also bridge a small amount of HYPE (e.g., ~$10) for gas on HyperEVM."
+        "contract": "Smart contract vulnerabilities or protocol risk.",
+        "market": "Market/liquidity risk across underlying positions.",
+        "infrastructure": "Chain/RPC outages and infrastructure dependencies.",
+        "operational": "Wallet/key management and operational mistakes."
+      }
+    },
+    "faq": {
+      "title": "FAQ",
+      "q1": {
+        "title": "What is USDT0?",
+        "body": "USDT0 is a USD-pegged stablecoin used natively on Hyperliquid's networks (HyperEVM / Hypercore). It's integrated via LayerZero for omnichain transfers and is widely used as the quote asset across Hyperliquid venues. On HyperEVM, the canonical contract you'll interact with in our app resolves to the commonly referenced USDT0 token."
+      },
+      "q2": {
+        "title": "How often are allocations updated?",
+        "body": "Daily. We review markets and adjust positions every day."
+      },
+      "q3": {
+        "title": "What are the minimum/maximum deposit amounts?",
+        "body": "None. There is no hard-coded minimum or maximum. (Practical limits are only gas costs and on-chain limits.)"
+      },
+      "q4": {
+        "title": "How do I track my position performance?",
+        "body": "On the Vault Information page. Connect your wallet to see shares, share price, and your current position."
+      },
+      "q5": {
+        "title": "What happens if I want to exit early?",
+        "body": "You can withdraw anytime. There is no lockup or withdrawal delay."
+      },
+      "q6": {
+        "title": "Fees",
+        "body": "20% performance fee, assessed at withdrawal on realized profits. No other fees are charged by the vault."
+      },
+      "q7": {
+        "title": "Risks",
+        "body": "DeFi carries risk. Key factors for this vault include:",
+        "risks": {
+          "contract": "Smart-contract risk: Morpho, HyperEVM, and any dependencies could have bugs or be exploited.",
+          "market": "Market/liquidity risk: Rapid moves or thin liquidity can impair borrower liquidations and slow rebalancing.",
+          "stablecoin": "Stablecoin/bridge risk: USDT0's peg or bridge/omnichain transport could fail or depeg under stress.",
+          "oracle": "Oracle/parameter risk: Liquidations and LLTV thresholds depend on protocol parameters and pricing feeds; misconfigurations or delays can increase loss severity.",
+          "utilization": "Utilization risk: If a market's utilization spikes, immediate full withdrawal may require brief on-chain unwinds."
+        },
+        "disclaimer": "This product is non-custodial and on-chain; users bear transaction and protocol risks."
       }
     }
-  }
-},
+  },
   "vaultInfo": {
     "about": {
       "title": "About",
       "body": "MYRMIDONS USDT0 PHALANX allocates liquidity across selected Morpho markets on HyperEVM to capture yield while respecting strict risk limits."
     },
+    "vaultHeader": {
+      "address": "Vault Address:",
+      "description": "MYRMIDONS USDT0 PHALANX allocates liquidity across selected Morpho markets on HyperEVM to capture yield while respecting strict risk limits."
+    },
     "metrics": {
-      "title": "Key metrics",
-      "tvlUsd": "TVL (USD)",
-      "sharePrice": "Share price (USD)",
+      "title": "Key Metrics",
+      "tvlUsd": "Total Value Locked",
+      "sharePrice": "Share Price",
       "yield": "Current APY",
       "yieldHint": "APY is computed on-chain and may vary.",
       "performanceFee": "Performance fee",
@@ -31,10 +184,11 @@
     },
     "allocations": {
       "title": "Allocations",
+      "subtitle": "Current vault allocation strategy across Morpho markets",
       "columns": {
         "market": "Market",
         "share": "Share",
-        "usd": "USD",
+        "usd": "USD Value",
         "supplyApy": "Supply APY"
       },
       "otherDust": "Other (dust)",
@@ -46,7 +200,11 @@
       "bridgeCta": "Need funds on HyperEVM? Bridge from Arbitrum via Jumper",
       "title": "Actions",
       "deposit": "Deposit",
+      "depositTitle": "Deposit into USDT0 PHALANX",
+      "depositDescription": "Bridge from any chain or deposit USDT0 directly",
       "withdraw": "Withdraw",
+      "withdrawTitle": "Withdraw from USDT0 PHALANX",
+      "withdrawDescription": "Withdraw your vault shares to USDT0",
       "placeholderAmount": "0.00",
       "balance": "Balance",
       "max": "Max",
@@ -61,10 +219,20 @@
       "cancel": "Cancel"
     },
     "position": {
-      "title": "Current position",
+      "title": "Current Position",
       "connectToView": "Connect your wallet to view your position.",
-      "shares": "Vault shares",
-      "usdValue": "USD value"
+      "shares": "Vault Shares",
+      "usdValue": "USD Value"
+    },
+    "errors": {
+      "connectWallet": "Connect wallet",
+      "tokenUnknown": "Token unknown",
+      "enterAmount": "Enter amount",
+      "insufficientBalance": "Insufficient balance",
+      "approvalConfirmed": "Approval confirmed",
+      "depositSuccessful": "Deposit successful",
+      "approvalTimeout": "Approval receipt wait timed out",
+      "error": "Error"
     }
   }
 }

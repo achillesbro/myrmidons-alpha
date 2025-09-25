@@ -73,20 +73,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
     return () => clearInterval(id);
   }, [lastUpdated]);
 
-  const renderTimeAgo = () => {
-    if (!lastUpdated) return null;
-    const seconds = Math.max(0, Math.floor((Date.now() - lastUpdated) / 1000));
-    const parts = seconds < 60
-      ? `${seconds}s`
-      : seconds < 3600
-        ? `${Math.floor(seconds / 60)}m`
-        : `${Math.floor(seconds / 3600)}h`;
-    return (
-      <span className="text-xs text-[#101720]/60">
-        {t("common.lastUpdated", { defaultValue: "Last updated {{timeAgo}} ago", timeAgo: parts })}
-      </span>
-    );
-  };
   // If using HyperEVM (chainId 999), fetch vault data on-chain instead of via GraphQL
   const VAULT_ADDRESS = (vaultAddress ?? "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42") as `0x${string}`;
 
@@ -390,10 +376,10 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       // Still await approval receipt in the background to refresh UI state
       try {
         await hyperPublicClient.waitForTransactionReceipt({ hash: tx.hash, confirmations: 1, timeout: 15_000 });
-        pushToast("success", "Approval confirmed");
+        pushToast("success", t("vaultInfo.errors.approvalConfirmed"));
       } catch (err) {
         // Swallow timeout — deposit has already been prompted; nonce ordering will ensure safety
-        console.warn("Approval receipt wait timed out", err);
+        console.warn(t("vaultInfo.errors.approvalTimeout"), err);
       } finally {
         // Allowance refresh removed - not needed for new deposit flow
         setLastUpdated(Date.now());
@@ -407,11 +393,11 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
 
   const runDeposit = async (overrideAmountWei?: bigint) => {
     try {
-      if (!clientW.data) throw new Error("Connect wallet");
-      if (!underlyingAddress) throw new Error("Token unknown");
+      if (!clientW.data) throw new Error(t("vaultInfo.errors.connectWallet"));
+      if (!underlyingAddress) throw new Error(t("vaultInfo.errors.tokenUnknown"));
       const amountWei = overrideAmountWei ?? parseUnits(depAmount, assetDecimals);
-      if (amountWei <= 0n) throw new Error("Enter amount");
-      if (amountWei > onchainBalance) throw new Error("Insufficient balance");
+      if (amountWei <= 0n) throw new Error(t("vaultInfo.errors.enterAmount"));
+      if (amountWei > onchainBalance) throw new Error(t("vaultInfo.errors.insufficientBalance"));
       const provider = new BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
@@ -420,7 +406,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       pushToast("info", `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
       // Use wallet provider to wait for confirmation — typically faster than public RPCs
       await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
-      pushToast("success", "Deposit successful");
+      pushToast("success", t("vaultInfo.errors.depositSuccessful"));
       setPending(null);
       // Use wallet RPC for freshest reads immediately after confirmation
       const provider2 = new BrowserProvider((window as any).ethereum);
@@ -490,63 +476,79 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   // HyperEVM on-chain path
   if (onchainLoading) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
-          {/* Left column skeletons */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Info / About skeleton */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6 animate-pulse">
-                <div className="h-6 bg-[#E1E1D6] rounded w-1/3 mb-3"></div>
-                <div className="h-4 bg-[#E1E1D6] rounded w-2/3"></div>
-              </div>
-              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6 animate-pulse">
-                <div className="h-6 bg-[#E1E1D6] rounded w-1/4 mb-3"></div>
-                <div className="space-y-2">
-                  <div className="h-4 bg-[#E1E1D6] rounded"></div>
-                  <div className="h-4 bg-[#E1E1D6] rounded w-5/6"></div>
-                  <div className="h-4 bg-[#E1E1D6] rounded w-4/6"></div>
+      <div className="space-y-4">
+        {/* Top section: Vault header skeleton */}
+        <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4 animate-pulse">
+          <div className="flex items-center space-x-3 mb-3">
+            <div className="w-10 h-10 bg-[#E1E1D6] rounded-lg"></div>
+            <div className="flex-1">
+              <div className="h-5 bg-[#E1E1D6] rounded w-1/2 mb-1"></div>
+              <div className="h-3 bg-[#E1E1D6] rounded w-3/4"></div>
+            </div>
+          </div>
+          <div className="h-3 bg-[#E1E1D6] rounded w-full"></div>
+        </div>
+        
+        {/* Middle section: Actions and Current Position skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Actions skeleton - 2/3 width */}
+          <div className="lg:col-span-2">
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 animate-pulse">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="text-center space-y-2">
+                  <div className="h-5 bg-[#E1E1D6] rounded w-3/4 mx-auto"></div>
+                  <div className="h-4 bg-[#E1E1D6] rounded w-5/6 mx-auto"></div>
+                  <div className="h-8 bg-[#E1E1D6] rounded"></div>
+                </div>
+                <div className="text-center space-y-2">
+                  <div className="h-5 bg-[#E1E1D6] rounded w-3/4 mx-auto"></div>
+                  <div className="h-4 bg-[#E1E1D6] rounded w-5/6 mx-auto"></div>
+                  <div className="h-8 bg-[#E1E1D6] rounded"></div>
                 </div>
               </div>
             </div>
-            {/* Metrics skeleton */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="h-4 bg-[#E1E1D6] rounded w-20"></div>
-                <div className="h-3 bg-[#E1E1D6] rounded w-28"></div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4 animate-pulse">
-                    <div className="h-3 bg-[#E1E1D6] rounded w-1/3 mb-2"></div>
-                    <div className="h-6 bg-[#E1E1D6] rounded w-1/2"></div>
-                  </div>
-                ))}
+          </div>
+          {/* Current Position skeleton - 1/3 width */}
+          <div className="lg:col-span-1">
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 animate-pulse">
+              <div className="h-5 bg-[#E1E1D6] rounded w-24 mb-3"></div>
+              <div className="space-y-3">
+                <div className="text-center">
+                  <div className="h-4 bg-[#E1E1D6] rounded w-16 mx-auto mb-1"></div>
+                  <div className="h-5 bg-[#E1E1D6] rounded w-20 mx-auto"></div>
+                </div>
+                <div className="text-center">
+                  <div className="h-4 bg-[#E1E1D6] rounded w-16 mx-auto mb-1"></div>
+                  <div className="h-5 bg-[#E1E1D6] rounded w-20 mx-auto"></div>
+                </div>
               </div>
             </div>
-            {/* Allocations skeleton */}
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6 animate-pulse">
-              <div className="h-5 bg-[#E1E1D6] rounded w-24 mb-3"></div>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-8 bg-[#E1E1D6] rounded mb-2"></div>
+          </div>
+        </div>
+        
+        {/* Bottom section: metrics, allocations skeleton */}
+        <div className="space-y-4">
+          
+          {/* Metrics skeleton */}
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4 animate-pulse">
+            <div className="h-4 bg-[#E1E1D6] rounded w-20 mb-3"></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="text-center">
+                  <div className="h-4 bg-[#E1E1D6] rounded w-16 mx-auto mb-1"></div>
+                  <div className="h-3 bg-[#E1E1D6] rounded w-12 mx-auto"></div>
+                </div>
               ))}
             </div>
           </div>
-          {/* Right column skeletons */}
-          <div className="space-y-6">
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6 animate-pulse">
-              <div className="h-5 bg-[#E1E1D6] rounded w-24 mb-4"></div>
-              <div className="h-10 bg-[#E1E1D6] rounded mb-2"></div>
-              <div className="h-10 bg-[#E1E1D6] rounded mb-2"></div>
-              <div className="h-10 bg-[#E1E1D6] rounded"></div>
-            </div>
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6 animate-pulse">
-              <div className="h-5 bg-[#E1E1D6] rounded w-32 mb-2"></div>
-              <div className="space-y-3">
-                <div className="h-4 bg-[#E1E1D6] rounded w-28"></div>
-                <div className="h-6 bg-[#E1E1D6] rounded w-36"></div>
-                <div className="h-4 bg-[#E1E1D6] rounded w-24"></div>
-              </div>
+          
+          {/* Allocations skeleton */}
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 animate-pulse">
+            <div className="h-4 bg-[#E1E1D6] rounded w-20 mb-3"></div>
+            <div className="space-y-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-8 bg-[#E1E1D6] rounded"></div>
+              ))}
             </div>
           </div>
         </div>
@@ -567,61 +569,153 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       <ErrorBoundary>
         <div className="space-y-6">
 
-        {/* Actions & Current Position (right), Vault Info, Metrics, Allocations (left) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
-          {/* Left side: vault info, metrics, allocations */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Top: two columns (Info / About) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left: Vault name & address */}
-              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
-                <h2 className="text-2xl font-semibold text-[#00295B]">{onchainData.name}</h2>
-                <p className="text-[#101720]/70 text-sm mt-1">
-                  Vault Address:&nbsp;
-                  <span className="font-mono break-all">{VAULT_ADDRESS}</span>
-                </p>
-              </div>
-              {/* Right: About */}
-              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-2 text-[#00295B]">
-                  {t("vaultInfo.about.title", { defaultValue: "About" })}
-                </h3>
-                <p className="text-[#101720]/80 text-sm">
-                  {t("vaultInfo.about.body", {
-                    defaultValue:
-                      "MYRMIDONS USDT0 PHALANX allocates liquidity across selected Morpho markets on HyperEVM to capture yield while respecting strict risk limits."
-                  })}
+        {/* Vault Info on top, Actions (2/3) & Current Position (1/3) below, then Metrics, Allocations */}
+        <div className="space-y-4">
+          {/* Top section: Vault Information */}
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <img 
+                      src="/Myrmidons-logo-dark-no-bg.png" 
+                      alt="Myrmidons Strategies" 
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h1 
+                      className="text-xs font-bold text-[#00295B] mb-1 break-words"
+                      style={{ fontSize: '36px', lineHeight: '1.2' }}
+                    >
+                      {onchainData.name}
+                    </h1>
+                    <p className="text-[#101720]/70 text-sm">
+                      {t("vaultInfo.vaultHeader.address")} <span className="font-mono break-all">{VAULT_ADDRESS}</span>
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[#101720]/80 text-sm leading-relaxed">
+                  {t("vaultInfo.vaultHeader.description")}
                 </p>
               </div>
             </div>
-            {/* Metrics: TVL / Underlying / Yield / Performance Fee */}
-            <div>
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium text-[#00295B]">
-                  {t("vaultInfo.metrics.title", { defaultValue: "Metrics" })}
+          </div>
+          
+          {/* Middle section: Actions (2/3) and Current Position (1/3) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Actions section - takes 2/3 of the grid */}
+            <div className="lg:col-span-2">
+              <ChainVaultGuard
+                requiredChainId={999}
+                requiredChainName="HyperEVM"
+                vaultAddress={VAULT_ADDRESS as `0x${string}`}
+                allowedVaultsByChain={ALLOWED_VAULTS}
+                warnOnly={false}
+              >
+                {/* Enhanced Actions: Deposit and Withdraw */}
+                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full flex flex-col">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+                    {/* Deposit Button */}
+                    <div className="flex flex-col justify-center text-center">
+                      <h4 className="text-base font-semibold text-[#00295B] mb-2">
+                        {t("vaultInfo.actions.depositTitle")}
+                      </h4>
+                      <p className="text-sm text-[#101720]/70 mb-3 leading-relaxed">
+                        {t("vaultInfo.actions.depositDescription")}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setDepositDialogOpen(true)}
+                        className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                        style={{ backgroundColor: '#101720', color: '#FFFFF5' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0d1419'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#101720'}
+                      >
+                        {t("vaultInfo.actions.deposit")}
+                      </button>
+                    </div>
+                    
+                    {/* Withdraw Button */}
+                    <div className="flex flex-col justify-center text-center">
+                      <h4 className="text-base font-semibold text-[#00295B] mb-2">
+                        {t("vaultInfo.actions.withdrawTitle")}
+                      </h4>
+                      <p className="text-sm text-[#101720]/70 mb-3 leading-relaxed">
+                        {t("vaultInfo.actions.withdrawDescription")}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setWithdrawalDialogOpen(true)}
+                        className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
+                        style={{ backgroundColor: '#101720', color: '#FFFFF5' }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0d1419'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#101720'}
+                      >
+                        {t("vaultInfo.actions.withdraw")}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                {renderTimeAgo()}
+              </ChainVaultGuard>
+            </div>
+            
+            {/* Current Position section - takes 1/3 of the grid */}
+            <div className="lg:col-span-1">
+              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full flex flex-col">
+                <h3 className="text-base font-semibold text-[#00295B] mb-2">
+                  {t("vaultInfo.position.title")}
+                </h3>
+                {!clientW.data?.account ? (
+                  <div className="text-sm text-[#101720]/70 text-center py-3">
+                    {t("vaultInfo.position.connectToView")}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 flex-1">
+                    <div className="text-center">
+                      <div className="text-sm text-[#101720]/70 mb-1">
+                        {t("vaultInfo.position.shares")}
+                      </div>
+                      <div className="text-base font-semibold text-[#00295B]">{fmtToken(userShares, onchainData.shareDecimals)}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-[#101720]/70 mb-1">
+                        {t("vaultInfo.position.usdValue")}
+                      </div>
+                      <div className="text-base font-semibold text-[#00295B]">{priceLoading ? <Skeleton className="h-5 w-20 mx-auto"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
-                  <p className="text-[#101720]/70 text-xs">
-                    {t("vaultInfo.metrics.tvlUsd", { defaultValue: "TVL (USD)" })}
-                  </p>
-                  <p className="text-xl font-semibold mt-1 text-[#101720]">
+            </div>
+          </div>
+          
+          {/* Bottom section: metrics, allocations */}
+          <div className="space-y-4">
+            {/* Enhanced Metrics Section */}
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
+              <div className="mb-3">
+                <h2 className="text-lg font-bold text-[#00295B]">
+                  {t("vaultInfo.metrics.title")}
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="text-center">
+                  <div className="text-xl font-bold text-[#00295B] mb-1">
                     {priceLoading ? (
-                      "Loading…"
+                      <div className="h-7 bg-[#E1E1D6] rounded animate-pulse"></div>
                     ) : tvlUsd !== undefined ? (
-                      `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                      `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                     ) : (
                       "N/A"
                     )}
+                  </div>
+                  <p className="text-[#101720]/70 text-sm font-medium">
+                    {t("vaultInfo.metrics.tvlUsd")}
                   </p>
                 </div>
-                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
-                  <p className="text-[#101720]/70 text-xs">
-                    {t("vaultInfo.metrics.sharePrice", { defaultValue: "Share price (USD)" })}
-                  </p>
-                  <p className="text-xl font-semibold mt-1 text-[#101720]">
+                <div className="text-center">
+                  <div className="text-xl font-bold text-[#00295B] mb-1">
                     {(() => {
                       // Compute share price = (assets/shares) * underlying USD, aligning decimals
                       const assetsUnderlying = Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals));
@@ -629,49 +723,52 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                       const underlyingPriceUSD = typeof usdPrice === "number" && usdPrice > 0 ? usdPrice : 1; // USDT0-safe fallback
                       const sharePriceUSD = shares === 0 ? 0 : (assetsUnderlying / shares) * underlyingPriceUSD;
                       return priceLoading
-                        ? "Loading…"
+                        ? <div className="h-7 bg-[#E1E1D6] rounded animate-pulse"></div>
                         : `$${sharePriceUSD.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
                     })()}
+                  </div>
+                  <p className="text-[#101720]/70 text-sm font-medium">
+                    {t("vaultInfo.metrics.sharePrice")}
                   </p>
                 </div>
-                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
-                  <p className="text-[#101720]/70 text-xs">
-                    {t("vaultInfo.metrics.yield", { defaultValue: "Current APY" })}
-                  </p>
-                  <p className="text-xl font-semibold mt-1 text-[#101720]">
+                <div className="text-center">
+                  <div className="text-xl font-bold text-[#00295B] mb-1">
                     {apyLoading ? (
-                      "Computing…"
+                      <div className="h-7 bg-[#E1E1D6] rounded animate-pulse"></div>
                     ) : apyError ? (
-                      "Error"
+                      t("vaultInfo.errors.error")
                     ) : apy != null ? (
                       `${(apy * 100).toFixed(2)}%`
                     ) : (
                       "N/A"
                     )}
+                  </div>
+                  <p className="text-[#101720]/70 text-sm font-medium">
+                    {t("vaultInfo.metrics.yield")}
                   </p>
-                  <p className="text-[#101720]/60 text-xs mt-1">
-                    {t("vaultInfo.metrics.yieldHint", { defaultValue: "Blended APY by allocation" })}
-                  </p>
+                  {apyLoading && (
+                    <p className="text-[#101720]/60 text-sm mt-1">
+                      {t("vaultInfo.metrics.yieldHint")}
+                    </p>
+                  )}
                 </div>
-                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-md p-4">
-                  <p className="text-[#101720]/70 text-xs">
-                    {t("vaultInfo.metrics.performanceFee", { defaultValue: "Performance fee" })}
-                  </p>
-                  <p className="text-xl font-semibold mt-1 text-[#101720]">
+                <div className="text-center">
+                  <div className="text-xl font-bold text-[#00295B] mb-1">
                     {feeLoading ? (
-                      "Loading…"
+                      <div className="h-7 bg-[#E1E1D6] rounded animate-pulse"></div>
                     ) : feeWad != null ? (
                       `${(Number(formatUnits(feeWad, 18)) * 100).toFixed(2)}%`
                     ) : feeError ? (
-                      "Error"
+                      t("vaultInfo.errors.error")
                     ) : (
                       "N/A"
                     )}
+                  </div>
+                  <p className="text-[#101720]/70 text-sm font-medium">
+                    {t("vaultInfo.metrics.performanceFee")}
                   </p>
-                  <p className="text-[#101720]/60 text-xs mt-1">
-                    {t("vaultInfo.metrics.recipient", { defaultValue: "Recipient" })}:
-                    {" "}
-                    {feeRecipient ? (
+                  {feeRecipient && (
+                    <p className="text-[#101720]/60 text-sm mt-1">
                       <a
                         href={`https://purrsec.com/address/${feeRecipient}`}
                         target="_blank"
@@ -680,22 +777,20 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                       >
                         {`${feeRecipient.slice(0, 6)}…${feeRecipient.slice(-4)}`}
                       </a>
-                    ) : (
-                      "N/A"
-                    )}
-                  </p>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
-            {/* Allocations */}
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-lg font-semibold text-[#00295B]">
-                  {t("vaultInfo.allocations.title", { defaultValue: "Allocations" })}
-                </h3>
-                <span className="text-xs text-[#101720]/70">
-                  {t("vaultInfo.allocations.caption", { defaultValue: "Share • USD • Supply APY" })}
-                </span>
+            {/* Enhanced Allocations */}
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
+              <div className="mb-3">
+                <h2 className="text-base font-bold text-[#00295B]">
+                  {t("vaultInfo.allocations.title")}
+                </h2>
+                <p className="text-sm text-[#101720]/70 mt-1">
+                  {t("vaultInfo.allocations.subtitle")}
+                </p>
               </div>
               <OnchainAllocations
                 key={allocRefreshKey}
@@ -704,95 +799,12 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
               />
             </div>
           </div>
-          {/* Right side: actions above current position */}
-          <div className="space-y-6">
-            <ChainVaultGuard
-              requiredChainId={999}
-              requiredChainName="HyperEVM"
-              vaultAddress={VAULT_ADDRESS as `0x${string}`}
-              allowedVaultsByChain={ALLOWED_VAULTS}
-              warnOnly={false}
-            >
-              {/* Actions: Deposit and Withdraw (separate buttons) */}
-              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
-                <h3 className="text-base font-semibold text-[#00295B] mb-4">
-                  {t("vaultInfo.actions.title", { defaultValue: "Actions" })}
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Deposit Button */}
-                  <div className="text-center">
-                    <h4 className="text-lg font-semibold text-[#00295B] mb-2">
-                      {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
-                    </h4>
-                    <p className="text-sm text-[#101720]/70 mb-4">
-                      {t("vaultInfo.actions.depositDescription", { 
-                        defaultValue: "Bridge from any chain or deposit USDT0 directly" 
-                      })}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setDepositDialogOpen(true)}
-                      className="w-full px-4 py-3 text-base font-medium rounded-lg bg-[#00295B] text-[#FFFFF5] hover:bg-[#001a3d] transition-colors"
-                    >
-                      {t("vaultInfo.actions.deposit", { defaultValue: "Deposit" })}
-                    </button>
-                  </div>
-                  
-                  {/* Withdraw Button */}
-                  <div className="text-center">
-                    <h4 className="text-lg font-semibold text-[#00295B] mb-2">
-                      {t("vaultInfo.actions.withdrawTitle", { defaultValue: "Withdraw from USDT0 PHALANX" })}
-                    </h4>
-                    <p className="text-sm text-[#101720]/70 mb-4">
-                      {t("vaultInfo.actions.withdrawDescription", { 
-                        defaultValue: "Withdraw your vault shares to USDT0" 
-                      })}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setWithdrawalDialogOpen(true)}
-                      className="w-full px-4 py-3 text-base font-medium rounded-lg bg-[#00295B] text-[#FFFFF5] hover:bg-[#001a3d] transition-colors"
-                    >
-                      {t("vaultInfo.actions.withdraw", { defaultValue: "Withdraw" })}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </ChainVaultGuard>
-            {/* Bridge to HyperEVM (via Jumper) removed */}
-            {/* Current Position */}
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
-              <h3 className="text-base font-semibold text-[#00295B] mb-2">
-                {t("vaultInfo.position.title", { defaultValue: "Current position" })}
-              </h3>
-              {!clientW.data?.account ? (
-                <div className="text-sm text-[#101720]/70">
-                  {t("vaultInfo.position.connectToView", { defaultValue: "Connect your wallet to view your position." })}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-[#101720]/70 mb-1">
-                      {t("vaultInfo.position.shares", { defaultValue: "Vault shares" })}
-                    </div>
-                    <div className="font-medium text-[#101720]">{fmtToken(userShares, onchainData.shareDecimals)}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-[#101720]/70 mb-1">
-                      {t("vaultInfo.position.usdValue", { defaultValue: "USD value" })}
-                    </div>
-                    <div className="font-medium text-[#101720]">{priceLoading ? <Skeleton className="h-5 w-24"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Confirm dialog for approval */}
         <ConfirmDialog
           open={approveConfirmOpen}
-          title={t("vaultInfo.actions.approveTitle", { defaultValue: "Approve {{symbol}}", symbol: "USDT0" })}
+          title={t("vaultInfo.actions.approveTitle", { symbol: "USDT0" })}
           body={
             <div className="text-sm">
               {t("vaultInfo.actions.approveBody", {
@@ -803,8 +815,8 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
               })}
             </div>
           }
-          confirmLabel={t("vaultInfo.actions.approve", { defaultValue: "Approve" })}
-          cancelLabel={t("vaultInfo.actions.cancel", { defaultValue: "Cancel" })}
+          confirmLabel={t("vaultInfo.actions.approve")}
+          cancelLabel={t("vaultInfo.actions.cancel")}
           onConfirm={() => {
             setApproveConfirmOpen(false);
             const amountWei = parseUnits(depAmount || "0", onchainData.underlyingDecimals);
@@ -833,7 +845,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
               <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
                 <div className="flex items-center space-x-3">
                   <h2 className="text-xl font-semibold text-[#00295B]">
-                    {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
+                    {t("vaultInfo.actions.depositTitle")}
                   </h2>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -871,7 +883,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
               <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
                 <div className="flex items-center space-x-3">
                   <h2 className="text-xl font-semibold text-[#00295B]">
-                    {t("vaultInfo.actions.withdrawTitle", { defaultValue: "Withdraw from USDT0 PHALANX" })}
+                    {t("vaultInfo.actions.withdrawTitle")}
                   </h2>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -933,56 +945,109 @@ function AllocationList({
       : null;
 
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-12 text-xs text-[#101720]/70 pb-2 border-b border-[#E5E2D6]">
-        <div className="col-span-5">{t("vaultInfo.allocations.columns.market", { defaultValue: "Market" })}</div>
-        <div className="col-span-3 text-right">{t("vaultInfo.allocations.columns.share", { defaultValue: "Share" })}</div>
-        <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.usd", { defaultValue: "USD" })}</div>
-        <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.supplyApy", { defaultValue: "Supply APY" })}</div>
+    <div className="space-y-1">
+      {/* Enhanced Header - Hidden on mobile, shown on larger screens */}
+      <div className="hidden sm:grid grid-cols-12 text-xs font-semibold text-[#00295B] py-2 px-3 bg-[#F8F7F0] rounded-lg border border-[#E5E2D6]">
+        <div className="col-span-5">{t("vaultInfo.allocations.columns.market")}</div>
+        <div className="col-span-3 text-right">{t("vaultInfo.allocations.columns.share")}</div>
+        <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.usd")}</div>
+        <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.supplyApy")}</div>
       </div>
 
-      {items.map((it) => (
-        <div key={it.id} className="grid grid-cols-12 items-center py-2 border-b border-[#EDE9D7]">
-          <div className="col-span-5 flex items-center space-x-2 text-[#101720] truncate">
-            {it.logo && (
-              <img
-                src={it.logo}
-                alt={it.label}
-                className="w-5 h-5 rounded-full border border-[#E5E2D6] object-contain"
-                onError={(e) => (e.currentTarget.style.display = 'none')}
-              />
-            )}
-            <span className="truncate">{it.label}</span>
+      {/* Enhanced Rows */}
+      <div className="space-y-1">
+        {items.map((it, index) => (
+          <div key={it.id} className={`grid grid-cols-1 sm:grid-cols-12 items-center py-2 sm:py-3 px-2 sm:px-3 rounded-lg transition-colors ${
+            index % 2 === 0 ? 'bg-[#F8F7F0]/50' : 'bg-transparent'
+          } hover:bg-[#F8F7F0]`}>
+            {/* Mobile Layout */}
+            <div className="sm:hidden space-y-1">
+              <div className="flex items-center space-x-2">
+                {it.logo && (
+                  <img
+                    src={it.logo}
+                    alt={it.label}
+                    className="w-5 h-5 rounded-full border border-[#E5E2D6] object-contain flex-shrink-0"
+                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                  />
+                )}
+                <span className="font-medium text-[#101720] flex-1 text-sm">{it.label}</span>
+                <span className="text-sm font-semibold text-[#00295B]">
+                  {ceilPct(it.pct)}%
+                </span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-[#101720]/70">
+                  USD: {it.usd != null ? `$${it.usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "N/A"}
+                </span>
+                <span className="text-[#101720]/70">
+                  APY: {it.supplyApy != null ? `${(it.supplyApy * 100).toFixed(2)}%` : "N/A"}
+                </span>
+              </div>
+            </div>
+            
+            {/* Desktop Layout */}
+            <div className="hidden sm:contents">
+              <div className="col-span-5 flex items-center space-x-2 text-[#101720]">
+                {it.logo && (
+                  <img
+                    src={it.logo}
+                    alt={it.label}
+                    className="w-5 h-5 rounded-full border border-[#E5E2D6] object-contain flex-shrink-0"
+                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                  />
+                )}
+                <span className="font-medium truncate text-sm">{it.label}</span>
+              </div>
+              <div className="col-span-3 text-right">
+                <span className="text-sm font-semibold text-[#00295B]">
+                  {ceilPct(it.pct)}%
+                </span>
+              </div>
+              <div className="col-span-2 text-right">
+                <span className="text-xs font-medium text-[#101720]">
+                  {it.usd != null
+                    ? `$${it.usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "N/A"}
+                </span>
+              </div>
+              <div className="col-span-2 text-right">
+                <span className="text-xs font-medium text-[#101720]">
+                  {it.supplyApy != null
+                    ? `${(it.supplyApy * 100).toFixed(2)}%`
+                    : "N/A"}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="col-span-3 text-right text-[#101720]">
-            {ceilPct(it.pct)}%
-          </div>
-          <div className="col-span-2 text-right text-[#101720]">
-            {it.usd != null
-              ? `$${it.usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-              : "N/A"}
-          </div>
-          <div className="col-span-2 text-right text-[#101720]">
-            {it.supplyApy != null
-              ? `${(it.supplyApy * 100).toFixed(2)}%`
-              : "N/A"}
-          </div>
-        </div>
-      ))}
+        ))}
 
-      {/* Hidden dust row (filtered allocations) */}
-      {hiddenDust != null && hiddenDust > 0n && (
-        <div className="grid grid-cols-12 items-center py-2">
-          <div className="col-span-5 font-medium">
-            {t("vaultInfo.allocations.otherDust", { defaultValue: "Other (dust)" })}
+        {/* Enhanced Hidden dust row */}
+        {hiddenDust != null && hiddenDust > 0n && (
+          <div className="grid grid-cols-1 sm:grid-cols-12 items-center py-3 sm:py-4 px-3 sm:px-4 bg-[#F8F7F0]/30 rounded-lg border border-[#E5E2D6]">
+            <div className="sm:hidden text-center">
+              <div className="font-medium text-[#101720] mb-1">
+                {t("vaultInfo.allocations.otherDust")}
+              </div>
+              <div className="text-lg font-semibold text-[#00295B]">
+                {pctOf(hiddenDust) ? `${pctOf(hiddenDust)}%` : "—"}
+              </div>
+            </div>
+            <div className="hidden sm:contents">
+              <div className="col-span-5 font-medium text-[#101720]">
+                {t("vaultInfo.allocations.otherDust")}
+              </div>
+              <div className="col-span-3 text-right">
+                <span className="text-lg font-semibold text-[#00295B]">
+                  {pctOf(hiddenDust) ? `${pctOf(hiddenDust)}%` : "—"}
+                </span>
+              </div>
+              <div className="col-span-2 text-right text-[#101720]/60">—</div>
+              <div className="col-span-2 text-right text-[#101720]/60">—</div>
+            </div>
           </div>
-          <div className="col-span-3 text-right text-[#101720]">
-            {pctOf(hiddenDust) ? `${pctOf(hiddenDust)}%` : "—"}
-          </div>
-          <div className="col-span-2 text-right">—</div>
-          <div className="col-span-2 text-right">—</div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -997,9 +1062,58 @@ function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${st
     }
   }, [loading, onSettled]);
 
-  if (loading) return <p className="text-sm text-[#101720]/70">{t("vaultInfo.allocations.loading", { defaultValue: "Loading allocations…" })}</p>;
-  if (error) return <p className="text-sm text-red-500">{t("vaultInfo.allocations.error", { defaultValue: "Failed to load allocations: {{error}}", error })}</p>;
-  if (!items || totalAssets === null) return <p className="text-sm text-[#101720]/70">{t("vaultInfo.allocations.empty", { defaultValue: "No allocations found." })}</p>;
+  if (loading) {
+    return (
+      <div className="space-y-1">
+        {/* Enhanced Skeleton Header - Hidden on mobile */}
+        <div className="hidden sm:grid grid-cols-12 text-xs font-semibold text-[#00295B] py-2 px-3 bg-[#F8F7F0] rounded-lg border border-[#E5E2D6]">
+          <div className="col-span-5">{t("vaultInfo.allocations.columns.market")}</div>
+          <div className="col-span-3 text-right">{t("vaultInfo.allocations.columns.share")}</div>
+          <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.usd")}</div>
+          <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.supplyApy")}</div>
+        </div>
+        {/* Enhanced Skeleton Rows */}
+        <div className="space-y-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={`grid grid-cols-1 sm:grid-cols-12 items-center py-2 sm:py-3 px-2 sm:px-3 rounded-lg animate-pulse ${
+              i % 2 === 0 ? 'bg-[#F8F7F0]/50' : 'bg-transparent'
+            }`}>
+              {/* Mobile Skeleton */}
+              <div className="sm:hidden space-y-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-5 h-5 bg-[#E1E1D6] rounded-full"></div>
+                  <div className="h-4 bg-[#E1E1D6] rounded flex-1"></div>
+                  <div className="h-4 bg-[#E1E1D6] rounded w-10"></div>
+                </div>
+                <div className="flex justify-between">
+                  <div className="h-3 bg-[#E1E1D6] rounded w-16"></div>
+                  <div className="h-3 bg-[#E1E1D6] rounded w-12"></div>
+                </div>
+              </div>
+              {/* Desktop Skeleton */}
+              <div className="hidden sm:contents">
+                <div className="col-span-5 flex items-center space-x-2">
+                  <div className="w-5 h-5 bg-[#E1E1D6] rounded-full"></div>
+                  <div className="h-4 bg-[#E1E1D6] rounded w-20"></div>
+                </div>
+                <div className="col-span-3 text-right">
+                  <div className="h-4 bg-[#E1E1D6] rounded w-10 ml-auto"></div>
+                </div>
+                <div className="col-span-2 text-right">
+                  <div className="h-3 bg-[#E1E1D6] rounded w-12 ml-auto"></div>
+                </div>
+                <div className="col-span-2 text-right">
+                  <div className="h-3 bg-[#E1E1D6] rounded w-10 ml-auto"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (error) return <p className="text-sm text-red-500">{t("vaultInfo.allocations.error", { error })}</p>;
+  if (!items || totalAssets === null) return <p className="text-sm text-[#101720]/70">{t("vaultInfo.allocations.empty")}</p>;
 
   return (
     <AllocationList

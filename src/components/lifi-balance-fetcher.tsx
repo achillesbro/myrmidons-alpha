@@ -79,6 +79,7 @@ export const LiFiBalanceFetcher = ({
         CHAIN_IDS.BASE,
         CHAIN_IDS.OPTIMISM,
         CHAIN_IDS.BSC,
+        CHAIN_IDS.HYPEREVM,
       ];
 
       const tokensToCheck: any[] = [];
