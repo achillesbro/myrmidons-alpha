@@ -407,6 +407,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       selectedPath: path,
       currentStep: 2,
       amount: '', // Reset amount when changing tokens
+      transactionSubsteps: [], // Reset substeps for new flow
     });
     
     // Legacy compatibility
@@ -869,6 +870,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         updateDepositState({
           bridgedUsdt0Amount: receivedAmountFormatted,
           currentStep: 5, // Move to deposit confirmation
+          transactionSubsteps: [], // Reset substeps for deposit step
         });
         
       } else {
