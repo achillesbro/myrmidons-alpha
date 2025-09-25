@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getRoutes, executeRoute, getToken, getTokenBalances } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
@@ -9,6 +9,7 @@ import { useLifiConfig } from '../hooks/useLifiConfig';
 import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
 import { erc20Abi } from 'viem';
 import vaultAbi from '../abis/vault.json';
+import { Toasts, type Toast, type ToastKind } from './vault-shared';
 
 // Vault address for direct deposits
 const VAULT_ADDRESS = '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42' as `0x${string}`;
@@ -126,6 +127,15 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   } | null>(null);
   const [usdt0Loading, setUsdt0Loading] = useState(false);
   
+  // Toast system for error handling
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastIdRef = useRef<number>(1);
+  const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
+    toastIdRef.current += 1;
+    const id = toastIdRef.current;
+    setToasts((t) => [...t, { id, kind, text, href }]);
+    if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
+  };
   
   const clientW = useWalletClient();
   const wagmiConfig = useConfig();
@@ -616,6 +626,9 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       
       console.error('Error:', errorMessage);
       
+      // Show error toast
+      pushToast('error', errorMessage);
+      
       // Reset to previous step to allow retry
       const previousStep = selectedPath === 'A' ? 3 : 5;
       updateDepositState({
@@ -794,6 +807,9 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       }
       
       console.error('Error:', errorMessage);
+      
+      // Show error toast
+      pushToast('error', errorMessage);
       
       // Reset to step 3 to allow retry
       updateDepositState({
@@ -1709,6 +1725,9 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           }}
         />
       )}
+
+      {/* Toast notifications for errors */}
+      <Toasts toasts={toasts} />
 
     </div>
   );
