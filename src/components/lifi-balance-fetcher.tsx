@@ -208,6 +208,18 @@ export const LiFiBalanceFetcher = ({
     onAmountEnter(e.target.value);
   };
 
+  // Sort balances: USDT0 first, then by USD amount descending
+  const sortedBalances = balances.sort((a, b) => {
+    // USDT0 always first
+    if (a.tokenSymbol === 'USDT0') return -1;
+    if (b.tokenSymbol === 'USDT0') return 1;
+    
+    // Then sort by USD amount descending
+    const aUSD = parseFloat(a.balanceUSD || '0');
+    const bUSD = parseFloat(b.balanceUSD || '0');
+    return bUSD - aUSD;
+  });
+
   // Fetch gas prices for the selected token's chain
   const fetchGasPrices = async (chainId: number) => {
     try {
@@ -238,12 +250,8 @@ export const LiFiBalanceFetcher = ({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Select Token Section */}
-      <div>
-        <h3 className="text-lg font-semibold text-[#00295B] mb-2">SELECT TOKEN</h3>
-        <p className="text-sm text-[#101720]/70 mb-4">Choose the token you want to deposit</p>
-      </div>
+    <div className="space-y-4">
+      {/* Compact Token Selection */}
 
       {/* Error Message */}
       {error && (
@@ -254,21 +262,29 @@ export const LiFiBalanceFetcher = ({
 
       {/* USDT0 Direct Deposit Section - Only show in step 1 */}
       {usdt0Balance && currentStep === 1 && (
-        <div className="p-3 border-l-4 border-green-500 bg-green-50 rounded-r-lg">
-          <div className="flex items-center justify-between mb-2">
+        <div
+          onClick={() => handleTokenClick(usdt0Balance)}
+          className={`p-3 border rounded cursor-pointer transition-colors ${
+            selectedToken?.chainId === usdt0Balance.chainId && 
+            selectedToken?.tokenSymbol === usdt0Balance.tokenSymbol
+              ? 'border-green-500 bg-green-100'
+              : 'border-green-300 hover:border-green-400 bg-green-50'
+          }`}
+        >
+          <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               {usdt0Balance.logoURI && (
                 <img
                   src={usdt0Balance.logoURI}
                   alt={usdt0Balance.tokenSymbol}
-                  className="w-6 h-6 rounded-full"
+                  className="w-5 h-5 rounded-full"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                   }}
                 />
               )}
               <div>
-                <div className="font-semibold text-base text-green-800">{usdt0Balance.tokenSymbol}</div>
+                <div className="font-semibold text-sm text-green-800">{usdt0Balance.tokenSymbol}</div>
                 <div className="text-xs text-green-600">Direct Deposit</div>
               </div>
             </div>
@@ -281,35 +297,9 @@ export const LiFiBalanceFetcher = ({
               </div>
             </div>
           </div>
-          <div
-            onClick={() => handleTokenClick(usdt0Balance)}
-            className={`p-2 border rounded cursor-pointer transition-colors ${
-              selectedToken?.chainId === usdt0Balance.chainId && 
-              selectedToken?.tokenSymbol === usdt0Balance.tokenSymbol
-                ? 'border-green-500 bg-green-100'
-                : 'border-green-300 hover:border-green-400'
-            }`}
-          >
-            <div className="text-center text-green-700 text-sm font-medium">
-              Click to select for direct deposit
-            </div>
-          </div>
         </div>
       )}
 
-      {/* Bridge Tokens Section - Only show in step 1 */}
-      {currentStep === 1 && (
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-base font-semibold text-[#00295B]">SELECT TOKEN TO BRIDGE</h4>
-          <button
-            onClick={fetchAllBalances}
-            disabled={loading}
-            className="px-3 py-1 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
-          >
-            Refresh Balances
-          </button>
-        </div>
-      )}
 
       {/* USDT0 Loading State - Only show in step 1 */}
       {usdt0Loading && currentStep === 1 && (
@@ -318,14 +308,6 @@ export const LiFiBalanceFetcher = ({
         </div>
       )}
 
-      {/* Separator - Only show in step 1 */}
-      {usdt0Balance && balances.length > 0 && currentStep === 1 && (
-        <div className="flex items-center my-3">
-          <div className="flex-1 border-t border-gray-300"></div>
-          <div className="px-3 text-xs text-gray-500 bg-white">Bridge & Swap Tokens</div>
-          <div className="flex-1 border-t border-gray-300"></div>
-        </div>
-      )}
 
       {/* Balances List - Only show in step 1 */}
       {currentStep === 1 && (
@@ -339,12 +321,12 @@ export const LiFiBalanceFetcher = ({
               No token balances found. Make sure you have tokens on the supported chains.
             </div>
           ) : (
-            <div className="space-y-2">
-              {balances.map((balance, index) => (
+            <div className="space-y-1">
+              {sortedBalances.map((balance, index) => (
                 <div
                   key={`${balance.chainId}-${balance.tokenSymbol}-${index}`}
                   onClick={() => handleTokenClick(balance)}
-                  className={`p-3 border rounded cursor-pointer transition-colors ${
+                  className={`p-2 border rounded cursor-pointer transition-colors ${
                     selectedToken?.chainId === balance.chainId && 
                     selectedToken?.tokenSymbol === balance.tokenSymbol
                       ? 'border-blue-500 bg-blue-50'
@@ -357,14 +339,14 @@ export const LiFiBalanceFetcher = ({
                         <img
                           src={balance.logoURI}
                           alt={balance.tokenSymbol}
-                          className="w-6 h-6 rounded-full"
+                          className="w-5 h-5 rounded-full"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                           }}
                         />
                       )}
                       <div>
-                        <div className="font-semibold text-base">{balance.tokenSymbol}</div>
+                        <div className="font-semibold text-sm">{balance.tokenSymbol}</div>
                         <div className="text-xs text-gray-600">{balance.chainName}</div>
                       </div>
                     </div>
