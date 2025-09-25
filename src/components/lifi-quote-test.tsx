@@ -966,8 +966,12 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           </div>
         </div>
         
-        {/* Compact progress steps - side by side layout */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
+        {/* Compact progress steps - responsive grid layout */}
+        <div className={`grid gap-2 mb-4 ${
+          totalSteps === 4 
+            ? 'grid-cols-2 sm:grid-cols-4' 
+            : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'
+        }`}>
           {Array.from({ length: totalSteps }, (_, index) => {
             const stepNumber = index + 1;
             const stepInfo = getStepInfo(selectedPath, stepNumber);
@@ -1418,9 +1422,6 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                 max={selectedToken ? parseFloat(selectedToken.balanceFormatted) : 0}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <div className="text-xs text-gray-500 mt-1">
-                Available: {selectedToken ? parseFloat(selectedToken.balanceFormatted).toFixed(6) : '0.000000'} USDT0
-              </div>
               
               {/* Percentage selector buttons */}
               <div className="flex justify-center space-x-2 mt-3">
