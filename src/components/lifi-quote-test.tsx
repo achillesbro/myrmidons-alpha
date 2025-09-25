@@ -1035,18 +1035,6 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         // Step 2b: Enter USD Amount
         return (
           <div className="p-6 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-[#00295B]">Enter USD Amount</h3>
-              {!executing && (
-                <button
-                  onClick={() => navigateToStep(1)}
-                  className="text-sm text-gray-600 hover:text-gray-800 flex items-center space-x-1"
-                >
-                  <span>←</span>
-                  <span>Back to Token Selection</span>
-                </button>
-              )}
-            </div>
             
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-3">
@@ -1162,12 +1150,21 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                   <div className="flex justify-between">
                     <span className="text-gray-600">To:</span>
                     <div className="flex items-center space-x-2">
-                      <img
-                        src="/Myrmidons-logo-dark-no-bg.png"
-                        alt="USDT0"
-                        className="w-4 h-4 rounded-full"
-                        onError={(e) => (e.currentTarget.style.display = 'none')}
-                      />
+                      {usdt0Balance?.logoURI ? (
+                        <img
+                          src={usdt0Balance.logoURI}
+                          alt="USDT0"
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      ) : (
+                        <img
+                          src="/Myrmidons-logo-dark-no-bg.png"
+                          alt="USDT0"
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      )}
                       <span className="font-medium">USDT0 on HyperEVM</span>
                     </div>
                   </div>
@@ -1181,6 +1178,11 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                   </div>
                 </div>
               </div>
+              
+              {/* Transaction substeps for bridge execution */}
+              {executing && depositState.transactionSubsteps && depositState.transactionSubsteps.length > 0 && (
+                renderTransactionSubsteps(depositState.transactionSubsteps)
+              )}
               
               <button
                 onClick={handlePathBStep3}
@@ -1275,7 +1277,24 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">From:</span>
-                    <span className="font-medium">USDT0 on HyperEVM</span>
+                    <div className="flex items-center space-x-2">
+                      {usdt0Balance?.logoURI ? (
+                        <img
+                          src={usdt0Balance.logoURI}
+                          alt="USDT0"
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      ) : (
+                        <img
+                          src="/Myrmidons-logo-dark-no-bg.png"
+                          alt="USDT0"
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      )}
+                      <span className="font-medium">USDT0 on HyperEVM</span>
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">To:</span>
@@ -1319,13 +1338,11 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         return (
           <div className="p-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
             <div className="text-center">
-              {/* Enhanced success icon with animation */}
+              {/* Enhanced success icon */}
               <div className="relative w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-10 h-10 text-white animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
-                {/* Success pulse animation */}
-                <div className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-20"></div>
               </div>
               
               <h3 className="text-2xl font-bold text-green-800 mb-2">Deposit Successful!</h3>
@@ -1344,7 +1361,17 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Vault Shares:</span>
-                    <span className="font-bold text-gray-900">{vaultSharesMinted || 'Calculating...'}</span>
+                    <div className="flex items-center space-x-2">
+                      <img
+                        src="/Myrmidons-logo-dark-no-bg.png"
+                        alt="USDT0 PHALANX"
+                        className="w-5 h-5 rounded-full"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      <span className="font-bold text-gray-900">
+                        {vaultSharesMinted ? parseFloat(vaultSharesMinted).toFixed(2) : 'Calculating...'} USDT0 PHALANX
+                      </span>
+                    </div>
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600 font-medium">Network:</span>
