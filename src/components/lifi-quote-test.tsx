@@ -244,16 +244,6 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
 
 
 
-  // Token logo fetching function
-  const fetchTokenLogo = async (tokenAddress: string, chainId: number): Promise<string | null> => {
-    try {
-      const token = await getToken(chainId, tokenAddress as `0x${string}`);
-      return token.logoURI || null;
-    } catch (error) {
-      console.error('Failed to fetch token logo:', error);
-      return null;
-    }
-  };
 
   // Transaction substep progress component
   const renderTransactionSubsteps = (substeps: Array<{label: string, status: 'pending' | 'processing' | 'completed' | 'failed', txHash?: string, chainId?: number}>) => {
@@ -941,12 +931,6 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     }
   };
 
-  // Legacy handleDirectDeposit function - now replaced by handleUSDT0Deposit
-  // This is kept for backward compatibility but is no longer used
-  const handleDirectDeposit = async (_enteredAmount: string) => {
-    console.warn('handleDirectDeposit is deprecated - use handleUSDT0Deposit instead');
-    // This function is no longer used as we have the unified handleUSDT0Deposit
-  };
 
   // Legacy handleExecute function - now handled by path-specific functions
   // This is kept for backward compatibility with LiFiBalanceFetcher

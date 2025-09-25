@@ -101,9 +101,7 @@ const TestInterface = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    const page = activeTab === "VAULTINFO" ? t('tabs.vaultInfo') : 
-                 activeTab === "ABOUT" ? t('tabs.about') : 
-                 "Li.Fi Test";
+    const page = activeTab === "VAULTINFO" ? t('tabs.vaultInfo') : t('tabs.about');
     document.title = `${t('brand')} — ${page}`;
   }, [activeTab, t]);
 
@@ -154,25 +152,12 @@ const TestInterface = () => {
               >
                 {t('tabs.about')}
               </button>
-              <button
-                aria-pressed={activeTab === "LIFI_TEST"}
-                onClick={() => setActiveTab("LIFI_TEST")}
-                className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center border ${
-                  activeTab === "LIFI_TEST"
-                    ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
-                    : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
-                }`}
-              >
-                Li.Fi Test
-              </button>
             </div>
 
             {activeTab === "VAULTINFO" ? (
               <VaultAPIView vaultAddress={vaultAddress} />
-            ) : activeTab === "ABOUT" ? (
-              <AboutView />
             ) : (
-              <LiFiQuoteTest />
+              <AboutView />
             )}
           </div>
         </div>

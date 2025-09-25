@@ -148,12 +148,10 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   
   // Deposit dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
-  const [currentDepositStep, setCurrentDepositStep] = useState(1);
   
   // Dialog close handler with position refresh
   const handleDialogClose = async () => {
     setDepositDialogOpen(false);
-    setCurrentDepositStep(1);
     
     // Refresh position data
     try {
@@ -788,7 +786,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                       type="button"
                       onClick={() => {
               setDepositDialogOpen(true);
-              setCurrentDepositStep(1);
             }}
                       className="w-full px-4 py-3 text-base font-medium rounded-lg bg-[#00295B] text-[#FFFFF5] hover:bg-[#001a3d] transition-colors"
                     >
@@ -917,7 +914,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                 </div>
               </div>
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-                <LiFiQuoteTest onStepChange={setCurrentDepositStep} onClose={handleDialogClose} />
+                <LiFiQuoteTest onClose={handleDialogClose} />
               </div>
             </div>
           </div>
