@@ -1034,9 +1034,9 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       case 2:
         // Step 2b: Enter USD Amount
         return (
-          <div className="p-6 bg-gray-50 rounded-lg">
+          <div className="p-4 bg-gray-50 rounded-lg">
             
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-3">
                 {selectedToken?.logoURI && (
                   <img
@@ -1061,7 +1061,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               </div>
             </div>
             
-            <div className="mb-4">
+            <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Enter Amount (USD)
               </label>
@@ -1107,8 +1107,8 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       case 3:
         // Step 3b: Confirm Bridge
         return (
-          <div className="p-6 bg-blue-50 rounded-lg">
-            <div className="flex items-center justify-between mb-4">
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold text-blue-800">Confirm Bridge</h3>
               {!executing && (
                 <button
@@ -1190,20 +1190,20 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       case 4:
         // Step 4b: Bridge Success
         return (
-          <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
+          <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
             <div className="text-center">
               {/* Enhanced success icon */}
-              <div className="relative w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="relative w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               
-              <h3 className="text-2xl font-bold text-blue-800 mb-2">Bridge Successful!</h3>
-              <p className="text-blue-700 mb-6 text-lg">Your deposit has been completed successfully. The funds have been converted to USDT0</p>
+              <h3 className="text-xl font-bold text-blue-800 mb-2">Bridge Successful!</h3>
+              <p className="text-blue-700 mb-4 text-base">Your deposit has been completed successfully. The funds have been converted to USDT0</p>
               
               {/* Enhanced bridge summary */}
-              <div className="bg-white p-6 rounded-xl border border-blue-200 mb-6 shadow-sm">
+              <div className="bg-white p-4 rounded-xl border border-blue-200 mb-4 shadow-sm">
                 <div className="flex items-center justify-center mb-4">
                   <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                   <span className="text-sm font-semibold text-gray-700">Bridge Summary</span>
@@ -1265,14 +1265,14 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       case 5:
         // Step 5b: Confirm Vault Deposit (same as Path A step 3a)
         return (
-          <div className="p-6 bg-blue-50 rounded-lg">
-            <div className="flex items-center justify-between mb-4">
+          <div className="p-4 bg-blue-50 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold text-blue-800">Confirm USDT0 Deposit</h3>
             </div>
             
-            <div className="space-y-4">
-              <div className="bg-white p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-gray-800 mb-3">Deposit Summary</h4>
+            <div className="space-y-3">
+              <div className="bg-white p-3 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-gray-800 mb-2">Deposit Summary</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">From:</span>
@@ -1335,20 +1335,20 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       case 6:
         // Step 6b: Final Success (same as Path A step 4a)
         return (
-          <div className="p-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
+          <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
             <div className="text-center">
               {/* Enhanced success icon */}
-              <div className="relative w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="relative w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               
-              <h3 className="text-2xl font-bold text-green-800 mb-2">Deposit Successful!</h3>
-              <p className="text-green-700 mb-6 text-lg">Your deposit has been completed successfully</p>
+              <h3 className="text-xl font-bold text-green-800 mb-2">Deposit Successful!</h3>
+              <p className="text-green-700 mb-4 text-base">Your deposit has been completed successfully</p>
               
               {/* Enhanced transaction summary */}
-              <div className="bg-white p-6 rounded-xl border border-green-200 mb-6 shadow-sm">
+              <div className="bg-white p-4 rounded-xl border border-green-200 mb-4 shadow-sm">
                 <div className="flex items-center justify-center mb-4">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                   <span className="text-sm font-semibold text-gray-700">Transaction Summary</span>
@@ -1407,9 +1407,9 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       case 2:
         // Step 2a: Enter USDT0 Amount
         return (
-          <div className="p-6 bg-gray-50 rounded-lg">
+          <div className="p-4 bg-gray-50 rounded-lg">
             
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-3">
                 {selectedToken?.logoURI && (
                   <img
@@ -1434,7 +1434,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               </div>
             </div>
             
-            <div className="mb-4">
+            <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Enter USDT0 Amount
               </label>
@@ -1480,8 +1480,8 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       case 3:
         // Step 3a: Confirm Deposit
         return (
-          <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
+          <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-blue-800">Confirm USDT0 Deposit</h3>
               {!executing && (
                 <button
@@ -1494,10 +1494,10 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               )}
             </div>
             
-            <div className="space-y-6">
+            <div className="space-y-3">
               {/* Enhanced deposit summary */}
-              <div className="bg-white p-6 rounded-xl border border-blue-200 shadow-sm">
-                <div className="flex items-center justify-center mb-4">
+              <div className="bg-white p-3 rounded-xl border border-blue-200 shadow-sm">
+                <div className="flex items-center justify-center mb-2">
                   <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                   <span className="text-sm font-semibold text-gray-700">Deposit Summary</span>
                 </div>
@@ -1564,20 +1564,20 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       case 4:
         // Step 4a: Success
         return (
-          <div className="p-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
+          <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
             <div className="text-center">
               {/* Success icon */}
-              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               
-              <h3 className="text-2xl font-bold text-green-800 mb-2">Deposit Successful!</h3>
-              <p className="text-green-700 mb-6 text-lg">Your deposit has been completed successfully</p>
+              <h3 className="text-xl font-bold text-green-800 mb-2">Deposit Successful!</h3>
+              <p className="text-green-700 mb-4 text-base">Your deposit has been completed successfully</p>
               
               {/* Enhanced transaction summary */}
-              <div className="bg-white p-6 rounded-xl border border-green-200 mb-6 shadow-sm">
+              <div className="bg-white p-4 rounded-xl border border-green-200 mb-4 shadow-sm">
                 <div className="flex items-center justify-center mb-4">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                   <span className="text-sm font-semibold text-gray-700">Transaction Summary</span>
