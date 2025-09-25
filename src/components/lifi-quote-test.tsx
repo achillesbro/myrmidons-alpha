@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getRoutes, executeRoute, getToken, getTokenBalances } from '@lifi/sdk';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
@@ -7,7 +7,6 @@ import { formatUnits, parseUnits } from 'viem';
 import { BrowserProvider, Contract } from 'ethers';
 import { useLifiConfig } from '../hooks/useLifiConfig';
 import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
-import { Toasts, type Toast, type ToastKind } from './vault-shared';
 import { erc20Abi } from 'viem';
 import vaultAbi from '../abis/vault.json';
 
@@ -55,27 +54,28 @@ interface StepInfo {
   canGoBack: boolean;
 }
 
-// Comprehensive deposit state
-interface DepositState {
-  selectedPath: DepositPath;
-  selectedToken: {
-    chainId: number;
-    chainName: string;
-    tokenSymbol: string;
-    tokenAddress: string;
-    balance: string;
-    balanceFormatted: string;
-    decimals: number;
-    logoURI?: string;
-    priceUSD?: string;
-    balanceUSD?: string;
-  } | null;
-  amount: string;
-  bridgeTxHash: string | null;
-  bridgedUsdt0Amount: string | null;
-  vaultSharesMinted: string | null;
-  currentStep: number;
-}
+  // Comprehensive deposit state
+  interface DepositState {
+    selectedPath: DepositPath;
+    selectedToken: {
+      chainId: number;
+      chainName: string;
+      tokenSymbol: string;
+      tokenAddress: string;
+      balance: string;
+      balanceFormatted: string;
+      decimals: number;
+      logoURI?: string;
+      priceUSD?: string;
+      balanceUSD?: string;
+    } | null;
+    amount: string;
+    bridgeTxHash: string | null;
+    bridgedUsdt0Amount: string | null;
+    vaultSharesMinted: string | null;
+    vaultSharesBefore: string | null; // Track shares before deposit to calculate newly minted
+    currentStep: number;
+  }
 
 export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
   const [executing, setExecuting] = useState(false);
@@ -88,6 +88,7 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
     bridgeTxHash: null,
     bridgedUsdt0Amount: null,
     vaultSharesMinted: null,
+    vaultSharesBefore: null,
     currentStep: 1,
   });
   
@@ -122,9 +123,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
   } | null>(null);
   const [usdt0Loading, setUsdt0Loading] = useState(false);
   
-  // Toast management
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const toastIdRef = useRef<number>(1);
   
   const clientW = useWalletClient();
   const wagmiConfig = useConfig();
@@ -231,17 +229,17 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
     }
   }, [clientW.data?.account?.address]);
 
-  // Toast helper functions
-  const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
-    toastIdRef.current += 1;
-    const id = toastIdRef.current;
-    setToasts((t) => [...t, { id, kind, text, href }]);
-    if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
-  };
 
-  // Legacy clearToasts function - kept for backward compatibility
-  const clearToasts = () => {
-    setToasts([]);
+
+  // Token logo fetching function
+  const fetchTokenLogo = async (tokenAddress: string, chainId: number): Promise<string | null> => {
+    try {
+      const token = await getToken(chainId, tokenAddress as `0x${string}`);
+      return token.logoURI || null;
+    } catch (error) {
+      console.error('Failed to fetch token logo:', error);
+      return null;
+    }
   };
 
   // Li.Fi Transaction Monitoring System
@@ -294,7 +292,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
       const result = await monitorBridgeStatus(txHash, fromChainId, toChainId);
       
       if (result.success) {
-        pushToast('success', 'Bridge completed successfully!', 5000);
         return {
           success: true,
           receivedAmount: result.receivedAmount,
@@ -303,23 +300,16 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
       }
       
       if (result.status === 'FAILED') {
-        pushToast('error', `Bridge failed: ${result.error || 'Unknown error'}`, 8000);
         return {
           success: false,
           error: result.error
         };
       }
       
-      // Show progress toast every 5 attempts
-      if (attempts % 5 === 0) {
-        pushToast('info', `Bridge in progress... (${attempts + 1}/${maxAttempts})`, 3000);
-      }
-      
       attempts++;
       await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
     
-    pushToast('error', 'Bridge monitoring timed out', 8000);
     return {
       success: false,
       error: 'Monitoring timeout'
@@ -359,27 +349,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
       const stepStatus = getStepStatus(step);
       
       console.log(`Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus}`);
-      
-      // Show toast for each step
-      if (stepStatus === 'DONE') {
-        pushToast('success', `${stepDescription} completed`, 3000);
-      } else if (stepStatus === 'FAILED') {
-        pushToast('error', `${stepDescription} failed`, 5000);
-      } else if (stepStatus === 'PENDING') {
-        pushToast('info', `${stepDescription} pending...`, 2000);
-      } else if (stepStatus === 'PROCESSING') {
-        pushToast('info', `${stepDescription} processing...`, 2000);
-      }
-      
-      // Show transaction hashes for completed steps
-      if (step.execution?.process) {
-        step.execution.process.forEach((process: any) => {
-          if (process.txHash && process.status === 'DONE') {
-            const explorerUrl = getExplorerUrl(step.action?.fromChainId || 0, process.txHash);
-            pushToast('info', `Transaction: ${process.txHash.slice(0, 8)}...`, 5000, explorerUrl);
-          }
-        });
-      }
     });
   };
 
@@ -426,10 +395,8 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
       // Force switch to HyperEVM
       try {
         await switchChain(wagmiConfig, { chainId: CHAIN_IDS.HYPEREVM });
-        pushToast('info', 'Switched to HyperEVM', 2000);
       } catch (error: any) {
         console.error('Chain switch failed:', error);
-        pushToast('error', 'Failed to switch to HyperEVM. Please switch manually.');
         setExecuting(false);
         return;
       }
@@ -462,35 +429,38 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
       }
       
       if (needsApproval) {
-        pushToast('info', 'Approving USDT0 spending...', 3000);
         const approveTx = await token.approve(VAULT_ADDRESS, amountWei);
-        pushToast('info', `Approval tx: ${approveTx.hash}`, 7000, `https://hyperevmscan.io/tx/${approveTx.hash}`);
         await provider.waitForTransaction(approveTx.hash, 1, 20_000).catch(() => null);
-        pushToast('success', 'Approval confirmed', 3000);
       }
       
+      // Get shares before deposit
+      const vaultBefore = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+      const sharesBefore = await vaultBefore.balanceOf(clientW.data?.account?.address);
+      const sharesBeforeFormatted = formatUnits(sharesBefore, 18);
+      
       // Execute deposit
-      pushToast('info', 'Depositing to vault...', 3000);
       const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
       const tx = await vault.deposit(amountWei, clientW.data?.account?.address);
-      pushToast('info', `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
       
       // Wait for confirmation using wallet provider
       await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
       
-      // Get vault shares minted by reading the vault balance after deposit
-      const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
-      const userShares = await vaultR.balanceOf(clientW.data?.account?.address);
-      const sharesFormatted = formatUnits(userShares, 18); // Vault shares use 18 decimals
+      // Get vault shares after deposit
+      const vaultAfter = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+      const userShares = await vaultAfter.balanceOf(clientW.data?.account?.address);
+      
+      // Calculate newly minted shares (shares after - shares before)
+      const newlyMintedShares = userShares - sharesBefore;
+      const newlyMintedFormatted = formatUnits(BigInt(newlyMintedShares.toString()), 18);
       
       // Update state with success information
       const nextStep = selectedPath === 'A' ? 4 : 6; // Path A goes to step 4, Path B goes to step 6
       updateDepositState({
-        vaultSharesMinted: sharesFormatted,
+        vaultSharesBefore: sharesBeforeFormatted,
+        vaultSharesMinted: newlyMintedFormatted,
         currentStep: nextStep,
       });
       
-      pushToast('success', 'Deposit successful!', 5000);
       
       // Refresh USDT0 balance
       await fetchUSDT0Balance();
@@ -515,7 +485,7 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
         errorMessage = `Deposit failed: ${error.message}`;
       }
       
-      pushToast('error', errorMessage, 8000);
+      console.error('Error:', errorMessage);
       
       // Reset to previous step to allow retry
       const previousStep = selectedPath === 'A' ? 3 : 5;
@@ -533,7 +503,7 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
     if (depositState.amount && parseFloat(depositState.amount) > 0) {
       navigateToStep(3);
     } else {
-      pushToast('error', 'Please enter a valid amount');
+      console.error('Please enter a valid amount');
     }
   };
 
@@ -658,7 +628,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
       });
 
       // Start monitoring bridge status in the background
-      pushToast('info', 'Bridge transaction submitted. Monitoring progress...', 5000);
       
       // Start background monitoring (don't await to avoid blocking UI)
       pollBridgeStatus(finalTxHash, selectedToken.chainId, CHAIN_IDS.HYPEREVM)
@@ -694,7 +663,7 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
         errorMessage = `Bridge failed: ${error.message}`;
       }
       
-      pushToast('error', errorMessage, 8000);
+      console.error('Error:', errorMessage);
       
       // Reset to step 3 to allow retry
       updateDepositState({
@@ -714,7 +683,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
     }
 
     try {
-      pushToast('info', 'Checking bridge status...', 3000);
       
       // Monitor bridge status and get received amount
       const result = await pollBridgeStatus(
@@ -732,13 +700,12 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
           currentStep: 5, // Move to deposit confirmation
         });
         
-        pushToast('success', `Bridge completed! Received ${receivedAmountFormatted} USDT0`, 5000);
       } else {
-        pushToast('error', `Bridge monitoring failed: ${result.error || 'Unknown error'}`, 8000);
+        console.error('Bridge monitoring failed:', result.error || 'Unknown error');
       }
     } catch (error: any) {
       console.error('Bridge status check failed:', error);
-      pushToast('error', `Failed to check bridge status: ${error.message}`, 8000);
+      console.error('Failed to check bridge status:', error.message);
     }
   };
 
@@ -1019,6 +986,23 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
                   </span>
                 )}
               </div>
+              
+              {/* Percentage selector buttons */}
+              <div className="flex justify-center space-x-2 mt-3">
+                {[25, 50, 75, 100].map((percentage) => (
+                  <button
+                    key={percentage}
+                    onClick={() => {
+                      const maxAmount = selectedToken?.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken?.balanceFormatted || '0');
+                      const amount = (maxAmount * percentage / 100).toString();
+                      handleAmountEnter(amount);
+                    }}
+                    className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors duration-200"
+                  >
+                    {percentage === 100 ? 'MAX' : `${percentage}%`}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button
@@ -1294,6 +1278,23 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
               <div className="text-xs text-gray-500 mt-1">
                 Available: {selectedToken ? parseFloat(selectedToken.balanceFormatted).toFixed(6) : '0.000000'} USDT0
               </div>
+              
+              {/* Percentage selector buttons */}
+              <div className="flex justify-center space-x-2 mt-3">
+                {[25, 50, 75, 100].map((percentage) => (
+                  <button
+                    key={percentage}
+                    onClick={() => {
+                      const maxAmount = selectedToken ? parseFloat(selectedToken.balanceFormatted) : 0;
+                      const amount = (maxAmount * percentage / 100).toString();
+                      handleAmountEnter(amount);
+                    }}
+                    className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors duration-200"
+                  >
+                    {percentage === 100 ? 'MAX' : `${percentage}%`}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button
@@ -1508,8 +1509,6 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
         />
       )}
 
-      {/* Toast notifications */}
-      <Toasts toasts={toasts} />
     </div>
   );
 }
