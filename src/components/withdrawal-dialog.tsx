@@ -1,28 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWalletClient, useConfig } from 'wagmi';
-import { switchChain, getWalletClient } from '@wagmi/core';
+import { switchChain } from '@wagmi/core';
 import { formatUnits, parseUnits } from 'viem';
 import { BrowserProvider, Contract } from 'ethers';
 import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
-import { erc20Abi } from 'viem';
 import vaultAbi from '../abis/vault.json';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
+import { getToken } from '@lifi/sdk';
 
 // Vault address for withdrawals
 const VAULT_ADDRESS = '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42' as `0x${string}`;
 
-// Helper functions for chain names and explorer URLs
-const getChainName = (chainId: number): string => {
-  const chainNames: Record<number, string> = {
-    999: 'HyperEVM',
-    1: 'Ethereum',
-    8453: 'Base',
-    137: 'Polygon',
-    42161: 'Arbitrum',
-    10: 'Optimism',
-  };
-  return chainNames[chainId] || `Chain ${chainId}`;
-};
+// Helper functions for explorer URLs
 
 const getExplorerUrl = (chainId: number, txHash: string): string => {
   const explorers: Record<number, string> = {
@@ -93,10 +82,13 @@ export function WithdrawalDialog({
     if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
   };
   
+  // USDT0 logo state
+  const [usdt0LogoURI, setUsdt0LogoURI] = useState<string | null>(null);
+  
   const clientW = useWalletClient();
   const wagmiConfig = useConfig();
   
-  // Initialize vault shares token info
+  // Initialize vault shares token info and fetch USDT0 logo
   useEffect(() => {
     if (userShares > 0n) {
       const sharesFormatted = formatUnits(userShares, shareDecimals);
@@ -114,6 +106,18 @@ export function WithdrawalDialog({
         }
       }));
     }
+    
+    // Fetch USDT0 logo
+    const fetchUSDT0Logo = async () => {
+      try {
+        const usdt0Token = await getToken(CHAIN_IDS.HYPEREVM, TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0);
+        setUsdt0LogoURI(usdt0Token.logoURI || null);
+      } catch (error) {
+        console.error('Failed to fetch USDT0 logo:', error);
+      }
+    };
+    
+    fetchUSDT0Logo();
   }, [userShares, shareDecimals]);
   
   // Update withdrawal state helper
@@ -155,14 +159,17 @@ export function WithdrawalDialog({
       const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
       
       // Parse amount (vault shares)
-      const amountWei = parseUnits(withdrawalState.amount, shareDecimals);
+      const sharesWei = parseUnits(withdrawalState.amount, shareDecimals);
       
       // Check if user has enough shares
-      if (amountWei > userShares) {
+      if (sharesWei > userShares) {
         pushToast('error', 'Insufficient vault shares');
         setExecuting(false);
         return;
       }
+      
+      // Convert shares to assets using previewRedeem (same as runWithdraw)
+      const assetsOut = await vault.previewRedeem(sharesWei);
       
       // Update substeps for withdrawal
       updateWithdrawalState({
@@ -171,8 +178,8 @@ export function WithdrawalDialog({
         ]
       });
       
-      // Execute withdrawal
-      const tx = await vault.withdraw(amountWei, clientW.data.account.address, clientW.data.account.address);
+      // Execute withdrawal with assets amount (not shares)
+      const tx = await vault.withdraw(assetsOut, clientW.data.account.address, clientW.data.account.address);
       
       // Update substeps with transaction hash
       updateWithdrawalState({
@@ -193,10 +200,10 @@ export function WithdrawalDialog({
         currentStep: 3, // Success step
       });
       
-      // Calculate estimated USDT0 amount received
-      const estimatedUsdt0Amount = formatUnits(amountWei, underlyingDecimals); // This is a rough estimate
+      // Calculate actual USDT0 amount received (from assetsOut)
+      const actualUsdt0Amount = formatUnits(assetsOut, underlyingDecimals);
       updateWithdrawalState({
-        withdrawnUsdt0Amount: estimatedUsdt0Amount
+        withdrawnUsdt0Amount: actualUsdt0Amount
       });
       
       pushToast('success', 'Withdrawal successful!');
@@ -341,8 +348,8 @@ export function WithdrawalDialog({
       case 1:
         // Step 1: Enter Amount
         return (
-          <div className="p-6 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between mb-4">
+          <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center space-x-3">
                 <img
                   src="/Myrmidons-logo-dark-no-bg.png"
@@ -365,7 +372,7 @@ export function WithdrawalDialog({
               </div>
             </div>
             
-            <div className="mb-4">
+            <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Enter Amount (Vault Shares)
               </label>
@@ -411,14 +418,14 @@ export function WithdrawalDialog({
       case 2:
         // Step 2: Confirm & Execute
         return (
-          <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
+          <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-blue-800">Confirm USDT0 Withdrawal</h3>
             </div>
             
-            <div className="space-y-4">
-              <div className="bg-white p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-gray-800 mb-3">Withdrawal Summary</h4>
+            <div className="space-y-3">
+              <div className="bg-white p-3 rounded-lg border border-blue-200">
+                <h4 className="font-semibold text-gray-800 mb-2">Withdrawal Summary</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">From:</span>
@@ -435,12 +442,18 @@ export function WithdrawalDialog({
                   <div className="flex justify-between">
                     <span className="text-gray-600">To:</span>
                     <div className="flex items-center space-x-2">
-                      <img
-                        src="/Myrmidons-logo-dark-no-bg.png"
-                        alt="USDT0"
-                        className="w-4 h-4 rounded-full"
-                        onError={(e) => (e.currentTarget.style.display = 'none')}
-                      />
+                      {usdt0LogoURI ? (
+                        <img
+                          src={usdt0LogoURI}
+                          alt="USDT0"
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
+                          U
+                        </div>
+                      )}
                       <span className="font-medium">USDT0 on HyperEVM</span>
                     </div>
                   </div>
@@ -474,20 +487,20 @@ export function WithdrawalDialog({
       case 3:
         // Step 3: Success
         return (
-          <div className="p-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
+          <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
             <div className="text-center">
               {/* Success icon */}
-              <div className="relative w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="relative w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               
-              <h3 className="text-2xl font-bold text-green-800 mb-2">Withdrawal Successful!</h3>
-              <p className="text-green-700 mb-6 text-lg">Your withdrawal has been completed successfully</p>
+              <h3 className="text-xl font-bold text-green-800 mb-2">Withdrawal Successful!</h3>
+              <p className="text-green-700 mb-4 text-base">Your withdrawal has been completed successfully</p>
               
               {/* Transaction summary */}
-              <div className="bg-white p-6 rounded-xl border border-green-200 mb-6 shadow-sm">
+              <div className="bg-white p-4 rounded-xl border border-green-200 mb-4 shadow-sm">
                 <div className="flex items-center justify-center mb-4">
                   <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                   <span className="text-sm font-semibold text-gray-700">Transaction Summary</span>
@@ -500,12 +513,18 @@ export function WithdrawalDialog({
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Received:</span>
                     <div className="flex items-center space-x-2">
-                      <img
-                        src="/Myrmidons-logo-dark-no-bg.png"
-                        alt="USDT0"
-                        className="w-5 h-5 rounded-full"
-                        onError={(e) => (e.currentTarget.style.display = 'none')}
-                      />
+                      {usdt0LogoURI ? (
+                        <img
+                          src={usdt0LogoURI}
+                          alt="USDT0"
+                          className="w-5 h-5 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
+                          U
+                        </div>
+                      )}
                       <span className="font-bold text-gray-900">
                         {withdrawalState.withdrawnUsdt0Amount || 'Calculating...'} USDT0
                       </span>
