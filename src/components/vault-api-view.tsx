@@ -149,6 +149,53 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   // Deposit dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [currentDepositStep, setCurrentDepositStep] = useState(1);
+  
+  // Dialog close handler with position refresh
+  const handleDialogClose = async () => {
+    setDepositDialogOpen(false);
+    setCurrentDepositStep(1);
+    
+    // Refresh position data
+    try {
+      if (clientW.data?.account?.address && underlyingAddress) {
+        const provider = new BrowserProvider((window as any).ethereum);
+        const signer = await provider.getSigner();
+        const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+        const tokenR = new Contract(underlyingAddress, erc20Abi as any, signer);
+        
+        const [bal, shares, totalA, totalS] = await Promise.all([
+          tokenR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+          vaultR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+          vaultR.totalAssets() as Promise<bigint>,
+          vaultR.totalSupply() as Promise<bigint>,
+        ]);
+        const assets = (await vaultR.convertToAssets(shares)) as bigint;
+        
+        setOnchainBalance(bal);
+        setUserShares(shares);
+        setUserAssets(assets);
+        setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
+        setAllocRefreshKey((k) => k + 1);
+        await refreshVaultTotalsFast();
+      }
+    } catch (error) {
+      console.error('Failed to refresh position data:', error);
+    }
+  };
+  
+  // Handle escape key press
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && depositDialogOpen) {
+        handleDialogClose();
+      }
+    };
+    
+    if (depositDialogOpen) {
+      document.addEventListener('keydown', handleEscapeKey);
+      return () => document.removeEventListener('keydown', handleEscapeKey);
+    }
+  }, [depositDialogOpen]);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
@@ -840,7 +887,15 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
 
         {/* Deposit Dialog */}
         {depositDialogOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={(e) => {
+              // Close dialog when clicking outside
+              if (e.target === e.currentTarget) {
+                handleDialogClose();
+              }
+            }}
+          >
             {/* Blurred background - transparent with blur effect */}
             <div className="absolute inset-0 backdrop-blur-sm"></div>
             
@@ -848,20 +903,13 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
             <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl">
               <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
                 <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => setDepositDialogOpen(false)}
-                    className="text-[#101720]/60 hover:text-[#101720] text-xl font-bold"
-                  >
-                    ←
-                  </button>
                   <h2 className="text-xl font-semibold text-[#00295B]">
                     {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
                   </h2>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm text-[#101720]/60">Step {currentDepositStep} of 3</span>
                   <button
-                    onClick={() => setDepositDialogOpen(false)}
+                    onClick={handleDialogClose}
                     className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
                   >
                     ×
@@ -869,7 +917,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                 </div>
               </div>
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-                <LiFiQuoteTest onStepChange={setCurrentDepositStep} />
+                <LiFiQuoteTest onStepChange={setCurrentDepositStep} onClose={handleDialogClose} />
               </div>
             </div>
           </div>

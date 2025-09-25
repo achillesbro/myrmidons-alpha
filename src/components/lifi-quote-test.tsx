@@ -42,6 +42,7 @@ const getExplorerUrl = (chainId: number, txHash: string): string => {
 
 interface LiFiQuoteTestProps {
   onStepChange?: (step: number) => void;
+  onClose?: () => void;
 }
 
 // Path types for deposit flows
@@ -77,7 +78,7 @@ interface StepInfo {
     currentStep: number;
   }
 
-export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
+export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}) {
   const [executing, setExecuting] = useState(false);
   
   // Comprehensive deposit state
@@ -525,6 +526,7 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
     setAmount('');
     setCurrentStep(1);
     onStepChange?.(1);
+    onClose?.();
   };
 
   // Path B: Bridge & Deposit Functions
@@ -930,13 +932,15 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
           <div className="p-6 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-[#00295B]">Enter USD Amount</h3>
-              <button
-                onClick={() => navigateToStep(1)}
-                className="text-sm text-gray-600 hover:text-gray-800 flex items-center space-x-1"
-              >
-                <span>←</span>
-                <span>Back to Token Selection</span>
-              </button>
+              {!executing && (
+                <button
+                  onClick={() => navigateToStep(1)}
+                  className="text-sm text-gray-600 hover:text-gray-800 flex items-center space-x-1"
+                >
+                  <span>←</span>
+                  <span>Back to Token Selection</span>
+                </button>
+              )}
             </div>
             
             <div className="flex items-center justify-between mb-4">
@@ -1021,13 +1025,15 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
           <div className="p-6 bg-blue-50 rounded-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-blue-800">Confirm Bridge</h3>
-              <button
-                onClick={() => navigateToStep(2)}
-                className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
-              >
-                <span>←</span>
-                <span>Back to Amount</span>
-              </button>
+              {!executing && (
+                <button
+                  onClick={() => navigateToStep(2)}
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+                >
+                  <span>←</span>
+                  <span>Back to Amount</span>
+                </button>
+              )}
             </div>
             
             <div className="space-y-4">
@@ -1227,13 +1233,15 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
           <div className="p-6 bg-gray-50 rounded-lg">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-[#00295B]">Enter USDT0 Amount</h3>
-              <button
-                onClick={() => navigateToStep(1)}
-                className="text-sm text-gray-600 hover:text-gray-800 flex items-center space-x-1"
-              >
-                <span>←</span>
-                <span>Back to Token Selection</span>
-              </button>
+              {!executing && (
+                <button
+                  onClick={() => navigateToStep(1)}
+                  className="text-sm text-gray-600 hover:text-gray-800 flex items-center space-x-1"
+                >
+                  <span>←</span>
+                  <span>Back to Token Selection</span>
+                </button>
+              )}
             </div>
             
             <div className="flex items-center justify-between mb-4">
@@ -1313,13 +1321,15 @@ export function LiFiQuoteTest({ onStepChange }: LiFiQuoteTestProps = {}) {
           <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-blue-800">Confirm USDT0 Deposit</h3>
-              <button
-                onClick={() => navigateToStep(2)}
-                className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1 transition-colors duration-200"
-              >
-                <span>←</span>
-                <span>Back to Amount</span>
-              </button>
+              {!executing && (
+                <button
+                  onClick={() => navigateToStep(2)}
+                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1 transition-colors duration-200"
+                >
+                  <span>←</span>
+                  <span>Back to Amount</span>
+                </button>
+              )}
             </div>
             
             <div className="space-y-6">
