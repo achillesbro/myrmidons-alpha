@@ -313,8 +313,42 @@ export const LiFiBalanceFetcher = ({
       {currentStep === 1 && (
         <>
           {loading ? (
-            <div className="text-center py-8 text-gray-600">
-              Loading token balances...
+            <div className="space-y-1">
+              {/* Skeleton for USDT0 */}
+              <div className="p-2 border border-gray-200 bg-gray-50 rounded animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
+                    <div>
+                      <div className="h-4 w-12 bg-gray-300 rounded mb-1"></div>
+                      <div className="h-3 w-16 bg-gray-300 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="h-4 w-16 bg-gray-300 rounded mb-1"></div>
+                    <div className="h-3 w-12 bg-gray-300 rounded"></div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Skeleton for other tokens */}
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="p-2 border border-gray-200 bg-white rounded animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
+                      <div>
+                        <div className="h-4 w-12 bg-gray-300 rounded mb-1"></div>
+                        <div className="h-3 w-16 bg-gray-300 rounded"></div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="h-4 w-16 bg-gray-300 rounded mb-1"></div>
+                      <div className="h-3 w-12 bg-gray-300 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : balances.length === 0 ? (
             <div className="text-center py-8 text-gray-600">
