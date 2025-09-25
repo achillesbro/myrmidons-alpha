@@ -144,10 +144,12 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const [depAmount, setDepAmount] = useState<string>("");
   const [wdAmount, setWdAmount] = useState<string>("");
   const [pending, setPending] = useState<"approve" | "deposit" | "withdraw" | null>(null);
-  const [txMode, setTxMode] = useState<"deposit" | "withdraw">("deposit");
   
   // Deposit dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  
+  // Withdrawal dialog state
+  const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
   
   // Dialog close handler with position refresh
   const handleDialogClose = async () => {
@@ -181,35 +183,57 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
     }
   };
   
+  // Withdrawal dialog close handler with position refresh
+  const handleWithdrawalClose = async () => {
+    setWithdrawalDialogOpen(false);
+    
+    // Refresh position data (same as deposit)
+    try {
+      if (clientW.data?.account?.address && underlyingAddress) {
+        const provider = new BrowserProvider((window as any).ethereum);
+        const signer = await provider.getSigner();
+        const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+        const tokenR = new Contract(underlyingAddress, erc20Abi as any, signer);
+        
+        const [bal, shares, totalA, totalS] = await Promise.all([
+          tokenR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+          vaultR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+          vaultR.totalAssets() as Promise<bigint>,
+          vaultR.totalSupply() as Promise<bigint>,
+        ]);
+        const assets = (await vaultR.convertToAssets(shares)) as bigint;
+        
+        setOnchainBalance(bal);
+        setUserShares(shares);
+        setUserAssets(assets);
+        setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
+        setAllocRefreshKey((k) => k + 1);
+        await refreshVaultTotalsFast();
+      }
+    } catch (error) {
+      console.error('Failed to refresh position data:', error);
+    }
+  };
+  
   // Handle escape key press
   useEffect(() => {
     const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && depositDialogOpen) {
-        handleDialogClose();
+      if (event.key === 'Escape' && (depositDialogOpen || withdrawalDialogOpen)) {
+        if (depositDialogOpen) {
+          handleDialogClose();
+        } else if (withdrawalDialogOpen) {
+          handleWithdrawalClose();
+        }
       }
     };
     
-    if (depositDialogOpen) {
+    if (depositDialogOpen || withdrawalDialogOpen) {
       document.addEventListener('keydown', handleEscapeKey);
       return () => document.removeEventListener('keydown', handleEscapeKey);
     }
-  }, [depositDialogOpen]);
+  }, [depositDialogOpen, withdrawalDialogOpen]);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
-  const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
-  // const [bridgeAmount, setBridgeAmount] = useState<string>("");
-  // const chainId = useChainId();
-  // Load persisted toggle
-  useEffect(() => {
-    try {
-      const v = localStorage.getItem(TX_MODE_KEY);
-      if (v === "deposit" || v === "withdraw") setTxMode(v);
-    } catch {}
-  }, [TX_MODE_KEY]);
-  // Persist on change
-  useEffect(() => {
-    try { localStorage.setItem(TX_MODE_KEY, txMode); } catch {}
-  }, [TX_MODE_KEY, txMode]);
   useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -745,86 +769,50 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
               allowedVaultsByChain={ALLOWED_VAULTS}
               warnOnly={false}
             >
-              {/* Actions: Deposit / Withdraw (toggle) */}
+              {/* Actions: Deposit and Withdraw (separate buttons) */}
               <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-base font-semibold text-[#00295B]">
-                    {t("vaultInfo.actions.title", { defaultValue: "Actions" })}
-                  </h3>
-                  <div className="inline-flex rounded-md overflow-hidden">
+                <h3 className="text-base font-semibold text-[#00295B] mb-4">
+                  {t("vaultInfo.actions.title", { defaultValue: "Actions" })}
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Deposit Button */}
+                  <div className="text-center">
+                    <h4 className="text-lg font-semibold text-[#00295B] mb-2">
+                      {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
+                    </h4>
+                    <p className="text-sm text-[#101720]/70 mb-4">
+                      {t("vaultInfo.actions.depositDescription", { 
+                        defaultValue: "Bridge from any chain or deposit USDT0 directly" 
+                      })}
+                    </p>
                     <button
                       type="button"
-                      onClick={() => setTxMode("deposit")}
-                      className={`px-2.5 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "deposit" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
-                      aria-pressed={txMode === "deposit"}
-                    >
-                      {t("vaultInfo.actions.deposit", { defaultValue: "Deposit" })}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTxMode("withdraw")}
-                      className={`px-2.5 py-1 text-sm focus:outline-none focus:ring-0 ${txMode === "withdraw" ? "bg-[#00295B] text-[#FFFFF5]" : "bg-[#FFFFF5] text-[#00295B]"}`}
-                      aria-pressed={txMode === "withdraw"}
-                    >
-                      {t("vaultInfo.actions.withdraw", { defaultValue: "Withdraw" })}
-                    </button>
-                  </div>
-                </div>
-                {txMode === "deposit" ? (
-                  <div className="min-h-[160px] flex flex-col justify-center">
-                    <div className="text-center mb-4">
-                      <h4 className="text-lg font-semibold text-[#00295B] mb-2">
-                        {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
-                      </h4>
-                      <p className="text-sm text-[#101720]/70">
-                        {t("vaultInfo.actions.depositDescription", { 
-                          defaultValue: "Bridge from any chain or deposit USDT0 directly" 
-                        })}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-              setDepositDialogOpen(true);
-            }}
+                      onClick={() => setDepositDialogOpen(true)}
                       className="w-full px-4 py-3 text-base font-medium rounded-lg bg-[#00295B] text-[#FFFFF5] hover:bg-[#001a3d] transition-colors"
                     >
                       {t("vaultInfo.actions.deposit", { defaultValue: "Deposit" })}
                     </button>
                   </div>
-                ) : (
-                  <div className="min-h-[160px]">
-                    <input
-                      value={wdAmount}
-                      onChange={(e) => setWdAmount(e.target.value)}
-                      placeholder={t("vaultInfo.actions.placeholderAmount", { defaultValue: "0.00" })}
-                      className="w-full border rounded py-1.5 px-2 bg-white"
-                      inputMode="decimal"
-                    />
-                    <div className="flex items-center justify-between mt-1 text-xs text-[#101720]/70">
-                      <div>
-                        {t("vaultInfo.actions.maxWithdrawable", { defaultValue: "Max withdrawable" })}: {fmtToken(userAssets, onchainData.underlyingDecimals)} USDT0
-                      </div>
-                      <button
-                        type="button"
-                        className="px-2 py-0.5 text-xs border rounded"
-                        onClick={() => setWdAmount(formatUnits(userAssets, onchainData.underlyingDecimals))}
-                      >
-                        {t("vaultInfo.actions.max", { defaultValue: "Max" })}
-                      </button>
-                    </div>
+                  
+                  {/* Withdraw Button */}
+                  <div className="text-center">
+                    <h4 className="text-lg font-semibold text-[#00295B] mb-2">
+                      {t("vaultInfo.actions.withdrawTitle", { defaultValue: "Withdraw from USDT0 PHALANX" })}
+                    </h4>
+                    <p className="text-sm text-[#101720]/70 mb-4">
+                      {t("vaultInfo.actions.withdrawDescription", { 
+                        defaultValue: "Withdraw your vault shares to USDT0" 
+                      })}
+                    </p>
                     <button
                       type="button"
-                      disabled={pending !== null || !wdAmount || parseUnits(wdAmount || "0", onchainData.underlyingDecimals) <= 0n || parseUnits(wdAmount || "0", onchainData.underlyingDecimals) > userAssets}
-                      className="mt-3 w-full px-3 py-2 text-sm rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
-                      onClick={() => runWithdraw(false)}
+                      onClick={() => setWithdrawalDialogOpen(true)}
+                      className="w-full px-4 py-3 text-base font-medium rounded-lg bg-[#00295B] text-[#FFFFF5] hover:bg-[#001a3d] transition-colors"
                     >
-                      {pending === "withdraw"
-                        ? t("vaultInfo.actions.withdrawing", { defaultValue: "Withdrawing…" })
-                        : t("vaultInfo.actions.withdraw", { defaultValue: "Withdraw" })}
+                      {t("vaultInfo.actions.withdraw", { defaultValue: "Withdraw" })}
                     </button>
                   </div>
-                )}
+                </div>
               </div>
             </ChainVaultGuard>
             {/* Bridge to HyperEVM (via Jumper) removed */}
@@ -915,6 +903,47 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
               </div>
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
                 <LiFiQuoteTest onClose={handleDialogClose} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Withdrawal Dialog */}
+        {withdrawalDialogOpen && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={(e) => {
+              // Close dialog when clicking outside
+              if (e.target === e.currentTarget) {
+                handleWithdrawalClose();
+              }
+            }}
+          >
+            {/* Blurred background - transparent with blur effect */}
+            <div className="absolute inset-0 backdrop-blur-sm"></div>
+            
+            {/* Dialog container with cropping effect */}
+            <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-xl font-semibold text-[#00295B]">
+                    {t("vaultInfo.actions.withdrawTitle", { defaultValue: "Withdraw from USDT0 PHALANX" })}
+                  </h2>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleWithdrawalClose}
+                    className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
+                {/* WithdrawalDialog component will be added here */}
+                <div className="text-center py-8">
+                  <p className="text-[#101720]/70">Withdrawal dialog component coming soon...</p>
+                </div>
               </div>
             </div>
           </div>
