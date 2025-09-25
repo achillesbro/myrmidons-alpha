@@ -235,12 +235,12 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   //   }
   // };
 
-  // Fetch USDT0 balance when wallet connects
+  // Fetch USDT0 balance when wallet connects AND SDK is initialized
   useEffect(() => {
-    if (clientW.data?.account?.address) {
+    if (clientW.data?.account?.address && sdkInitialized) {
       fetchUSDT0Balance();
     }
-  }, [clientW.data?.account?.address]);
+  }, [clientW.data?.account?.address, sdkInitialized]);
 
 
 
@@ -720,12 +720,39 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         }
       }
 
+      // Update substeps for bridge execution
+      updateDepositState({
+        transactionSubsteps: [
+          { label: 'Execute bridge transaction', status: 'processing' as const, chainId: selectedToken.chainId }
+        ]
+      });
+
       // Execute the route with enhanced monitoring
       const executedRoute = await executeRoute(selectedRoute, {
         updateRouteHook: (updatedRoute) => {
           console.log('Route update:', updatedRoute);
           // Monitor route execution with real-time feedback
           monitorRouteExecution(updatedRoute);
+          
+          // Update substeps based on route execution status
+          if (updatedRoute.steps && updatedRoute.steps.length > 0) {
+            const lastStep = updatedRoute.steps[updatedRoute.steps.length - 1];
+            if (lastStep.execution?.process && lastStep.execution.process.length > 0) {
+              const lastProcess = lastStep.execution.process[lastStep.execution.process.length - 1];
+              if (lastProcess.txHash) {
+                updateDepositState({
+                  transactionSubsteps: [
+                    { 
+                      label: 'Execute bridge transaction', 
+                      status: 'processing' as const, 
+                      txHash: lastProcess.txHash, 
+                      chainId: selectedToken.chainId 
+                    }
+                  ]
+                });
+              }
+            }
+          }
         },
         acceptExchangeRateUpdateHook: async () => {
           console.log('Exchange rate update requested, accepting...');
@@ -754,10 +781,18 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         }
       }
 
-      // Update state with bridge transaction hash
+      // Update state with bridge transaction hash and mark as completed
       updateDepositState({
         bridgeTxHash: finalTxHash,
         currentStep: 4, // Move to bridge success step
+        transactionSubsteps: [
+          { 
+            label: 'Execute bridge transaction', 
+            status: 'completed' as const, 
+            txHash: finalTxHash, 
+            chainId: selectedToken.chainId 
+          }
+        ]
       });
 
       // Start monitoring bridge status in the background
