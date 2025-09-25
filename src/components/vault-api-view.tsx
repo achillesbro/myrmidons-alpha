@@ -129,18 +129,8 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const pushToast = (kind: ToastKind, text: string, ttl = 5000, href?: string) => {
     toastIdRef.current += 1;
     const id = toastIdRef.current;
-    
-    // If this is a success or error toast, remove all pending (info) toasts first
-    if (kind === 'success' || kind === 'error') {
-      setToasts((t) => t.filter((toast) => toast.kind !== 'info'));
-    }
-    
     setToasts((t) => [...t, { id, kind, text, href }]);
-    
-    // Only auto-remove non-pending toasts
-    if (ttl > 0 && kind !== 'info') {
-      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
-    }
+    if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
   };
 
   // User state (HyperEVM tx path only)
@@ -152,27 +142,13 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   const [userShares, setUserShares] = useState<bigint>(0n);
   const [userAssets, setUserAssets] = useState<bigint>(0n);
   const [depAmount, setDepAmount] = useState<string>("");
-  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
   const [wdAmount, setWdAmount] = useState<string>("");
   const [pending, setPending] = useState<"approve" | "deposit" | "withdraw" | null>(null);
   const [txMode, setTxMode] = useState<"deposit" | "withdraw">("deposit");
-
-  // Handle escape key to close deposit dialog
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && depositDialogOpen) {
-        setDepositDialogOpen(false);
-      }
-    };
-
-    if (depositDialogOpen) {
-      document.addEventListener('keydown', handleEscape);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [depositDialogOpen]);
+  
+  // Deposit dialog state
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [currentDepositStep, setCurrentDepositStep] = useState(1);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
   const TX_MODE_KEY = `TX_MODE_PREF:${VAULT_ADDRESS}`;
@@ -765,6 +741,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                       type="button"
                       onClick={() => {
               setDepositDialogOpen(true);
+              setCurrentDepositStep(1);
             }}
                       className="w-full px-4 py-3 text-base font-medium rounded-lg bg-[#00295B] text-[#FFFFF5] hover:bg-[#001a3d] transition-colors"
                     >
@@ -863,40 +840,36 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
 
         {/* Deposit Dialog */}
         {depositDialogOpen && (
-          <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={(e) => {
-              // Close dialog when clicking on the backdrop
-              if (e.target === e.currentTarget) {
-                setDepositDialogOpen(false);
-              }
-            }}
-          >
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Blurred background - transparent with blur effect */}
             <div className="absolute inset-0 backdrop-blur-sm"></div>
             
             {/* Dialog container with cropping effect */}
             <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl">
-            <div className="sticky top-0 bg-[#FFFFF5] border-b border-[#E5E2D6] z-10">
-              <div className="flex items-center justify-between p-6">
-                <h2 className="text-xl font-semibold text-[#00295B]">
-                  {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
-                </h2>
-                <button
-                  onClick={() => setDepositDialogOpen(false)}
-                  className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
-                >
-                  ×
-                </button>
+              <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={() => setDepositDialogOpen(false)}
+                    className="text-[#101720]/60 hover:text-[#101720] text-xl font-bold"
+                  >
+                    ←
+                  </button>
+                  <h2 className="text-xl font-semibold text-[#00295B]">
+                    {t("vaultInfo.actions.depositTitle", { defaultValue: "Deposit into USDT0 PHALANX" })}
+                  </h2>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-[#101720]/60">Step {currentDepositStep} of 3</span>
+                  <button
+                    onClick={() => setDepositDialogOpen(false)}
+                    className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
-            </div>
-              <div className="p-6 overflow-y-auto max-h-[calc(85vh-80px)]">
-                <LiFiQuoteTest 
-                  onSuccess={() => {
-                    setDepositDialogOpen(false);
-                    window.location.reload();
-                  }}
-                />
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
+                <LiFiQuoteTest onStepChange={setCurrentDepositStep} />
               </div>
             </div>
           </div>

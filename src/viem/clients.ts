@@ -7,15 +7,13 @@ const ENV_HYPER_RPC_URLS = [
   import.meta.env.VITE_HYPER_RPC_1,
   import.meta.env.VITE_HYPER_RPC_2,
   import.meta.env.VITE_HYPER_RPC_3,
-  import.meta.env.VITE_HYPER_RPC_4,
 ].filter(Boolean) as string[];
 
 // Sensible defaults (you can override via .env). Note:
-// - http://rpc.hypurrscan.io is HTTP only; keep if you’re comfortable with HTTP.
+// - http://rpc.hypurrscan.io is HTTP only; keep if you're comfortable with HTTP.
 const DEFAULT_HYPER_RPC_URLS: string[] = [
   "https://rpc.hyperliquid.xyz/evm",
   "http://rpc.hypurrscan.io",
-  "https://rpc.purroofgroup.com",
 ];
 
 // Merge env + defaults and de-duplicate while preserving order

@@ -1,6 +1,6 @@
 // src/components/ChainVaultGuard.tsx
 import { type ReactNode } from "react";
-import { useAccount, useChainId, useSwitchChain } from "wagmi";
+import { useAccount, useChainId } from "wagmi";
 
 type Props = {
   /** The only chain we allow for these children (e.g., 999 for HyperEVM) */
@@ -26,7 +26,6 @@ export function ChainVaultGuard({
 }: Props) {
   const { isConnected } = useAccount();
   const chainId = useChainId();
-  const { switchChain, isPending } = useSwitchChain();
 
   const allowed = allowedVaultsByChain[requiredChainId] ?? [];
   const isVaultAllowed = allowed
@@ -38,46 +37,6 @@ export function ChainVaultGuard({
 
   // If not connected: just render children (your UI already asks to connect)
   if (!isConnected) return <>{children}</>;
-
-  // Wrong chain
-  if (wrongChain && !warnOnly) {
-    return (
-      <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4 text-[#101720]">
-        <div className="text-sm mb-3">
-          You are connected to the wrong network. Please switch to <span className="font-medium">{requiredChainName}</span> to continue.
-        </div>
-        <button
-          type="button"
-          onClick={() => switchChain?.({ chainId: requiredChainId })}
-          disabled={isPending}
-          className="px-3 py-2 rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
-        >
-          {isPending ? "Switching…" : `Switch to ${requiredChainName}`}
-        </button>
-      </div>
-    );
-  }
-
-  if (wrongChain && warnOnly) {
-    return (
-      <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4 text-[#101720]">
-        <div className="text-sm mb-3">
-          You are on the wrong network. Some features may be disabled. Switch to <span className="font-medium">{requiredChainName}</span> for full functionality.
-        </div>
-        <div className="mb-3">
-          <button
-            type="button"
-            onClick={() => switchChain?.({ chainId: requiredChainId })}
-            disabled={isPending}
-            className="px-3 py-2 rounded bg-[#00295B] text-[#FFFFF5] disabled:opacity-50"
-          >
-            {isPending ? "Switching…" : `Switch to ${requiredChainName}`}
-          </button>
-        </div>
-        {children}
-      </div>
-    );
-  }
 
   // Wrong vault
   if (badVault && !warnOnly) {
