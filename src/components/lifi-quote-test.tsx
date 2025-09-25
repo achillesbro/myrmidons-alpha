@@ -966,8 +966,8 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           </div>
         </div>
         
-        {/* Enhanced progress steps */}
-        <div className="flex items-center justify-center space-x-1 mb-4">
+        {/* Compact progress steps - side by side layout */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 mb-4">
           {Array.from({ length: totalSteps }, (_, index) => {
             const stepNumber = index + 1;
             const stepInfo = getStepInfo(selectedPath, stepNumber);
@@ -976,52 +976,39 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
             const isCompleted = currentStep > stepNumber;
             
             return (
-              <div key={stepNumber} className="flex items-center">
-                <div className="flex items-center space-x-3">
-                  {/* Step circle with enhanced styling */}
-                  <div className={`relative w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${
-                    isCompleted 
-                      ? 'bg-green-500 text-white shadow-lg shadow-green-200' 
-                      : isCurrent 
-                        ? `${isPathA ? 'bg-green-100 text-green-800 border-2 border-green-500' : 'bg-blue-100 text-blue-800 border-2 border-blue-500'} shadow-lg` 
-                        : 'bg-gray-100 text-gray-500 border-2 border-gray-200'
-                  }`}>
-                    {isCompleted ? (
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      stepNumber
-                    )}
-                    
-                    {/* Current step pulse animation */}
-                    {isCurrent && (
-                      <div className={`absolute inset-0 rounded-full animate-ping ${
-                        isPathA ? 'bg-green-400' : 'bg-blue-400'
-                      } opacity-20`}></div>
-                    )}
-                  </div>
+              <div key={stepNumber} className="flex flex-col items-center space-y-2">
+                {/* Step circle with compact styling */}
+                <div className={`relative w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-300 ${
+                  isCompleted 
+                    ? 'bg-green-500 text-white' 
+                    : isCurrent 
+                      ? `${isPathA ? 'bg-green-100 text-green-800 border-2 border-green-500' : 'bg-blue-100 text-blue-800 border-2 border-blue-500'}` 
+                      : 'bg-gray-100 text-gray-500 border-2 border-gray-200'
+                }`}>
+                  {isCompleted ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    stepNumber
+                  )}
                   
-                  {/* Step label with enhanced styling */}
-                  <div className="hidden sm:block">
-                    <span className={`text-sm font-medium transition-colors duration-300 ${
-                      isActive ? (isPathA ? 'text-green-800' : 'text-blue-800') : 'text-gray-500'
-                    }`}>
-                      {stepInfo.label}
-                    </span>
-                  </div>
+                  {/* Current step pulse animation */}
+                  {isCurrent && (
+                    <div className={`absolute inset-0 rounded-full animate-ping ${
+                      isPathA ? 'bg-green-400' : 'bg-blue-400'
+                    } opacity-20`}></div>
+                  )}
                 </div>
                 
-                {/* Enhanced connector line */}
-                {stepNumber < totalSteps && (
-                  <div className={`w-8 h-0.5 mx-2 transition-colors duration-300 ${
-                    isCompleted 
-                      ? 'bg-green-500' 
-                      : currentStep > stepNumber 
-                        ? (isPathA ? 'bg-green-300' : 'bg-blue-300')
-                        : 'bg-gray-200'
-                  }`}></div>
-                )}
+                {/* Step label with compact styling */}
+                <div className="text-center">
+                  <span className={`text-xs font-medium transition-colors duration-300 ${
+                    isActive ? (isPathA ? 'text-green-800' : 'text-blue-800') : 'text-gray-500'
+                  }`}>
+                    {stepInfo.label}
+                  </span>
+                </div>
               </div>
             );
           })}
@@ -1170,11 +1157,29 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">From:</span>
-                    <span className="font-medium">{selectedToken?.tokenSymbol} on {selectedToken?.chainName}</span>
+                    <div className="flex items-center space-x-2">
+                      {selectedToken?.logoURI && (
+                        <img
+                          src={selectedToken.logoURI}
+                          alt={selectedToken.tokenSymbol}
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      )}
+                      <span className="font-medium">{selectedToken?.tokenSymbol} on {selectedToken?.chainName}</span>
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">To:</span>
-                    <span className="font-medium">USDT0 on HyperEVM</span>
+                    <div className="flex items-center space-x-2">
+                      <img
+                        src="/Myrmidons-logo-dark-no-bg.png"
+                        alt="USDT0"
+                        className="w-4 h-4 rounded-full"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      <span className="font-medium">USDT0 on HyperEVM</span>
+                    </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Amount:</span>
@@ -1204,7 +1209,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           <div className="p-8 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
             <div className="text-center">
               {/* Enhanced success icon with animation */}
-              <div className="relative w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200">
+              <div className="relative w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-10 h-10 text-white animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
@@ -1224,11 +1229,29 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">From:</span>
-                    <span className="font-bold text-gray-900">{selectedToken?.tokenSymbol} on {selectedToken?.chainName}</span>
+                    <div className="flex items-center space-x-2">
+                      {selectedToken?.logoURI && (
+                        <img
+                          src={selectedToken.logoURI}
+                          alt={selectedToken.tokenSymbol}
+                          className="w-5 h-5 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      )}
+                      <span className="font-bold text-gray-900">{selectedToken?.tokenSymbol} on {selectedToken?.chainName}</span>
+                    </div>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">To:</span>
-                    <span className="font-bold text-gray-900">USDT0 on HyperEVM</span>
+                    <div className="flex items-center space-x-2">
+                      <img
+                        src="/Myrmidons-logo-dark-no-bg.png"
+                        alt="USDT0"
+                        className="w-5 h-5 rounded-full"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      <span className="font-bold text-gray-900">USDT0 on HyperEVM</span>
+                    </div>
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600 font-medium">Amount:</span>
@@ -1240,7 +1263,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               {/* Enhanced deposit button */}
               <button
                 onClick={handlePathBStep4}
-                className="w-full py-4 px-6 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold text-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="w-full py-4 px-6 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold text-lg transition-all duration-200 transform hover:-translate-y-0.5"
               >
                 Deposit USDT0 to Vault
               </button>
@@ -1307,7 +1330,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           <div className="p-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
             <div className="text-center">
               {/* Enhanced success icon with animation */}
-              <div className="relative w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-200">
+              <div className="relative w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-10 h-10 text-white animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
@@ -1343,7 +1366,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               {/* Enhanced close button */}
               <button
                 onClick={handlePathBStep6}
-                className="w-full py-4 px-6 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold text-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="w-full py-4 px-6 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold text-lg transition-all duration-200 transform hover:-translate-y-0.5"
               >
                 Close
               </button>
@@ -1480,7 +1503,17 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">From:</span>
-                    <span className="font-bold text-gray-900">{selectedToken?.tokenSymbol} on {selectedToken?.chainName}</span>
+                    <div className="flex items-center space-x-2">
+                      {selectedToken?.logoURI && (
+                        <img
+                          src={selectedToken.logoURI}
+                          alt={selectedToken.tokenSymbol}
+                          className="w-5 h-5 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
+                      )}
+                      <span className="font-bold text-gray-900">{selectedToken?.tokenSymbol} on {selectedToken?.chainName}</span>
+                    </div>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">To:</span>
@@ -1512,7 +1545,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               <button
                 onClick={handlePathAStep3}
                 disabled={executing}
-                className="w-full py-4 px-6 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none"
+                className="w-full py-4 px-6 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg transition-all duration-200 transform hover:-translate-y-0.5 disabled:transform-none"
               >
                 {executing ? (
                   <div className="flex items-center justify-center space-x-2">
@@ -1533,7 +1566,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           <div className="p-8 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
             <div className="text-center">
               {/* Enhanced success icon with animation */}
-              <div className="relative w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-200">
+              <div className="relative w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-10 h-10 text-white animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
@@ -1569,7 +1602,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               {/* Enhanced close button */}
               <button
                 onClick={handlePathAStep4}
-                className="w-full py-4 px-6 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold text-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="w-full py-4 px-6 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold text-lg transition-all duration-200 transform hover:-translate-y-0.5"
               >
                 Close
               </button>
