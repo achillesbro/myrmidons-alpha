@@ -299,7 +299,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         headers: {
           'x-lifi-api-key': typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_LIFI_API_KEY 
             ? process.env.NEXT_PUBLIC_LIFI_API_KEY 
-            : 'f6f27ae1-842e-479b-93df-96965d72bffd.ce2dfa79-b4f9-40f9-8420-ca0a3b07b489'
+            : ''
         }
       });
       
