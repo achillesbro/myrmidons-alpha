@@ -3,10 +3,10 @@ import { getWalletClient, switchChain } from '@wagmi/core';
 
 // Initialize the Li.Fi SDK configuration
 const getApiKey = () => {
-  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_LIFI_API_KEY) {
-    return process.env.NEXT_PUBLIC_LIFI_API_KEY;
+  if (import.meta.env?.VITE_LIFI_API_KEY) {
+    return import.meta.env.VITE_LIFI_API_KEY;
   }
-  console.warn('NEXT_PUBLIC_LIFI_API_KEY not found in environment variables');
+  console.warn('VITE_LIFI_API_KEY not found in environment variables');
   return '';
 };
 

@@ -229,9 +229,7 @@ export const LiFiBalanceFetcher = ({
     try {
       const response = await fetch(`https://li.quest/v1/gas/prices/${chainId}`, {
         headers: {
-          'x-lifi-api-key': typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_LIFI_API_KEY 
-            ? process.env.NEXT_PUBLIC_LIFI_API_KEY 
-            : ''
+          'x-lifi-api-key': import.meta.env?.VITE_LIFI_API_KEY || ''
         }
       });
       
