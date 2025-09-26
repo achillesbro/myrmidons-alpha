@@ -1,31 +1,29 @@
 // api/lifi/gas/prices/[chainId].ts
-// Vercel API route to proxy Li.Fi gas prices API calls
+// Vercel serverless function to proxy Li.Fi gas prices API calls
 
-import { NextRequest, NextResponse } from 'next/server';
+export default async function handler(req: any, res: any) {
+  // Only allow GET requests
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { chainId: string } }
-) {
   try {
-    const { chainId } = params;
+    const { chainId } = req.query;
     
     // Validate chainId
     if (!chainId || isNaN(Number(chainId))) {
-      return NextResponse.json(
-        { error: 'Invalid chain ID' },
-        { status: 400 }
-      );
+      return res.status(400).json({
+        error: 'Invalid chain ID'
+      });
     }
 
     // Get API key from environment variables
     const apiKey = process.env.VITE_LIFI_API_KEY;
     if (!apiKey) {
       console.error('VITE_LIFI_API_KEY not found in environment variables');
-      return NextResponse.json(
-        { error: 'API key not configured' },
-        { status: 500 }
-      );
+      return res.status(500).json({
+        error: 'API key not configured'
+      });
     }
 
     // Proxy the request to Li.Fi API
@@ -39,20 +37,18 @@ export async function GET(
 
     if (!response.ok) {
       console.error(`Li.Fi API error: ${response.status} ${response.statusText}`);
-      return NextResponse.json(
-        { error: 'Failed to fetch gas prices' },
-        { status: response.status }
-      );
+      return res.status(response.status).json({
+        error: 'Failed to fetch gas prices'
+      });
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    return res.status(200).json(data);
 
   } catch (error) {
     console.error('Error in gas prices API route:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return res.status(500).json({
+      error: 'Internal server error'
+    });
   }
 }
