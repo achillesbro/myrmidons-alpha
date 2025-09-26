@@ -41,12 +41,12 @@ export function getEthereumProvider(): EthereumProvider | null {
     );
     
     if (metaMaskProvider) {
-      console.log('Multiple wallets detected, using MetaMask');
+      // Multiple wallets detected, using MetaMask
       return metaMaskProvider;
     }
 
     // Fallback to first available provider
-    console.log('Multiple wallets detected, using first available provider');
+    // Multiple wallets detected, using first available provider
     return window.ethereum.providers[0];
   }
 

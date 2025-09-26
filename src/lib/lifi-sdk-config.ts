@@ -6,7 +6,6 @@ const getApiKey = () => {
   if (import.meta.env?.VITE_LIFI_API_KEY) {
     return import.meta.env.VITE_LIFI_API_KEY;
   }
-  console.warn('VITE_LIFI_API_KEY not found in environment variables');
   return '';
 };
 
@@ -41,7 +40,7 @@ export const updateLifiConfig = async (wagmiConfig: any) => {
       }),
     ]);
     
-    console.log('Li.Fi SDK configured with chains:', chains.length);
+    // Li.Fi SDK configured successfully
   } catch (error) {
     console.error('Failed to configure Li.Fi SDK:', error);
   }

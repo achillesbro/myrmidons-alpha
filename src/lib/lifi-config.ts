@@ -1,16 +1,11 @@
 // Li.Fi SDK Configuration
 const getApiKey = () => {
-  // Debug: Log what we're getting from import.meta.env
-  console.log('import.meta.env keys:', Object.keys(import.meta.env).filter(key => key.includes('LIFI')));
-  console.log('VITE_LIFI_API_KEY value:', import.meta.env?.VITE_LIFI_API_KEY);
-  
   // Only use environment variable - no fallback for security
   if (import.meta.env?.VITE_LIFI_API_KEY) {
     return import.meta.env.VITE_LIFI_API_KEY;
   }
   
   // No fallback - will be empty string if not set
-  console.warn('VITE_LIFI_API_KEY not found in environment variables');
   return '';
 };
 

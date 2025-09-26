@@ -10,6 +10,7 @@ import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
 import { erc20Abi } from 'viem';
 import vaultAbi from '../abis/vault.json';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
+import { checkBridgeStatus } from '../lib/api-proxy';
 
 // Vault address for direct deposits
 const VAULT_ADDRESS = (import.meta.env.VITE_MORPHO_VAULT || '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42') as `0x${string}`;
@@ -295,17 +296,11 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     error?: string;
   }> => {
     try {
-      const response = await fetch(`https://li.quest/v1/status?txHash=${txHash}&fromChainId=${fromChainId}&toChainId=${toChainId}`, {
-        headers: {
-          'x-lifi-api-key': import.meta.env?.VITE_LIFI_API_KEY || ''
-        }
-      });
+      const status = await checkBridgeStatus(txHash, fromChainId, toChainId);
       
-      if (!response.ok) {
-        throw new Error(`Status API error: ${response.status}`);
+      if (!status) {
+        throw new Error('Failed to get bridge status');
       }
-      
-      const status = await response.json();
       
       return {
         success: status.status === 'DONE',
@@ -386,13 +381,12 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   };
 
   const monitorRouteExecution = (route: any) => {
-    console.log('Monitoring route execution:', route);
+    // Monitoring route execution
     
     route.steps.forEach((step: any, stepIndex: number) => {
-      const stepDescription = getStepDescription(step, stepIndex);
-      const stepStatus = getStepStatus(step);
-      
-      console.log(`Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus}`);
+      // Monitor each step for debugging (variables removed for production)
+      void getStepDescription(step, stepIndex);
+      void getStepStatus(step);
     });
   };
 
@@ -469,7 +463,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         const allowance = await token.allowance(clientW.data?.account?.address, VAULT_ADDRESS);
         needsApproval = allowance < amountWei;
       } catch (error: any) {
-        console.log('Allowance check failed, assuming no approval needed:', error.message);
+        // Allowance check failed, assuming no approval needed
         needsApproval = false;
       }
       
@@ -731,7 +725,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       // Execute the route with enhanced monitoring
       const executedRoute = await executeRoute(selectedRoute, {
         updateRouteHook: (updatedRoute) => {
-          console.log('Route update:', updatedRoute);
+          // Route updated
           // Monitor route execution with real-time feedback
           monitorRouteExecution(updatedRoute);
           
@@ -756,14 +750,14 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           }
         },
         acceptExchangeRateUpdateHook: async () => {
-          console.log('Exchange rate update requested, accepting...');
+          // Exchange rate update requested, accepting
           return true; // Accept rate updates automatically
         },
         switchChainHook: async (chainId) => {
-          console.log('Switching to chain:', chainId);
+          // Switching to chain
           try {
             const chain = await switchChain(wagmiConfig, { chainId });
-            console.log('Successfully switched to chain:', chain.id);
+            // Successfully switched to chain
             return getWalletClient(wagmiConfig, { chainId: chain.id });
           } catch (error) {
             console.error('Failed to switch chain:', error);
@@ -917,7 +911,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     
     setUsdt0Loading(true);
     try {
-      console.log('Fetching USDT0 balance for address:', clientW.data.account.address);
+      // Fetching USDT0 balance
       
       // Get USDT0 token info from Li.Fi
       const tokenInfo = await getToken(CHAIN_IDS.HYPEREVM, TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0);
@@ -933,12 +927,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           (parseFloat(balanceFormatted) * parseFloat(tokenInfo.priceUSD)).toFixed(2) : 
           balanceFormatted;
         
-        console.log('USDT0 balance fetched:', {
-          balance: amountStr,
-          balanceFormatted,
-          balanceUSD,
-          priceUSD: tokenInfo.priceUSD
-        });
+        // USDT0 balance fetched successfully
         
         // Only set balance if it's greater than 0
         if (parseFloat(balanceFormatted) > 0) {
@@ -972,7 +961,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   // Legacy handleExecute function - now handled by path-specific functions
   // This is kept for backward compatibility with LiFiBalanceFetcher
   const handleExecute = async () => {
-    console.warn('handleExecute is deprecated - use path-specific handlers instead');
+    // handleExecute is deprecated - use path-specific handlers instead
     // This function is no longer used as we have path-specific implementations
   };
 

@@ -3,6 +3,7 @@ import { useAccount } from 'wagmi';
 import { CHAIN_IDS } from '../lib/lifi-config';
 import { getTokens, getTokenBalances, getToken, ChainType } from '@lifi/sdk';
 import { formatUnits } from 'viem';
+import { fetchGasPrices } from '../lib/api-proxy';
 
 // Utility function to format USD values with comma separators for display only
 const formatUSD = (value: string | number): string => {
@@ -188,7 +189,7 @@ export const LiFiBalanceFetcher = ({
   // Fetch gas prices when reaching step 3
   useEffect(() => {
     if (currentStep === 3 && selectedToken) {
-      fetchGasPrices(selectedToken.chainId);
+      fetchGasPricesForChain(selectedToken.chainId);
     }
   }, [currentStep, selectedToken]);
 
@@ -224,20 +225,19 @@ export const LiFiBalanceFetcher = ({
     return true;
   });
 
-  // Fetch gas prices for the selected token's chain
-  const fetchGasPrices = async (chainId: number) => {
+  // Fetch gas prices for the selected token's chain using secure proxy
+  const fetchGasPricesForChain = async (chainId: number) => {
     try {
-      const response = await fetch(`https://li.quest/v1/gas/prices/${chainId}`, {
-        headers: {
-          'x-lifi-api-key': import.meta.env?.VITE_LIFI_API_KEY || ''
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setGasFees(data);
-      } else {
-        console.warn('Failed to fetch gas prices:', response.status);
+      const data = await fetchGasPrices(chainId);
+      if (data) {
+        // Convert API response to expected format
+        const gasFees = {
+          standard: parseFloat(data.standard.maxFeePerGas),
+          fast: parseFloat(data.fast.maxFeePerGas),
+          fastest: parseFloat(data.instant.maxFeePerGas),
+          lastUpdated: Date.now()
+        };
+        setGasFees(gasFees);
       }
     } catch (error) {
       console.warn('Error fetching gas prices:', error);

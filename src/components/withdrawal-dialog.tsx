@@ -200,7 +200,7 @@ export function WithdrawalDialog({
             throw timeoutError; // Re-throw if no receipt found
           }
           // Transaction was successful despite timeout
-          console.log('Transaction confirmed despite timeout');
+          // Transaction confirmed despite timeout
         } catch {
           throw timeoutError; // Re-throw if we can't verify success
         }
