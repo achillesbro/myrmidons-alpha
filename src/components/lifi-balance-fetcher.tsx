@@ -209,11 +209,11 @@ export const LiFiBalanceFetcher = ({
     onAmountEnter(e.target.value);
   };
 
-  // Sort balances: USDT0 first, then by USD amount descending
+  // Sort balances: USD₮0 first, then by USD amount descending
   const sortedBalances = balances.sort((a, b) => {
-    // USDT0 always first
-    if (a.tokenSymbol === 'USDT0') return -1;
-    if (b.tokenSymbol === 'USDT0') return 1;
+    // USD₮0 always first
+    if (a.tokenSymbol === 'USD₮0') return -1;
+    if (b.tokenSymbol === 'USD₮0') return 1;
     
     // Then sort by USD amount descending
     const aUSD = parseFloat(a.balanceUSD || '0');
@@ -221,10 +221,10 @@ export const LiFiBalanceFetcher = ({
     return bUSD - aUSD;
   });
 
-  // Filter balances for bridge flow: exclude USDT0 from HyperEVM to avoid duplication
+  // Filter balances for bridge flow: exclude USD₮0 from HyperEVM to avoid duplication
   const bridgeFlowBalances = sortedBalances.filter(balance => {
-    // Exclude USDT0 from HyperEVM in bridge flow since it's shown in direct deposit section
-    return !(balance.tokenSymbol === 'USDT0' && balance.chainId === CHAIN_IDS.HYPEREVM);
+    // Exclude USD₮0 from HyperEVM in bridge flow since it's shown in direct deposit section
+    return !(balance.tokenSymbol === 'USD₮0' && balance.chainId === CHAIN_IDS.HYPEREVM);
   });
 
   // Fetch gas prices for the selected token's chain
