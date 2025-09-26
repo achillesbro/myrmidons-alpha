@@ -1,6 +1,16 @@
 // Li.Fi SDK Configuration
+const getApiKey = () => {
+  // Try to get from environment variable first
+  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_LIFI_API_KEY) {
+    return process.env.NEXT_PUBLIC_LIFI_API_KEY;
+  }
+  
+  // Fallback for development (you can remove this after setting up .env.local)
+  return 'f6f27ae1-842e-479b-93df-96965d72bffd.ce2dfa79-b4f9-40f9-8420-ca0a3b07b489';
+};
+
 export const LIFI_CONFIG = {
-  apiKey: process.env.NEXT_PUBLIC_LIFI_API_KEY || '',
+  apiKey: getApiKey(),
   integrator: 'earn-basic-app',
 };
 
