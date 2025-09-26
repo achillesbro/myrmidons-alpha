@@ -4,7 +4,7 @@ import { CHAIN_IDS } from '../lib/lifi-config';
 import { getTokens, getTokenBalances, getToken, ChainType } from '@lifi/sdk';
 import { formatUnits } from 'viem';
 
-// Utility function to format USD values with comma separators
+// Utility function to format USD values with comma separators for display only
 const formatUSD = (value: string | number): string => {
   const numValue = typeof value === 'string' ? parseFloat(value) : value;
   if (isNaN(numValue)) return '0.00';
@@ -122,7 +122,7 @@ export const LiFiBalanceFetcher = ({
             
             // Calculate USD value
             const priceUSD = tokenDetails.priceUSD ? parseFloat(tokenDetails.priceUSD) : 0;
-            const balanceUSD = formatUSD(parseFloat(balanceFormatted) * priceUSD);
+            const balanceUSD = (parseFloat(balanceFormatted) * priceUSD).toFixed(2);
             
             balances.push({
               chainId: balance.chainId,
@@ -297,7 +297,7 @@ export const LiFiBalanceFetcher = ({
                 {parseFloat(usdt0Balance.balanceFormatted).toFixed(4)}
               </div>
               <div className="text-xs text-green-600">
-                {usdt0Balance.balanceUSD}
+                ${formatUSD(usdt0Balance.balanceUSD || '0')}
               </div>
             </div>
           </div>
@@ -393,7 +393,7 @@ export const LiFiBalanceFetcher = ({
                         {parseFloat(balance.balanceFormatted).toFixed(4)}
                       </div>
                       <div className="text-xs text-gray-600">
-                        {balance.balanceUSD ? `$${balance.balanceUSD}` : balance.tokenSymbol}
+                        {balance.balanceUSD ? `$${formatUSD(balance.balanceUSD)}` : balance.tokenSymbol}
                       </div>
                     </div>
                   </div>
@@ -439,7 +439,7 @@ export const LiFiBalanceFetcher = ({
                 {parseFloat(selectedToken.balanceFormatted).toFixed(6)} {selectedToken.tokenSymbol}
               </div>
               <div className="text-sm text-gray-600">
-                {selectedToken.balanceUSD ? `$${selectedToken.balanceUSD}` : 'USD value unavailable'}
+                {selectedToken.balanceUSD ? `$${formatUSD(selectedToken.balanceUSD)}` : 'USD value unavailable'}
               </div>
             </div>
           </div>
@@ -459,7 +459,7 @@ export const LiFiBalanceFetcher = ({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="text-xs text-gray-500 mt-1">
-              Available: ${selectedToken.balanceUSD || '0.00'} USD
+              Available: ${formatUSD(selectedToken.balanceUSD || '0')} USD
               {selectedToken.priceUSD && (
                 <span className="ml-2">
                   ({parseFloat(selectedToken.balanceFormatted).toFixed(6)} {selectedToken.tokenSymbol})
@@ -482,7 +482,7 @@ export const LiFiBalanceFetcher = ({
                       const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
                         ? parseFloat(selectedToken.balanceFormatted)
                         : parseFloat(selectedToken.balanceUSD || '0');
-                      const amountUSD = formatUSD(maxAmount * percentage / 100);
+                      const amountUSD = (maxAmount * percentage / 100).toFixed(2);
                       handleAmountChange({ target: { value: amountUSD } } as any);
                     }}
                     className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
