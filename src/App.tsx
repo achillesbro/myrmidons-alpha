@@ -23,7 +23,6 @@ import { apolloClient } from "./service/apollo.client";
 import { VaultAPIView } from "./components/vault-api-view";
 import { AboutView } from "./components/about-view";
 import { SiteFooter } from "./components/site-footer";
-import { LiFiQuoteTest } from "./components/lifi-quote-test";
 import { useTranslation } from 'react-i18next'
 import i18n from "./i18n";
 

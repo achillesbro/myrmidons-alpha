@@ -14,7 +14,7 @@ interface EthereumProvider {
 
 declare global {
   interface Window {
-    ethereum?: EthereumProvider;
+    ethereum?: any;
   }
 }
 
@@ -37,7 +37,7 @@ export function getEthereumProvider(): EthereumProvider | null {
   if (window.ethereum.providers && Array.isArray(window.ethereum.providers)) {
     // Prefer MetaMask if available
     const metaMaskProvider = window.ethereum.providers.find(
-      provider => provider.isMetaMask
+      (provider: any) => provider.isMetaMask
     );
     
     if (metaMaskProvider) {

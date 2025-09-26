@@ -31,7 +31,7 @@ export async function batchContractCalls(
             address: call.address,
             abi: call.abi,
             functionName: call.functionName,
-            args: call.args,
+            args: call.args || [],
           });
           return { key: call.key, result, error: null };
         } catch (error) {
@@ -95,7 +95,7 @@ export class ContractCallCache {
   }
 
   // Generate cache key for contract calls
-  static createKey(address: Address, abi: any, functionName: string, args?: any[]): string {
+  static createKey(address: Address, _abi: any, functionName: string, args?: any[]): string {
     const argsStr = args ? JSON.stringify(args) : '';
     return `${address.toLowerCase()}-${functionName}-${argsStr}`;
   }
@@ -137,7 +137,7 @@ export class OptimizedContractReader {
       address,
       abi,
       functionName,
-      args,
+      args: args || [],
     }).then(result => {
       this.cache.set(key, result);
       this.pendingCalls.delete(key);

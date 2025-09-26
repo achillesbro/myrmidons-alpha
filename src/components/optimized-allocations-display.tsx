@@ -1,5 +1,4 @@
 // src/components/optimized-allocations-display.tsx
-import React from 'react';
 import { useVaultAllocationsOptimized } from '../hooks/useVaultAllocationsOptimized';
 import { useVaultCurrentApyOptimized } from '../hooks/useVaultCurrentApyOptimized';
 import type { Address } from 'viem';

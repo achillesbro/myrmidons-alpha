@@ -185,7 +185,7 @@ export function useVaultAllocationsOptimized(vaultAddress: Address): OptimizedAl
         const queueResults = await globalContractReader.batchReadContracts(hyperPublicClient, queueCalls);
         
         // Process results
-        Object.entries(queueResults).forEach(([key, id]) => {
+        Object.entries(queueResults).forEach(([, id]) => {
           if (id && typeof id === 'string') {
             idsSet.add(id as `0x${string}`);
           }
@@ -198,7 +198,7 @@ export function useVaultAllocationsOptimized(vaultAddress: Address): OptimizedAl
         updateProgress(3, 10);
         const marketCalls: BatchCall[] = [];
         
-        ids.forEach((id, index) => {
+        ids.forEach((id) => {
           marketCalls.push(
             {
               address: morphoAddr,
