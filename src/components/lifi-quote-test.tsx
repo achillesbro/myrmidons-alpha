@@ -923,9 +923,19 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         const balance = balances[0];
         const amountStr = balance.amount?.toString() || '0';
         const balanceFormatted = formatUnits(BigInt(amountStr), balance.decimals || 6);
-        const balanceUSD = tokenInfo.priceUSD ? 
-          (parseFloat(balanceFormatted) * parseFloat(tokenInfo.priceUSD)).toFixed(2) : 
-          balanceFormatted;
+        // For USDT0, it's 1:1 with USD, so use balanceFormatted directly
+        // If priceUSD is available, use it; otherwise assume 1:1 ratio
+        const priceUSD = tokenInfo.priceUSD ? parseFloat(tokenInfo.priceUSD) : 1.0;
+        const balanceUSD = (parseFloat(balanceFormatted) * priceUSD).toFixed(2);
+        
+        // Debug logging to help identify the issue
+        console.log('USDT0 Balance Debug:', {
+          balanceFormatted,
+          priceUSD: tokenInfo.priceUSD,
+          calculatedPriceUSD: priceUSD,
+          balanceUSD,
+          tokenInfo: tokenInfo
+        });
         
         // USDT0 balance fetched successfully
         
@@ -941,7 +951,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
             decimals: balance.decimals || 6,
             logoURI: tokenInfo.logoURI,
             priceUSD: tokenInfo.priceUSD,
-            balanceUSD: `$${balanceUSD}`
+            balanceUSD: balanceUSD
           });
         } else {
           setUsdt0Balance(null);
