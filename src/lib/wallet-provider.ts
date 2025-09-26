@@ -29,6 +29,7 @@ export function getEthereumProvider(): EthereumProvider | null {
 
   // If no ethereum object exists
   if (!window.ethereum) {
+    console.warn('No Ethereum provider found. Please install a wallet extension.');
     return null;
   }
 
@@ -40,10 +41,12 @@ export function getEthereumProvider(): EthereumProvider | null {
     );
     
     if (metaMaskProvider) {
+      console.log('Multiple wallets detected, using MetaMask');
       return metaMaskProvider;
     }
 
     // Fallback to first available provider
+    console.log('Multiple wallets detected, using first available provider');
     return window.ethereum.providers[0];
   }
 
@@ -65,6 +68,7 @@ export function createSafeBrowserProvider(): BrowserProvider | null {
 
     return new BrowserProvider(provider);
   } catch (error) {
+    console.error('Failed to create BrowserProvider:', error);
     return null;
   }
 }
@@ -88,6 +92,7 @@ export async function getCurrentAddress(): Promise<string | null> {
     const accounts = await provider.request({ method: 'eth_accounts' });
     return accounts[0] || null;
   } catch (error) {
+    console.error('Failed to get current address:', error);
     return null;
   }
 }
@@ -108,6 +113,7 @@ export async function requestWalletConnection(): Promise<string[]> {
     
     return accounts;
   } catch (error) {
+    console.error('Failed to request wallet connection:', error);
     throw error;
   }
 }

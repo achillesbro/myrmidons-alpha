@@ -106,10 +106,17 @@ export const usePopulatedSimulationState = (vaultAddress: Address) => {
 
     const errorMessage = getSimulationErrorMessage(simulation.error);
     if (errorMessage) {
-      // Simulation error details available
+      console.error("Simulation error details:", {
+        error: simulation.error,
+        errorMessage,
+      });
     }
   } catch (error) {
-    // Error in useSimulationState
+    console.error("Error in useSimulationState:", {
+      error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     throw error;
   }
 

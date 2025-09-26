@@ -95,6 +95,7 @@ export class PriceOptimizer {
     try {
       return await getUsdPrice({ token, coingeckoId });
     } catch (error) {
+      console.warn(`Price fetch failed for ${token}:`, error);
       return null;
     }
   }
@@ -142,6 +143,7 @@ export async function getOptimizedPrice(
     const price = await globalPriceOptimizer.getPrice(token, coingeckoId);
     return price ?? fallbackPrice ?? null;
   } catch (error) {
+    console.warn(`Price optimization failed for ${token}, using fallback:`, error);
     return fallbackPrice ?? null;
   }
 }

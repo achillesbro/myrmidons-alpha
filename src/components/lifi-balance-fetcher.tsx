@@ -137,6 +137,7 @@ export const LiFiBalanceFetcher = ({
               balanceUSD,
             });
           } catch (error) {
+            console.error(`Error fetching token details for ${balance.symbol}:`, error);
             // Fallback without metadata
             const chainInfo = CHAIN_INFO[balance.chainId as keyof typeof CHAIN_INFO];
             const amountStr = balance.amount?.toString() || '0';
@@ -155,6 +156,7 @@ export const LiFiBalanceFetcher = ({
 
       return balances;
     } catch (error) {
+      console.error('Error fetching balances with Li.Fi:', error);
       return [];
     }
   };
@@ -170,6 +172,7 @@ export const LiFiBalanceFetcher = ({
       const allBalances = await fetchAllBalancesWithLifi();
       setBalances(allBalances);
     } catch (error) {
+      console.error('Error fetching balances:', error);
       setError('Failed to fetch balances. Please try again.');
     } finally {
       setLoading(false);
@@ -234,10 +237,10 @@ export const LiFiBalanceFetcher = ({
         const data = await response.json();
         setGasFees(data);
       } else {
-        // Failed to fetch gas prices
+        console.warn('Failed to fetch gas prices:', response.status);
       }
     } catch (error) {
-      // Error fetching gas prices
+      console.warn('Error fetching gas prices:', error);
     }
   };
 

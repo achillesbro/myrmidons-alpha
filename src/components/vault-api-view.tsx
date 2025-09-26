@@ -165,7 +165,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         await refreshVaultTotalsFast();
       }
     } catch (error) {
-      // Failed to refresh position data
+      console.error('Failed to refresh position data:', error);
     }
   };
   
@@ -197,7 +197,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         await refreshVaultTotalsFast();
       }
     } catch (error) {
-      // Failed to refresh position data
+      console.error('Failed to refresh position data:', error);
     }
   };
   
@@ -379,6 +379,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         pushToast("success", t("vaultInfo.errors.approvalConfirmed"));
       } catch (err) {
         // Swallow timeout — deposit has already been prompted; nonce ordering will ensure safety
+        console.warn(t("vaultInfo.errors.approvalTimeout"), err);
       } finally {
         // Allowance refresh removed - not needed for new deposit flow
         setLastUpdated(Date.now());
