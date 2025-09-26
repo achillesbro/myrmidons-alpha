@@ -37,7 +37,8 @@ export const TOKEN_GROUPS = [
     label: "WHYPE",
     logo: "/assets/WHYPE-TokenIcon.jpg",
     ids: [
-      "0xace279b5c6eff0a1ce7287249369fa6f4d3d32225e1629b04ef308e0eb568fb0"
+      "0xace279b5c6eff0a1ce7287249369fa6f4d3d32225e1629b04ef308e0eb568fb0",
+      "0xd5a9fba2309a0b85972a96f2cc45f9784e786d712944d8fc0b31a6d9cb4f21d3"
     ] as const,
   },
   {
@@ -45,7 +46,8 @@ export const TOKEN_GROUPS = [
     logo: "/assets/kHYPE-TokenIcon.png",
     ids: [
       "0xc5526286d537c890fdd879d17d80c4a22dc7196c1e1fff0dd6c853692a759c62",
-      "0x78f6b57d825ef01a5dc496ad1f426a6375c685047d07a30cd07ac5107ffc7976"
+      "0x78f6b57d825ef01a5dc496ad1f426a6375c685047d07a30cd07ac5107ffc7976",
+      "0xd2e8f6fd195556222d7a0314d4fb93fdf84ae920faaebba6dbcf584ac865e1f5"
     ] as const,
   },
   {
