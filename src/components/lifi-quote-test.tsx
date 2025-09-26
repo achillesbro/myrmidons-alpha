@@ -12,7 +12,7 @@ import vaultAbi from '../abis/vault.json';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
 
 // Vault address for direct deposits
-const VAULT_ADDRESS = '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42' as `0x${string}`;
+const VAULT_ADDRESS = (import.meta.env.VITE_MORPHO_VAULT || '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42') as `0x${string}`;
 
 // Helper functions for chain names and explorer URLs
 const getChainName = (chainId: number): string => {

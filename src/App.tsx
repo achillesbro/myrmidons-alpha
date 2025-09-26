@@ -26,7 +26,7 @@ import { SiteFooter } from "./components/site-footer";
 import { useTranslation } from 'react-i18next'
 import i18n from "./i18n";
 
-const DEFAULT_VAULT: Address = "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42";
+const DEFAULT_VAULT: Address = (import.meta.env.VITE_MORPHO_VAULT || "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42") as Address;
 
 const TABS = ["VAULTINFO", "ABOUT", "LIFI_TEST"] as const;
 type Tab = typeof TABS[number];
