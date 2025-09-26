@@ -113,7 +113,7 @@ export function WithdrawalDialog({
         const usdt0Token = await getToken(CHAIN_IDS.HYPEREVM, TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0);
         setUsdt0LogoURI(usdt0Token.logoURI || null);
       } catch (error) {
-        console.error('Failed to fetch USDT0 logo:', error);
+        // Failed to fetch USDT0 logo
       }
     };
     
@@ -193,14 +193,12 @@ export function WithdrawalDialog({
         await provider.waitForTransaction(tx.hash, 1, 60_000);
       } catch (timeoutError) {
         // If timeout occurs, check if transaction was actually successful
-        console.warn('Transaction wait timed out, checking if successful...');
         try {
           const receipt = await provider.getTransactionReceipt(tx.hash);
           if (!receipt) {
             throw timeoutError; // Re-throw if no receipt found
           }
           // Transaction was successful despite timeout
-          // Transaction confirmed despite timeout
         } catch {
           throw timeoutError; // Re-throw if we can't verify success
         }
@@ -224,7 +222,6 @@ export function WithdrawalDialog({
       pushToast('success', 'Withdrawal successful!');
       
     } catch (error: any) {
-      console.error('Withdrawal failed:', error);
       
       // Enhanced error handling
       let errorMessage = 'Withdrawal failed';

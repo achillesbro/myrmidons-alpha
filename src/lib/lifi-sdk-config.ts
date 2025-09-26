@@ -42,6 +42,6 @@ export const updateLifiConfig = async (wagmiConfig: any) => {
     
     // Li.Fi SDK configured successfully
   } catch (error) {
-    console.error('Failed to configure Li.Fi SDK:', error);
+    // Failed to configure Li.Fi SDK
   }
 };

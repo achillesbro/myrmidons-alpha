@@ -9,10 +9,11 @@ const ENV_HYPER_RPC_URLS = [
   import.meta.env.VITE_HYPER_RPC_3,
 ].filter(Boolean) as string[];
 
-// Sensible defaults (you can override via .env). Only HTTPS endpoints for security.
+// Sensible defaults (you can override via .env). Note:
+// - http://rpc.hypurrscan.io is HTTP only; keep if you're comfortable with HTTP.
 const DEFAULT_HYPER_RPC_URLS: string[] = [
   "https://rpc.hyperliquid.xyz/evm",
-  // Removed HTTP endpoint for security - use only HTTPS
+  "http://rpc.hypurrscan.io",
 ];
 
 // Merge env + defaults and de-duplicate while preserving order

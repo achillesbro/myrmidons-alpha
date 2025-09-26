@@ -44,7 +44,6 @@ export async function batchContractCalls(
     const batchResult: BatchResult = {};
     results.forEach(({ key, result, error }) => {
       if (error) {
-        console.warn(`Batch call failed for ${key}:`, error);
         batchResult[key] = null;
       } else {
         batchResult[key] = result;
@@ -53,7 +52,6 @@ export async function batchContractCalls(
 
     return batchResult;
   } catch (error) {
-    console.error('Batch contract calls failed:', error);
     // Fallback: return null for all keys
     const fallback: BatchResult = {};
     calls.forEach(call => {
