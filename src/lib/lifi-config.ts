@@ -1,6 +1,6 @@
 // Li.Fi SDK Configuration
 export const LIFI_CONFIG = {
-  apiKey: 'f6f27ae1-842e-479b-93df-96965d72bffd.ce2dfa79-b4f9-40f9-8420-ca0a3b07b489',
+  apiKey: process.env.NEXT_PUBLIC_LIFI_API_KEY || '',
   integrator: 'earn-basic-app',
 };
 

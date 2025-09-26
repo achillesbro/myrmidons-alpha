@@ -4,6 +4,7 @@ import { getWalletClient, switchChain } from '@wagmi/core';
 // Initialize the Li.Fi SDK configuration
 config.set({
   integrator: 'earn-basic-app',
+  apiKey: process.env.NEXT_PUBLIC_LIFI_API_KEY || '',
   // Disable chain preloading since we'll load chains dynamically
   preloadChains: false,
 });
