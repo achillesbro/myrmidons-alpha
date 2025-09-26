@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
+import { CHAIN_IDS } from '../lib/lifi-config';
 import { getTokens, getTokenBalances, getToken, ChainType } from '@lifi/sdk';
 import { formatUnits } from 'viem';
 
@@ -84,36 +84,16 @@ export const LiFiBalanceFetcher = ({
 
       const tokensToCheck: any[] = [];
 
-      // Add native tokens and specific ERC-20 tokens for each chain
+      // Add ALL tokens from each supported chain (not just hardcoded ones)
       for (const chainId of supportedChainIds) {
         const chainTokens = tokensResponse.tokens[chainId];
         if (!chainTokens) continue;
 
-        // Add native token (ETH, BNB, etc.)
-        const nativeToken = chainTokens.find(token => 
-          token.address === '0x0000000000000000000000000000000000000000'
-        );
-        if (nativeToken) {
-          tokensToCheck.push(nativeToken);
-        }
-
-        // Add specific ERC-20 tokens we want to track
-        const chainTokenAddresses = TOKEN_ADDRESSES[chainId as keyof typeof TOKEN_ADDRESSES];
-        if (chainTokenAddresses) {
-          for (const [, address] of Object.entries(chainTokenAddresses)) {
-            if (address !== '0x0000000000000000000000000000000000000000') {
-              const token = chainTokens.find(t => 
-                t.address.toLowerCase() === address.toLowerCase()
-              );
-              if (token) {
-                tokensToCheck.push(token);
-              }
-            }
-          }
-        }
+        // Add ALL tokens from this chain (native + ERC-20)
+        tokensToCheck.push(...chainTokens);
       }
 
-      // Get balances for all tokens
+      // Get balances for ALL tokens
       const tokenBalances = await getTokenBalances(address, tokensToCheck);
 
       // Convert to our format and fetch additional token metadata
@@ -121,12 +101,14 @@ export const LiFiBalanceFetcher = ({
       
       for (const balance of tokenBalances) {
         if (balance && balance.amount && parseFloat(balance.amount.toString()) > 0) {
+          // Skip tokens with very small balances (less than 0.000001) to avoid dust
+          const balanceFormatted = formatUnits(BigInt(balance.amount.toString()), balance.decimals);
+          if (parseFloat(balanceFormatted) < 0.000001) continue;
           try {
             // Fetch additional token metadata
             const tokenDetails = await getToken(balance.chainId, balance.address);
             const chainInfo = CHAIN_INFO[balance.chainId as keyof typeof CHAIN_INFO];
             const amountStr = balance.amount?.toString() || '0';
-            const balanceFormatted = formatUnits(BigInt(amountStr), balance.decimals);
             
             // Calculate USD value
             const priceUSD = tokenDetails.priceUSD ? parseFloat(tokenDetails.priceUSD) : 0;
@@ -155,7 +137,7 @@ export const LiFiBalanceFetcher = ({
               tokenSymbol: balance.symbol,
               tokenAddress: balance.address,
               balance: amountStr,
-              balanceFormatted: formatUnits(BigInt(amountStr), balance.decimals),
+              balanceFormatted,
               decimals: balance.decimals,
             });
           }
