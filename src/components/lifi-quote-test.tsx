@@ -1314,16 +1314,9 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                   <div className="flex justify-between">
                     <span className="text-gray-600">From:</span>
                     <div className="flex items-center space-x-2">
-                      {usdt0Balance?.logoURI ? (
+                      {usdt0Balance?.logoURI && (
                         <img
                           src={usdt0Balance.logoURI}
-                          alt="USDT0"
-                          className="w-4 h-4 rounded-full"
-                          onError={(e) => (e.currentTarget.style.display = 'none')}
-                        />
-                      ) : (
-                        <img
-                          src="/Myrmidons-logo-dark-no-bg.png"
                           alt="USDT0"
                           className="w-4 h-4 rounded-full"
                           onError={(e) => (e.currentTarget.style.display = 'none')}
