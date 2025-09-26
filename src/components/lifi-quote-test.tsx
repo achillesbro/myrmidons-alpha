@@ -14,7 +14,18 @@ import { Toasts, type Toast, type ToastKind } from './vault-shared';
 // Vault address for direct deposits
 const VAULT_ADDRESS = (import.meta.env.VITE_MORPHO_VAULT || '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42') as `0x${string}`;
 
-// Helper functions for explorer URLs
+// Helper functions for chain names and explorer URLs
+const getChainName = (chainId: number): string => {
+  const chainNames: Record<number, string> = {
+    1: 'Ethereum',
+    42161: 'Arbitrum',
+    8453: 'Base',
+    10: 'Optimism',
+    56: 'BSC',
+    999: 'HyperEVM',
+  };
+  return chainNames[chainId] || `Chain ${chainId}`;
+};
 
 const getExplorerUrl = (chainId: number, txHash: string): string => {
   const explorerUrls: Record<number, string> = {
@@ -206,6 +217,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     const totalSteps = getTotalSteps(path);
     
     if (newStep < 1 || newStep > totalSteps) {
+      console.warn(`Invalid step ${newStep} for path ${path}`);
       return;
     }
     
@@ -303,6 +315,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         error: status.status === 'FAILED' ? status.error : undefined
       };
     } catch (error: any) {
+      console.error('Bridge status monitoring failed:', error);
       return {
         success: false,
         status: 'ERROR',
@@ -347,10 +360,40 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     };
   };
 
-  // Helper functions removed as they were only used for console logging
+  const getStepStatus = (step: any): string => {
+    if (!step.execution?.process || step.execution.process.length === 0) {
+      return 'PENDING';
+    }
+    
+    const latestProcess = step.execution.process[step.execution.process.length - 1];
+    return latestProcess.status || 'PROCESSING';
+  };
 
-  const monitorRouteExecution = (_route: any) => {
-    // Monitor route execution silently
+  const getStepDescription = (step: any, stepIndex: number): string => {
+    const tool = step.toolDetails?.key || 'Unknown';
+    const fromToken = step.action?.fromToken?.symbol || 'Unknown';
+    const toToken = step.action?.toToken?.symbol || 'Unknown';
+    const fromChain = getChainName(step.action?.fromChainId || 0);
+    const toChain = getChainName(step.action?.toChainId || 0);
+    
+    if (tool.includes('bridge') || tool.includes('glacis') || tool.includes('relay')) {
+      return `Bridge ${fromToken} from ${fromChain} to ${toChain}`;
+    } else if (tool.includes('swap') || tool.includes('uniswap') || tool.includes('1inch')) {
+      return `Swap ${fromToken} to ${toToken} on ${fromChain}`;
+    } else {
+      return `Step ${stepIndex + 1}: ${tool}`;
+    }
+  };
+
+  const monitorRouteExecution = (route: any) => {
+    console.log('Monitoring route execution:', route);
+    
+    route.steps.forEach((step: any, stepIndex: number) => {
+      const stepDescription = getStepDescription(step, stepIndex);
+      const stepStatus = getStepStatus(step);
+      
+      console.log(`Step ${stepIndex + 1}: ${stepDescription} - Status: ${stepStatus}`);
+    });
   };
 
   // Handler functions for balance fetcher
@@ -387,6 +430,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     const depositAmount = selectedPath === 'B' ? bridgedUsdt0Amount : amount;
     
     if (!depositAmount) {
+      console.error('No deposit amount available');
       return;
     }
 
@@ -397,6 +441,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       try {
         await switchChain(wagmiConfig, { chainId: CHAIN_IDS.HYPEREVM });
       } catch (error: any) {
+        console.error('Chain switch failed:', error);
         setExecuting(false);
         return;
       }
@@ -424,6 +469,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         const allowance = await token.allowance(clientW.data?.account?.address, VAULT_ADDRESS);
         needsApproval = allowance < amountWei;
       } catch (error: any) {
+        console.log('Allowance check failed, assuming no approval needed:', error.message);
         needsApproval = false;
       }
       
@@ -550,22 +596,37 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       await fetchUSDT0Balance();
       
     } catch (error: any) {
-      // Enhanced error handling for USDT0 deposits
-      let errorMessage = 'Deposit failed';
+      console.error('USDT0 deposit failed:', error);
       
-      if (error.message?.includes('User rejected')) {
-        errorMessage = 'Transaction was rejected by user.';
-      } else if (error.message?.includes('Insufficient balance')) {
+      // Enhanced error handling for USDT0 deposits
+      let errorMessage = 'Deposit failed. Please try again.';
+      const errorMsg = error.message?.toLowerCase() || '';
+      
+      if (errorMsg.includes('user rejected') || errorMsg.includes('user denied')) {
+        errorMessage = 'Transaction was cancelled. Please try again.';
+      } else if (errorMsg.includes('insufficient balance')) {
         errorMessage = 'Insufficient USDT0 balance for deposit.';
-      } else if (error.message?.includes('Gas estimation failed')) {
-        errorMessage = 'Gas estimation failed. Please try with a higher gas limit.';
-      } else if (error.message?.includes('Network error')) {
+      } else if (errorMsg.includes('gas estimation failed') || errorMsg.includes('cannot estimate gas')) {
+        errorMessage = 'Gas estimation failed. Please try again with higher gas limit.';
+      } else if (errorMsg.includes('network error') || errorMsg.includes('connection') || errorMsg.includes('timeout')) {
         errorMessage = 'Network error occurred. Please check your connection and try again.';
-      } else if (error.message?.includes('Allowance')) {
+      } else if (errorMsg.includes('allowance') || errorMsg.includes('approval')) {
         errorMessage = 'Token approval failed. Please try again.';
-      } else if (error.message) {
-        errorMessage = `Deposit failed: ${error.message}`;
+      } else if (errorMsg.includes('nonce') || errorMsg.includes('replacement') || errorMsg.includes('already known')) {
+        errorMessage = 'Transaction conflict detected. Please wait a moment and try again.';
+      } else if (errorMsg.includes('rpc error') || errorMsg.includes('internal error') || errorMsg.includes('502') || errorMsg.includes('503') || errorMsg.includes('504')) {
+        errorMessage = 'Network temporarily unavailable. Please try again in a few moments.';
+      } else if (errorMsg.includes('slippage') || errorMsg.includes('price impact') || errorMsg.includes('execution reverted')) {
+        errorMessage = 'Price changed during transaction. Please try again.';
+      } else if (errorMsg.includes('gas price') || errorMsg.includes('gas too low')) {
+        errorMessage = 'Gas price too low. Please try again with higher gas.';
+      } else if (errorMsg.includes('cap') && errorMsg.includes('deposit')) {
+        errorMessage = 'Vault is currently closed for deposits. Please try again later.';
+      } else if (errorMsg.includes('missing revert data') || errorMsg.includes('call_exception') || errorMsg.includes('simulation')) {
+        errorMessage = 'Transaction simulation failed. Please try again.';
       }
+      
+      console.error('Error:', errorMessage);
       
       // Show error toast
       pushToast('error', errorMessage);
@@ -586,7 +647,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     if (depositState.amount && parseFloat(depositState.amount) > 0) {
       navigateToStep(3);
     } else {
-      // Invalid amount entered
+      console.error('Please enter a valid amount');
     }
   };
 
@@ -616,6 +677,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     const { selectedToken, amount } = depositState;
     
     if (!selectedToken || !amount) {
+      console.error('Missing token or amount for bridge execution');
       return;
     }
 
@@ -680,6 +742,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       // Execute the route with enhanced monitoring
       const executedRoute = await executeRoute(selectedRoute, {
         updateRouteHook: (updatedRoute) => {
+          console.log('Route update:', updatedRoute);
           // Monitor route execution with real-time feedback
           monitorRouteExecution(updatedRoute);
           
@@ -704,13 +767,17 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           }
         },
         acceptExchangeRateUpdateHook: async () => {
+          console.log('Exchange rate update requested, accepting...');
           return true; // Accept rate updates automatically
         },
         switchChainHook: async (chainId) => {
+          console.log('Switching to chain:', chainId);
           try {
             const chain = await switchChain(wagmiConfig, { chainId });
+            console.log('Successfully switched to chain:', chain.id);
             return getWalletClient(wagmiConfig, { chainId: chain.id });
           } catch (error) {
+            console.error('Failed to switch chain:', error);
             throw error;
           }
         },
@@ -752,27 +819,44 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
             });
           }
         })
-        .catch(() => {
-          // Background bridge monitoring failed
+        .catch(error => {
+          console.error('Background bridge monitoring failed:', error);
         });
 
     } catch (error: any) {
-      // Enhanced error handling with specific error messages
-      let errorMessage = 'Bridge execution failed';
+      console.error('Bridge execution failed:', error);
       
-      if (error.message?.includes('No routes available')) {
+      // Enhanced error handling with specific error messages
+      let errorMessage = 'Bridge execution failed. Please try again.';
+      const errorMsg = error.message?.toLowerCase() || '';
+      
+      if (errorMsg.includes('no routes available') || errorMsg.includes('no route')) {
         errorMessage = 'No bridge routes available for this token pair. Try a different amount or token.';
-      } else if (error.message?.includes('Insufficient balance')) {
+      } else if (errorMsg.includes('insufficient balance')) {
         errorMessage = 'Insufficient token balance for the bridge.';
-      } else if (error.message?.includes('User rejected')) {
-        errorMessage = 'Transaction was rejected by user.';
-      } else if (error.message?.includes('Network error')) {
+      } else if (errorMsg.includes('user rejected') || errorMsg.includes('user denied')) {
+        errorMessage = 'Transaction was cancelled. Please try again.';
+      } else if (errorMsg.includes('network error') || errorMsg.includes('connection') || errorMsg.includes('timeout')) {
         errorMessage = 'Network error occurred. Please check your connection and try again.';
-      } else if (error.message?.includes('Gas estimation failed')) {
-        errorMessage = 'Gas estimation failed. Please try with a higher gas limit.';
+      } else if (errorMsg.includes('gas estimation failed') || errorMsg.includes('cannot estimate gas')) {
+        errorMessage = 'Gas estimation failed. Please try again with higher gas limit.';
+      } else if (errorMsg.includes('allowance') || errorMsg.includes('approval')) {
+        errorMessage = 'Token approval failed. Please try again.';
+      } else if (errorMsg.includes('nonce') || errorMsg.includes('replacement') || errorMsg.includes('already known')) {
+        errorMessage = 'Transaction conflict detected. Please wait a moment and try again.';
+      } else if (errorMsg.includes('rpc error') || errorMsg.includes('internal error') || errorMsg.includes('502') || errorMsg.includes('503') || errorMsg.includes('504')) {
+        errorMessage = 'Network temporarily unavailable. Please try again in a few moments.';
+      } else if (errorMsg.includes('slippage') || errorMsg.includes('price impact') || errorMsg.includes('execution reverted')) {
+        errorMessage = 'Price changed during transaction. Please try again.';
+      } else if (errorMsg.includes('gas price') || errorMsg.includes('gas too low')) {
+        errorMessage = 'Gas price too low. Please try again with higher gas.';
+      } else if (errorMsg.includes('missing revert data') || errorMsg.includes('call_exception') || errorMsg.includes('simulation')) {
+        errorMessage = 'Transaction simulation failed. Please try again.';
       } else if (error.message) {
         errorMessage = `Bridge failed: ${error.message}`;
       }
+      
+      console.error('Error:', errorMessage);
       
       // Show error toast
       pushToast('error', errorMessage);
@@ -790,6 +874,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     const { bridgeTxHash, selectedToken } = depositState;
     
     if (!bridgeTxHash || !selectedToken) {
+      console.error('Missing bridge transaction hash or selected token');
       return;
     }
 
@@ -813,10 +898,11 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         });
         
       } else {
-        // Bridge monitoring failed
+        console.error('Bridge monitoring failed:', result.error || 'Unknown error');
       }
     } catch (error: any) {
-      // Bridge status check failed
+      console.error('Bridge status check failed:', error);
+      console.error('Failed to check bridge status:', error.message);
     }
   };
 
@@ -825,7 +911,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     if (depositState.amount && parseFloat(depositState.amount) > 0) {
       navigateToStep(3);
     } else {
-      // Invalid amount entered
+      console.error('Please enter a valid amount');
     }
   };
 
@@ -855,6 +941,8 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     
     setUsdt0Loading(true);
     try {
+      console.log('Fetching USDT0 balance for address:', clientW.data.account.address);
+      
       // Get USDT0 token info from Li.Fi
       const tokenInfo = await getToken(CHAIN_IDS.HYPEREVM, TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0);
       
@@ -869,7 +957,12 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           (parseFloat(balanceFormatted) * parseFloat(tokenInfo.priceUSD)).toFixed(2) : 
           balanceFormatted;
         
-        // USDT0 balance fetched successfully
+        console.log('USDT0 balance fetched:', {
+          balance: amountStr,
+          balanceFormatted,
+          balanceUSD,
+          priceUSD: tokenInfo.priceUSD
+        });
         
         // Only set balance if it's greater than 0
         if (parseFloat(balanceFormatted) > 0) {
@@ -892,6 +985,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         setUsdt0Balance(null);
       }
     } catch (error) {
+      console.error('Error fetching USDT0 balance:', error);
       setUsdt0Balance(null);
     } finally {
       setUsdt0Loading(false);
@@ -902,6 +996,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   // Legacy handleExecute function - now handled by path-specific functions
   // This is kept for backward compatibility with LiFiBalanceFetcher
   const handleExecute = async () => {
+    console.warn('handleExecute is deprecated - use path-specific handlers instead');
     // This function is no longer used as we have path-specific implementations
   };
 

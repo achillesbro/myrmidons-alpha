@@ -31,11 +31,69 @@ export const truncHash = (h: string) => (h && h.length > 12 ? `${h.slice(0, 6)}â
  */
 export const friendlyError = (err: unknown): string => {
   const m = (err instanceof Error ? err.message : String(err)).toLowerCase();
-  if (m.includes("user rejected") || m.includes("user denied") || m.includes("rejected by user")) return "Error: user rejected transaction";
-  if (m.includes("429") || m.includes("rate limit") || m.includes("too many requests")) return "network rate-limited, please retry";
-  if (m.includes("missing revert data") || m.includes("call_exception") || m.includes("cannot estimate gas") || m.includes("simulation")) return "transaction simulation failed";
-  if (m.includes("cap") && m.includes("deposit")) return "vault is closed for deposits (cap = 0)";
-  return `Error: ${err instanceof Error ? err.message : String(err)}`;
+  
+  // User rejection
+  if (m.includes("user rejected") || m.includes("user denied") || m.includes("rejected by user")) {
+    return "Transaction was cancelled. Please try again.";
+  }
+  
+  // Network and rate limiting issues
+  if (m.includes("429") || m.includes("rate limit") || m.includes("too many requests")) {
+    return "Network is busy. Please wait a moment and try again.";
+  }
+  
+  // Gas and simulation issues
+  if (m.includes("missing revert data") || m.includes("call_exception") || m.includes("cannot estimate gas") || m.includes("simulation")) {
+    return "Transaction simulation failed. Please try again with higher gas limit.";
+  }
+  
+  // Nonce issues (common retry scenario)
+  if (m.includes("nonce") || m.includes("replacement transaction underpriced") || m.includes("already known")) {
+    return "Transaction conflict detected. Please wait a moment and try again.";
+  }
+  
+  // Network connectivity issues
+  if (m.includes("network error") || m.includes("connection") || m.includes("timeout") || m.includes("fetch")) {
+    return "Network connection issue. Please check your connection and try again.";
+  }
+  
+  // RPC/Node issues
+  if (m.includes("rpc error") || m.includes("internal error") || m.includes("server error") || m.includes("502") || m.includes("503") || m.includes("504")) {
+    return "Network temporarily unavailable. Please try again in a few moments.";
+  }
+  
+  // Transaction replacement issues
+  if (m.includes("replacement") || m.includes("underpriced") || m.includes("already known")) {
+    return "Transaction already in progress. Please wait and try again.";
+  }
+  
+  // Slippage and price impact
+  if (m.includes("slippage") || m.includes("price impact") || m.includes("execution reverted")) {
+    return "Price changed during transaction. Please try again.";
+  }
+  
+  // Insufficient balance
+  if (m.includes("insufficient") && m.includes("balance")) {
+    return "Insufficient balance for this transaction.";
+  }
+  
+  // Gas price issues
+  if (m.includes("gas price") || m.includes("gas too low") || m.includes("intrinsic gas too low")) {
+    return "Gas price too low. Please try again with higher gas.";
+  }
+  
+  // Vault-specific issues
+  if (m.includes("cap") && m.includes("deposit")) {
+    return "Vault is currently closed for deposits. Please try again later.";
+  }
+  
+  // Generic retry-friendly message for unknown errors
+  if (m.includes("error") || m.includes("failed") || m.includes("revert")) {
+    return "Transaction failed. Please try again.";
+  }
+  
+  // Fallback for any other error
+  return `Transaction error: ${err instanceof Error ? err.message : String(err)}`;
 };
 
 /**
