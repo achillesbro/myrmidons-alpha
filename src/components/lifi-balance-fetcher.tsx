@@ -4,6 +4,16 @@ import { CHAIN_IDS } from '../lib/lifi-config';
 import { getTokens, getTokenBalances, getToken, ChainType } from '@lifi/sdk';
 import { formatUnits } from 'viem';
 
+// Utility function to format USD values with comma separators
+const formatUSD = (value: string | number): string => {
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(numValue)) return '0.00';
+  return numValue.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 interface TokenBalance {
   chainId: number;
   chainName: string;
@@ -112,7 +122,7 @@ export const LiFiBalanceFetcher = ({
             
             // Calculate USD value
             const priceUSD = tokenDetails.priceUSD ? parseFloat(tokenDetails.priceUSD) : 0;
-            const balanceUSD = (parseFloat(balanceFormatted) * priceUSD).toFixed(2);
+            const balanceUSD = formatUSD(parseFloat(balanceFormatted) * priceUSD);
             
             balances.push({
               chainId: balance.chainId,
@@ -203,10 +213,15 @@ export const LiFiBalanceFetcher = ({
     return bUSD - aUSD;
   });
 
-  // Filter balances for bridge flow: exclude USD₮0 from HyperEVM to avoid duplication
+  // Filter balances for bridge flow: exclude USD₮0 from HyperEVM and vault shares to avoid duplication
   const bridgeFlowBalances = sortedBalances.filter(balance => {
     // Exclude USD₮0 from HyperEVM in bridge flow since it's shown in direct deposit section
-    return !(balance.tokenSymbol === 'USD₮0' && balance.chainId === CHAIN_IDS.HYPEREVM);
+    if (balance.tokenSymbol === 'USD₮0' && balance.chainId === CHAIN_IDS.HYPEREVM) return false;
+    
+    // Exclude vault shares token (MYR_USDT0_PX) from bridge flow
+    if (balance.tokenSymbol === 'MYR_USDT0_PX') return false;
+    
+    return true;
   });
 
   // Fetch gas prices for the selected token's chain
@@ -467,7 +482,7 @@ export const LiFiBalanceFetcher = ({
                       const maxAmount = selectedToken.tokenSymbol === 'USDT0' 
                         ? parseFloat(selectedToken.balanceFormatted)
                         : parseFloat(selectedToken.balanceUSD || '0');
-                      const amountUSD = (maxAmount * percentage / 100).toFixed(2);
+                      const amountUSD = formatUSD(maxAmount * percentage / 100);
                       handleAmountChange({ target: { value: amountUSD } } as any);
                     }}
                     className="px-3 py-1 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -523,7 +538,7 @@ export const LiFiBalanceFetcher = ({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Amount:</span>
-                  <span className="font-medium">${amount} USD</span>
+                  <span className="font-medium">${formatUSD(amount)} USD</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Method:</span>
