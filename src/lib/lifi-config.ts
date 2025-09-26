@@ -6,6 +6,7 @@ const getApiKey = () => {
   }
   
   // No fallback - will be empty string if not set
+  console.warn('VITE_LIFI_API_KEY not found in environment variables');
   return '';
 };
 
