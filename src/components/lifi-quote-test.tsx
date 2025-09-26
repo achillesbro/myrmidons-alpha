@@ -955,7 +955,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         const balanceFormatted = formatUnits(BigInt(amountStr), balance.decimals || 6);
         const balanceUSD = tokenInfo.priceUSD ? 
           (parseFloat(balanceFormatted) * parseFloat(tokenInfo.priceUSD)).toFixed(2) : 
-          balanceFormatted;
+          '0';
         
         console.log('USDT0 balance fetched:', {
           balance: amountStr,
@@ -976,7 +976,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
             decimals: balance.decimals || 6,
             logoURI: tokenInfo.logoURI,
             priceUSD: tokenInfo.priceUSD,
-            balanceUSD: `$${balanceUSD}`
+            balanceUSD: balanceUSD
           });
         } else {
           setUsdt0Balance(null);
