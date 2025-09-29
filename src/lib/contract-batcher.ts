@@ -35,6 +35,12 @@ export async function batchContractCalls(
           });
           return { key: call.key, result, error: null };
         } catch (error) {
+          console.warn(`Contract call failed for ${call.key}:`, {
+            address: call.address,
+            functionName: call.functionName,
+            args: call.args,
+            error: error instanceof Error ? error.message : error
+          });
           return { key: call.key, result: null, error };
         }
       })
@@ -144,6 +150,12 @@ export class OptimizedContractReader {
       return result;
     }).catch(error => {
       this.pendingCalls.delete(key);
+      console.error(`Contract read failed for ${key}:`, {
+        address,
+        functionName,
+        args,
+        error: error instanceof Error ? error.message : error
+      });
       throw error;
     });
 

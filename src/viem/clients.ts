@@ -10,10 +10,12 @@ const ENV_HYPER_RPC_URLS = [
 ].filter(Boolean) as string[];
 
 // Sensible defaults (you can override via .env). Note:
-// - http://rpc.hypurrscan.io is HTTP only; keep if you're comfortable with HTTP.
+// - Only HTTPS endpoints for production reliability
+// - Removed http://rpc.hypurrscan.io as it's unreliable in production
 const DEFAULT_HYPER_RPC_URLS: string[] = [
   "https://rpc.hyperliquid.xyz/evm",
-  "http://rpc.hypurrscan.io",
+  "https://999.rpc.thirdweb.com/hyperliquid",
+  "https://1rpc.io/hyperliquid",
 ];
 
 // Merge env + defaults and de-duplicate while preserving order
@@ -29,9 +31,9 @@ const HYPER_RPC_URLS = [...ENV_HYPER_RPC_URLS, ...DEFAULT_HYPER_RPC_URLS].filter
 const hyperHttpTransports = HYPER_RPC_URLS.map((url) =>
   http(url, {
     batch: { wait: 25 }, // small window to coalesce calls
-    retryCount: 4,
-    retryDelay: 300,
-    timeout: 30_000,
+    retryCount: 6, // Increased retry count for production reliability
+    retryDelay: 1000, // 1 second delay between retries
+    timeout: 45_000, // Increased timeout for production
   }),
 );
 
@@ -43,8 +45,8 @@ const hyperTransport =
     ? fallback(hyperHttpTransports, {
         // Prefer the first URL; only fail over when it errors/timeouts.
         rank: true,
-        retryCount: 2,   // extra layer of retries across transports
-        retryDelay: 250,
+        retryCount: 3,   // extra layer of retries across transports
+        retryDelay: 500, // 500ms delay between fallback attempts
       })
     : hyperHttpTransports[0];
 
