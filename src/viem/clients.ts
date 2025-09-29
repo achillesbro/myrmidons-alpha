@@ -10,12 +10,14 @@ const ENV_HYPER_RPC_URLS = [
 ].filter(Boolean) as string[];
 
 // Sensible defaults (you can override via .env). Note:
-// - Only HTTPS endpoints for production reliability
-// - Removed http://rpc.hypurrscan.io as it's unreliable in production
+// - Only free, public RPC endpoints for production reliability
+// - All endpoints are HTTPS and don't require API keys
 const DEFAULT_HYPER_RPC_URLS: string[] = [
   "https://rpc.hyperliquid.xyz/evm",
-  "https://999.rpc.thirdweb.com/hyperliquid",
-  "https://1rpc.io/hyperliquid",
+  "https://rpc.hyperlend.finance",
+  "https://hyperliquid-json-rpc.stakely.io",
+  "https://hyperliquid.drpc.org",
+  "https://rpc.hypurrscan.io",
 ];
 
 // Merge env + defaults and de-duplicate while preserving order
