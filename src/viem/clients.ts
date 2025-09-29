@@ -10,14 +10,11 @@ const ENV_HYPER_RPC_URLS = [
 ].filter(Boolean) as string[];
 
 // Sensible defaults (you can override via .env). Note:
-// - Only free, public RPC endpoints for production reliability
-// - All endpoints are HTTPS and don't require API keys
+// - Only the most reliable free RPC endpoints to avoid rate limits
+// - Reduced list to prevent overwhelming public RPCs
 const DEFAULT_HYPER_RPC_URLS: string[] = [
-  "https://rpc.hyperliquid.xyz/evm",
-  "https://rpc.hyperlend.finance",
-  "https://hyperliquid-json-rpc.stakely.io",
-  "https://hyperliquid.drpc.org",
-  "https://rpc.hypurrscan.io",
+  "https://rpc.hyperliquid.xyz/evm", // Primary - most reliable
+  "https://rpc.hyperlend.finance",   // Secondary - good reliability
 ];
 
 // Merge env + defaults and de-duplicate while preserving order
@@ -29,13 +26,13 @@ const HYPER_RPC_URLS = [...ENV_HYPER_RPC_URLS, ...DEFAULT_HYPER_RPC_URLS].filter
   return true;
 });
 
-// Build per-URL http transports with batching + retries
+// Build per-URL http transports with conservative settings to avoid rate limits
 const hyperHttpTransports = HYPER_RPC_URLS.map((url) =>
   http(url, {
-    batch: { wait: 25 }, // small window to coalesce calls
-    retryCount: 6, // Increased retry count for production reliability
-    retryDelay: 1000, // 1 second delay between retries
-    timeout: 45_000, // Increased timeout for production
+    batch: { wait: 100 }, // Longer wait to reduce request frequency
+    retryCount: 3, // Reduced retry count to be less aggressive
+    retryDelay: 2000, // 2 second delay between retries
+    timeout: 30_000, // 30 second timeout
   }),
 );
 
@@ -47,8 +44,8 @@ const hyperTransport =
     ? fallback(hyperHttpTransports, {
         // Prefer the first URL; only fail over when it errors/timeouts.
         rank: true,
-        retryCount: 3,   // extra layer of retries across transports
-        retryDelay: 500, // 500ms delay between fallback attempts
+        retryCount: 2,   // Reduced fallback retries
+        retryDelay: 1000, // 1 second delay between fallback attempts
       })
     : hyperHttpTransports[0];
 

@@ -76,7 +76,7 @@ export class ContractCallCache {
   private cache = new Map<string, { data: any; timestamp: number }>();
   private ttl: number;
 
-  constructor(ttlMs: number = 30_000) { // 30 seconds default
+  constructor(ttlMs: number = 60_000) { // 60 seconds default - longer cache to reduce RPC calls
     this.ttl = ttlMs;
   }
 
@@ -204,5 +204,5 @@ export class OptimizedContractReader {
   }
 }
 
-// Global instance for reuse across components
-export const globalContractReader = new OptimizedContractReader();
+// Global instance for reuse across components with longer cache to reduce RPC calls
+export const globalContractReader = new OptimizedContractReader(120_000); // 2 minutes cache
