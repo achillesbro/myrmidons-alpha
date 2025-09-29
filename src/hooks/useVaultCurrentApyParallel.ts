@@ -1,5 +1,5 @@
 // src/hooks/useVaultCurrentApyParallel.ts
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Address } from "viem";
 import { hyperPublicClient } from "../viem/clients";
 import { globalContractReader, type BatchCall } from "../lib/contract-batcher";
