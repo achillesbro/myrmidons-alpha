@@ -14,9 +14,11 @@ import {
 } from "./vault-shared";
 import { hyperPublicClient } from "../viem/clients";
 import vaultAbi from "../abis/vault.json";
-import { useVaultCurrentApyOnchain } from "../hooks/useVaultCurrentApyOnchain";
+import { useVaultCurrentApyParallel } from "../hooks/useVaultCurrentApyParallel";
 import { useState, useEffect, useRef } from "react";
-import { useVaultAllocationsOnchain } from "../hooks/useVaultAllocationsOnchain";
+import { useVaultAllocationsOptimized } from "../hooks/useVaultAllocationsOptimized";
+import { GroupedAllocationList } from "./grouped-allocation-list";
+import { AllocationPieChart } from "./allocation-pie-chart";
 import { LiFiQuoteTest } from "./lifi-quote-test";
 import { WithdrawalDialog } from "./withdrawal-dialog";
 // Inline AllocationList component for on-chain allocations
@@ -464,7 +466,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
 
 
   // Always call APY hook so it's available for skeleton and metrics
-  const { apy, loading: apyLoading, error: apyError } = useVaultCurrentApyOnchain(
+  const { apy, loading: apyLoading, error: apyError } = useVaultCurrentApyParallel(
     VAULT_ADDRESS as `0x${string}`
   );
   useEffect(() => {
@@ -782,21 +784,36 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                 </div>
               </div>
             </div>
-            {/* Enhanced Allocations */}
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
-              <div className="mb-3">
-                <h2 className="text-base font-bold text-[#00295B]">
-                  {t("vaultInfo.allocations.title")}
-                </h2>
-                <p className="text-sm text-[#101720]/70 mt-1">
-                  {t("vaultInfo.allocations.subtitle")}
-                </p>
+            {/* Enhanced Allocations with Pie Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Allocations List - 2/3 width */}
+              <div className="lg:col-span-2">
+                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full">
+                  <div className="mb-3">
+                    <h2 className="text-base font-bold text-[#00295B]">
+                      {t("vaultInfo.allocations.title")}
+                    </h2>
+                    <p className="text-sm text-[#101720]/70 mt-1">
+                      {t("vaultInfo.allocations.subtitle")}
+                    </p>
+                  </div>
+                  <OnchainAllocations
+                    key={allocRefreshKey}
+                    vaultAddress={VAULT_ADDRESS as `0x${string}`}
+                    onSettled={(ts) => setLastUpdated(ts)}
+                  />
+                </div>
               </div>
-              <OnchainAllocations
-                key={allocRefreshKey}
-                vaultAddress={VAULT_ADDRESS as `0x${string}`}
-                onSettled={(ts) => setLastUpdated(ts)}
-              />
+              
+              {/* Pie Chart - 1/3 width */}
+              <div className="lg:col-span-1">
+                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-96">
+                  <AllocationPieChartWrapper
+                    key={allocRefreshKey}
+                    vaultAddress={VAULT_ADDRESS as `0x${string}`}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -916,145 +933,58 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
 
 }
 
-type AllocationRow = {
-  id: `0x${string}`;
-  label: string;
-  assets: bigint;
-  pct: number; // 0..100
-  usd?: number | null;
-  supplyApy?: number | null; // decimal (0..1)
-  decimals?: number; // token decimals for amount formatting
-  logo?: string | null;
-};
-
-function AllocationList({
-  items,
-  totalAssets,
-  hiddenDust,
-}: {
-  items: AllocationRow[];
-  totalAssets: bigint;
-  hiddenDust?: bigint | null;
-  decimals?: number;
-}) {
+// Pie Chart wrapper component
+function AllocationPieChartWrapper({ vaultAddress }: { vaultAddress: `0x${string}` }) {
   const { t } = useTranslation();
-  const ceilPct = (n: number) => Math.max(0, Math.min(100, Math.ceil(n)));
-  const pctOf = (v?: bigint | null) =>
-    v != null && totalAssets !== 0n
-      ? Math.max(0, Math.min(100, Number((v * 10000n) / totalAssets) / 100)).toFixed(2)
-      : null;
+  const { 
+    groupedItems, 
+    totalAssets, 
+    loading, 
+    error 
+  } = useVaultAllocationsOptimized(vaultAddress);
 
-  return (
-    <div className="space-y-1">
-      {/* Enhanced Header - Hidden on mobile, shown on larger screens */}
-      <div className="hidden sm:grid grid-cols-12 text-xs font-semibold text-[#00295B] py-2 px-3 bg-[#F8F7F0] rounded-lg border border-[#E5E2D6]">
-        <div className="col-span-5">{t("vaultInfo.allocations.columns.market")}</div>
-        <div className="col-span-3 text-right">{t("vaultInfo.allocations.columns.share")}</div>
-        <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.usd")}</div>
-        <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.supplyApy")}</div>
-      </div>
-
-      {/* Enhanced Rows */}
-      <div className="space-y-1">
-        {items.map((it, index) => (
-          <div key={it.id} className={`grid grid-cols-1 sm:grid-cols-12 items-center py-2 sm:py-3 px-2 sm:px-3 rounded-lg transition-colors ${
-            index % 2 === 0 ? 'bg-[#F8F7F0]/50' : 'bg-transparent'
-          } hover:bg-[#F8F7F0]`}>
-            {/* Mobile Layout */}
-            <div className="sm:hidden space-y-1">
-              <div className="flex items-center space-x-2">
-                {it.logo && (
-                  <img
-                    src={it.logo}
-                    alt={it.label}
-                    className="w-5 h-5 rounded-full border border-[#E5E2D6] object-contain flex-shrink-0"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                )}
-                <span className="font-medium text-[#101720] flex-1 text-sm">{it.label}</span>
-                <span className="text-sm font-semibold text-[#00295B]">
-                  {ceilPct(it.pct)}%
-                </span>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-pulse">
+          <div className="w-32 h-32 bg-[#E1E1D6] rounded-full mx-auto mb-4"></div>
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-[#E1E1D6] rounded-full"></div>
+                <div className="h-4 bg-[#E1E1D6] rounded w-20"></div>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-[#101720]/70">
-                  USD: {it.usd != null ? `$${it.usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "N/A"}
-                </span>
-                <span className="text-[#101720]/70">
-                  APY: {it.supplyApy != null ? `${(it.supplyApy * 100).toFixed(2)}%` : "N/A"}
-                </span>
-              </div>
-            </div>
-            
-            {/* Desktop Layout */}
-            <div className="hidden sm:contents">
-              <div className="col-span-5 flex items-center space-x-2 text-[#101720]">
-                {it.logo && (
-                  <img
-                    src={it.logo}
-                    alt={it.label}
-                    className="w-5 h-5 rounded-full border border-[#E5E2D6] object-contain flex-shrink-0"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                )}
-                <span className="font-medium truncate text-sm">{it.label}</span>
-              </div>
-              <div className="col-span-3 text-right">
-                <span className="text-sm font-semibold text-[#00295B]">
-                  {ceilPct(it.pct)}%
-                </span>
-              </div>
-              <div className="col-span-2 text-right">
-                <span className="text-xs font-medium text-[#101720]">
-                  {it.usd != null
-                    ? `$${it.usd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                    : "N/A"}
-                </span>
-              </div>
-              <div className="col-span-2 text-right">
-                <span className="text-xs font-medium text-[#101720]">
-                  {it.supplyApy != null
-                    ? `${(it.supplyApy * 100).toFixed(2)}%`
-                    : "N/A"}
-                </span>
-              </div>
-            </div>
+            ))}
           </div>
-        ))}
-
-        {/* Enhanced Hidden dust row */}
-        {hiddenDust != null && hiddenDust > 0n && (
-          <div className="grid grid-cols-1 sm:grid-cols-12 items-center py-3 sm:py-4 px-3 sm:px-4 bg-[#F8F7F0]/30 rounded-lg border border-[#E5E2D6]">
-            <div className="sm:hidden text-center">
-              <div className="font-medium text-[#101720] mb-1">
-                {t("vaultInfo.allocations.otherDust")}
-              </div>
-              <div className="text-lg font-semibold text-[#00295B]">
-                {pctOf(hiddenDust) ? `${pctOf(hiddenDust)}%` : "—"}
-              </div>
-            </div>
-            <div className="hidden sm:contents">
-              <div className="col-span-5 font-medium text-[#101720]">
-                {t("vaultInfo.allocations.otherDust")}
-              </div>
-              <div className="col-span-3 text-right">
-                <span className="text-lg font-semibold text-[#00295B]">
-                  {pctOf(hiddenDust) ? `${pctOf(hiddenDust)}%` : "—"}
-                </span>
-              </div>
-              <div className="col-span-2 text-right text-[#101720]/60">—</div>
-              <div className="col-span-2 text-right text-[#101720]/60">—</div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+  
+  if (error) {
+    return <p className="text-sm text-red-500 text-center py-8">{t("vaultInfo.allocations.error", { error })}</p>;
+  }
+  
+  if (!groupedItems || totalAssets === null) {
+    return <p className="text-sm text-[#101720]/70 text-center py-8">{t("vaultInfo.allocations.empty")}</p>;
+  }
+
+  return <AllocationPieChart groupedItems={groupedItems} totalAssets={totalAssets} />;
 }
+
+// Removed AllocationRow type - now using AllocationItem from allocation-grouper
+
+// Removed AllocationList function - now using GroupedAllocationList
 
 function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${string}`; onSettled?: (ts: number) => void }) {
   const { t } = useTranslation();
-  const { items, totalAssets, hiddenDust, loading, error } = useVaultAllocationsOnchain(vaultAddress);
+  const { 
+    groupedItems, 
+    groupingResult, 
+    totalAssets, 
+    loading, 
+    error 
+  } = useVaultAllocationsOptimized(vaultAddress);
 
   useEffect(() => {
     if (!loading) {
@@ -1066,7 +996,7 @@ function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${st
     return (
       <div className="space-y-1">
         {/* Enhanced Skeleton Header - Hidden on mobile */}
-        <div className="hidden sm:grid grid-cols-12 text-xs font-semibold text-[#00295B] py-2 px-3 bg-[#F8F7F0] rounded-lg border border-[#E5E2D6]">
+        <div className="hidden sm:grid grid-cols-12 text-xs font-semibold text-[#00295B] py-3 px-4 border-b-2 border-gray-300">
           <div className="col-span-5">{t("vaultInfo.allocations.columns.market")}</div>
           <div className="col-span-3 text-right">{t("vaultInfo.allocations.columns.share")}</div>
           <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.usd")}</div>
@@ -1075,9 +1005,7 @@ function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${st
         {/* Enhanced Skeleton Rows */}
         <div className="space-y-1">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className={`grid grid-cols-1 sm:grid-cols-12 items-center py-2 sm:py-3 px-2 sm:px-3 rounded-lg animate-pulse ${
-              i % 2 === 0 ? 'bg-[#F8F7F0]/50' : 'bg-transparent'
-            }`}>
+            <div key={i} className={`grid grid-cols-1 sm:grid-cols-12 items-center py-3 sm:py-4 px-3 sm:px-4 animate-pulse border-b border-gray-200`}>
               {/* Mobile Skeleton */}
               <div className="sm:hidden space-y-1">
                 <div className="flex items-center space-x-2">
@@ -1113,13 +1041,13 @@ function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${st
     );
   }
   if (error) return <p className="text-sm text-red-500">{t("vaultInfo.allocations.error", { error })}</p>;
-  if (!items || totalAssets === null) return <p className="text-sm text-[#101720]/70">{t("vaultInfo.allocations.empty")}</p>;
+  if (!groupedItems || !groupingResult || totalAssets === null) return <p className="text-sm text-[#101720]/70">{t("vaultInfo.allocations.empty")}</p>;
 
   return (
-    <AllocationList
-      items={items}
+    <GroupedAllocationList
+      groupedItems={groupedItems}
+      ungroupedItems={groupingResult.ungroupedItems}
       totalAssets={totalAssets}
-      hiddenDust={hiddenDust ?? null}
     />
   );
 }

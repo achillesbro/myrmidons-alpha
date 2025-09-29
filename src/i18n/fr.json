@@ -4,6 +4,26 @@
   "common": {
     "lastUpdated": "Mis à jour il y a {{timeAgo}}"
   },
+  "family": {
+    "hype": {
+      "description": "Token natif d'Hyperliquid et le gas sur HyperEVM ; actif de règlement central pour les applications construites sur HyperEVM."
+    },
+    "stables": {
+      "description": "Actifs indexés sur l'USD (ex. USDT0 sur HyperEVM) utilisés comme quote/collatéral et liquidité de routage ; faible volatilité des prix mais portent des risques d'émetteur/peg/pont."
+    },
+    "btc": {
+      "description": "Actif crypto phare avec la liquidité globale la plus profonde ; référence macro principale pour le risque de marché crypto."
+    },
+    "eth": {
+      "description": "Actif de base d'Ethereum utilisé pour le gas/collatéral ; bêta L1 large capitalisation avec des marchés spot et dérivés profonds."
+    },
+    "thbill": {
+      "description": "Exposition tokenisée aux bons du Trésor américain à court terme (Theo) ; instrument \"cash-plus\" à faible volatilité et générateur de rendement."
+    },
+    "default": {
+      "description": "Allocation de famille de tokens"
+    }
+  },
   "aboutView": {
     "title": "À propos de Myrmidons Strategies",
     "motto": "\"L'excellence forgée dans la chaleur du combat.\"",
@@ -185,6 +205,8 @@
     "allocations": {
       "title": "Allocations",
       "subtitle": "Stratégie d'allocation actuelle du vault sur les marchés Morpho",
+      "chartTitle": "Aperçu des Allocations",
+      "chartSubtitle": "Distribution TVL par famille d'actifs",
       "columns": {
         "market": "Marché",
         "share": "Part",

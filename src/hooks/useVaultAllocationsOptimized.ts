@@ -6,6 +6,7 @@ import { MARKET_LABELS } from "../constants/hyper";
 import { TOKEN_METADATA } from "../constants/hyper";
 import { globalContractReader, type BatchCall } from "../lib/contract-batcher";
 import { globalPriceOptimizer } from "../lib/price-optimizer";
+import { groupAllocationsByFamily, type GroupedAllocation, type AllocationGroupingResult } from "../lib/allocation-grouper";
 
 const vaultAbi = [
   { type: "function", name: "totalAssets", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
@@ -106,6 +107,8 @@ export interface OptimizedAllocationsResult {
   error: string | null;
   totalAssets: bigint | null;
   items: AllocationItem[] | null;
+  groupedItems: GroupedAllocation[] | null;
+  groupingResult: AllocationGroupingResult | null;
   trueIdle: bigint | null;
   hiddenDust: bigint | null;
   progress: number; // 0-100 progress indicator
@@ -422,11 +425,23 @@ export function useVaultAllocationsOptimized(vaultAddress: Address): OptimizedAl
     return rows;
   }, [rows, totalAssets]);
 
+  // Group items by family
+  const groupingResult: AllocationGroupingResult | null = useMemo(() => {
+    if (!items || totalAssets === null) return null;
+    return groupAllocationsByFamily(items, totalAssets);
+  }, [items, totalAssets]);
+
+  const groupedItems: GroupedAllocation[] | null = useMemo(() => {
+    return groupingResult?.groupedItems || null;
+  }, [groupingResult]);
+
   return { 
     loading, 
     error, 
     totalAssets, 
     items, 
+    groupedItems,
+    groupingResult,
     trueIdle, 
     hiddenDust, 
     progress 
