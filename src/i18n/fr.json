@@ -1,6 +1,63 @@
 {
   "brand": "Myrmidons Strategies",
   "tabs": { "user": "Position Utilisateur", "vault": "Informations du Vault", "about": "À propos" },
+  "landing": {
+    "hero": {
+      "title": "Rendements DeFi sélectionnés. Non-custodial par conception.",
+      "subtitle": "Myrmidons Strategies propose des vaults ERC-4626 sur Morpho. Transparent, on-chain, et prêt pour HyperEVM.",
+      "poweredBy": "Propulsé par Morpho",
+      "learnMore": "En savoir plus",
+      "ctaPrimary": "Déposer dans PHALANX",
+      "ctaSecondary": "À propos de nous"
+    },
+    "valueProps": {
+      "curated": {
+        "title": "Exposition sélectionnée",
+        "description": "Stratégies diversifiées sans complexité."
+      },
+      "riskFirst": {
+        "title": "Risque en premier",
+        "description": "Allocation disciplinée, vérifiabilité on-chain."
+      },
+      "frictionless": {
+        "title": "Financement sans friction",
+        "description": "Bridge et dépôt en quelques minutes."
+      }
+    },
+    "vaults": {
+      "title": "Vaults",
+      "phalanx": {
+        "objective": "Rendement USDT0 cohérent et ajusté au risque sur HyperEVM.",
+        "tags": ["Non-custodial", "Morpho", "ERC-4626"],
+        "tvlLabel": "TVL",
+        "apyLabel": "APY Actuel",
+        "marketsLabel": "# Marchés",
+        "viewDetails": "Voir les détails du vault",
+        "deposit": "Déposer"
+      }
+    },
+    "trust": {
+      "nonCustodial": {
+        "title": "Non-custodial",
+        "description": "Les fonds restent dans votre wallet jusqu'au dépôt dans des smart contracts audités ; les positions sont vérifiables on-chain."
+      },
+      "howItWorks": {
+        "title": "Comment ça marche",
+        "steps": [
+          "Connecter le wallet",
+          "(Optionnel) Bridge des fonds",
+          "Déposer dans PHALANX"
+        ]
+      }
+    },
+    "social": {
+      "contact": "Questions ou diligence ? Connectez-vous sur les réseaux sociaux ou par email",
+      "email": "myrmidons.strategies@gmail.com"
+    },
+    "footer": {
+      "disclaimer": "La DeFi comporte des risques, y compris les risques de smart-contract et de marché. Faites vos propres recherches."
+    }
+  },
   "common": {
     "lastUpdated": "Mis à jour il y a {{timeAgo}}"
   },

@@ -2,7 +2,7 @@ import { Analytics } from '@vercel/analytics/react';
 import {
   getDefaultConfig,
   RainbowKitProvider,
-  ConnectButton,
+  lightTheme,
 } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
 //import { mainnet } from "wagmi/chains";
@@ -23,6 +23,8 @@ import { apolloClient } from "./service/apollo.client";
 import { VaultAPIView } from "./components/vault-api-view";
 import { AboutView } from "./components/about-view";
 import { SiteFooter } from "./components/site-footer";
+import LandingPage from "./components/landing/LandingPage";
+import SiteHeader from "./components/layout/SiteHeader";
 import { useTranslation } from 'react-i18next'
 import i18n from "./i18n";
 
@@ -44,21 +46,19 @@ function normalizeTabParam(value: string | null): Tab | null {
   return null;
 }
 
-function getInitialTab(): Tab {
+function getInitialTab(): Tab | null {
   try {
     const url = new URL(window.location.href);
     const fromUrl = normalizeTabParam(url.searchParams.get(TAB_PARAM));
     if (fromUrl) return fromUrl;
-    const fromStorage = localStorage.getItem(STORAGE_KEY);
-    const storageTab = normalizeTabParam(fromStorage);
-    return storageTab ?? "VAULTINFO";
+    return null; // No tab means landing page
   } catch {
-    return "VAULTINFO";
+    return null; // No tab means landing page
   }
 }
 
 const TestInterface = () => {
-  const [activeTab, setActiveTab] = useState<Tab>(() => getInitialTab());
+  const [activeTab, setActiveTab] = useState<Tab | null>(() => getInitialTab());
   const [vaultAddressInput] = useState<string>(DEFAULT_VAULT);
   // `vaultAddress` is validated to be an Address
   const [vaultAddress, setVaultAddress] = useState(DEFAULT_VAULT);
@@ -78,11 +78,18 @@ const TestInterface = () => {
   // Persist + deep-link (URL ?tab=...)
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, activeTab);
-      const url = new URL(window.location.href);
-      url.searchParams.set(TAB_PARAM, activeTab.toLowerCase());
-      // replaceState so we don’t spam history on every click
-      window.history.replaceState(null, "", url.toString());
+      if (activeTab) {
+        localStorage.setItem(STORAGE_KEY, activeTab);
+        const url = new URL(window.location.href);
+        url.searchParams.set(TAB_PARAM, activeTab.toLowerCase());
+        // replaceState so we don't spam history on every click
+        window.history.replaceState(null, "", url.toString());
+      } else {
+        // Landing page - remove tab param
+        const url = new URL(window.location.href);
+        url.searchParams.delete(TAB_PARAM);
+        window.history.replaceState(null, "", url.toString());
+      }
     } catch {
       /* noop */
     }
@@ -100,60 +107,26 @@ const TestInterface = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    const page = activeTab === "VAULTINFO" ? t('tabs.vaultInfo') : t('tabs.about');
-    document.title = `${t('brand')} — ${page}`;
+    if (activeTab) {
+      const page = activeTab === "VAULTINFO" ? t('tabs.vault') : t('tabs.about');
+      document.title = `${t('brand')} — ${page}`;
+    } else {
+      document.title = `${t('brand')} — Landing`;
+    }
   }, [activeTab, t]);
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-      {/* Full-width top band */}
-      <div className="w-full bg-[var(--text)]">
-        <div className="max-w-7xl mx-auto flex justify-between items-center h-20 px-6 overflow-hidden">
-          <div className="flex items-center gap-3">
-            <img
-              src="/myrmidons-creamy.png"
-              alt="Myrmidons Strategies logo"
-              className="h-20 w-auto select-none"
-            />
-            <h1 className="text-3xl font-bold !text-[var(--bg)]">{t('brand')}</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <ConnectButton />
-          </div>
-        </div>
-      </div>
+      <SiteHeader />
       <div className="px-6">
         <div className="h-8" />
         {/* Main Content Area - centered */}
         <div className="max-w-6xl mx-auto">
           <div className="flex-1">
-            {/* Tab Navigation */}
-            <div className="flex space-x-4 mb-6">
-              <button
-                aria-pressed={activeTab === "VAULTINFO"}
-                onClick={() => setActiveTab("VAULTINFO")}
-                className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center border ${
-                  activeTab === "VAULTINFO"
-                    ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
-                    : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
-                }`}
-              >
-                {t('tabs.vault')}
-              </button>
-              <button
-                aria-pressed={activeTab === "ABOUT"}
-                onClick={() => setActiveTab("ABOUT")}
-                className={`px-6 py-2 rounded-lg font-medium transition-colors flex items-center border ${
-                  activeTab === "ABOUT"
-                    ? "bg-[var(--text)] text-[var(--bg)] border-[var(--text)]"
-                    : "bg-[var(--bg)] text-[var(--text)] border-[var(--border)] hover:bg-[color-mix(in_oklab,var(--text)_5%,transparent)]"
-                }`}
-              >
-                {t('tabs.about')}
-              </button>
-            </div>
-
-            {activeTab === "VAULTINFO" ? (
+            {!activeTab ? (
+              // Landing page
+              <LandingPage />
+            ) : activeTab === "VAULTINFO" ? (
               <VaultAPIView vaultAddress={vaultAddress} />
             ) : (
               <AboutView />
@@ -201,7 +174,14 @@ function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
+        <RainbowKitProvider
+          theme={lightTheme({
+            accentColor: '#B08D57',          // Muted Brass
+            accentColorForeground: '#FFFFFF',
+            borderRadius: 'large',
+            overlayBlur: 'small',
+          })}
+        >
           <ApolloProvider client={apolloClient}>
             <TestInterface />
           </ApolloProvider>
