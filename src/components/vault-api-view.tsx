@@ -138,6 +138,15 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   
   // Withdrawal dialog state
   const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
+
+  // Check for #deposit hash on mount and open dialog
+  useEffect(() => {
+    if (window.location.hash === '#deposit') {
+      setDepositDialogOpen(true);
+      // Remove the hash from URL without triggering page reload
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, []);
   
   // Dialog close handler with position refresh
   const handleDialogClose = async () => {

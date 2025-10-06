@@ -26,6 +26,14 @@ export function SiteFooter() {
             >
               Medium
             </a>
+            <span className="opacity-40">•</span>
+            <a
+              href="mailto:myrmidons.strategies@gmail.com"
+              className="underline hover:no-underline hover:opacity-80"
+              aria-label="Email Myrmidons Strategies"
+            >
+              myrmidons.strategies@gmail.com
+            </a>
           </nav>
           <LanguageSwitcher />
         </div>

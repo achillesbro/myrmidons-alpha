@@ -14,6 +14,7 @@
   --border-muted: #EDE9D7;
   --skeleton: #E1E1D6;
   --accent: #00295B;
+  --muted-brass: #B08D57;  /* Muted Brass */
 
   color-scheme: light;
   color: var(--text);

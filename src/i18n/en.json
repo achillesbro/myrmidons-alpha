@@ -1,6 +1,63 @@
 {
   "brand": "Myrmidons Strategies",
   "tabs": { "user": "User Position", "vault": "Vault Information", "about": "About" },
+  "landing": {
+    "hero": {
+      "title": "Curated DeFi yield. Non-custodial by design.",
+      "subtitle": "Myrmidons Strategies offers ERC-4626 vaults on Morpho. Transparent, on-chain, and HyperEVM-ready.",
+      "poweredBy": "Powered by Morpho",
+      "learnMore": "Learn more",
+      "ctaPrimary": "Deposit into PHALANX",
+      "ctaSecondary": "About us"
+    },
+    "valueProps": {
+      "curated": {
+        "title": "Curated exposure",
+        "description": "Diversified strategies without complexity."
+      },
+      "riskFirst": {
+        "title": "Risk-first",
+        "description": "Disciplined allocation, on-chain verifiability."
+      },
+      "frictionless": {
+        "title": "Frictionless funding",
+        "description": "Bridge and deposit in minutes."
+      }
+    },
+    "vaults": {
+      "title": "Vaults",
+      "phalanx": {
+        "objective": "Consistent, risk-adjusted USDT0 yield on HyperEVM.",
+        "tags": ["Non-custodial", "Morpho", "ERC-4626"],
+        "tvlLabel": "TVL",
+        "apyLabel": "Current APY",
+        "marketsLabel": "# Markets",
+        "viewDetails": "View vault details",
+        "deposit": "Deposit"
+      }
+    },
+    "trust": {
+      "nonCustodial": {
+        "title": "Non-custodial",
+        "description": "Funds remain in your wallet until deposited in audited smart contracts; positions are verifiable on-chain."
+      },
+      "howItWorks": {
+        "title": "How it works",
+        "steps": [
+          "Connect wallet",
+          "(Optional) Bridge funds",
+          "Deposit to PHALANX"
+        ]
+      }
+    },
+    "social": {
+      "contact": "Questions or diligence? Connect on social or email",
+      "email": "myrmidons.strategies@gmail.com"
+    },
+    "footer": {
+      "disclaimer": "DeFi carries risk, including smart-contract and market risk. Do your own research."
+    }
+  },
   "common": {
     "lastUpdated": "Updated {{timeAgo}} ago"
   },
