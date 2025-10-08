@@ -83,8 +83,36 @@
   },
   "aboutView": {
     "title": "About Myrmidons Strategies",
-    "motto": "\"Excellence forged in the heat of battle.\"",
+    "motto": "Excellence forged in the heat of battle.",
     "p1": "Myrmidons Strategies designs and curates ERC-4626 vaults that allocate across selected Morpho markets on HyperEVM (Hyperliquid). The goal is straightforward: deliver diversified, crypto-native yield with disciplined, transparent risk management.",
+    "featureCards": {
+      "curated": {
+        "title": "Curated Exposure",
+        "description": "Diversified strategies without complexity."
+      },
+      "riskFirst": {
+        "title": "Risk-First",
+        "description": "Disciplined allocation, on-chain verifiability."
+      },
+      "frictionless": {
+        "title": "Frictionless Funding",
+        "description": "Bridge & deposit in minutes."
+      }
+    },
+    "timeline": {
+      "connect": {
+        "title": "Connect",
+        "description": "Link your wallet on HyperEVM."
+      },
+      "allocate": {
+        "title": "Allocate",
+        "description": "Vault supplies liquidity across pre-screened Morpho markets."
+      },
+      "withdraw": {
+        "title": "Withdraw",
+        "description": "Exit anytime; all positions verifiable on-chain."
+      }
+    },
     "whatWeDo": {
       "title": "What we do",
       "bullets": {
@@ -105,11 +133,18 @@
     },
     "securityTrust": {
       "title": "Security & trust",
+      "description": "Your assets are never held by Myrmidons Strategies. This vault is non-custodial, built on Morpho's audited infrastructure, with all operations transparent and verifiable on-chain.",
       "bullets": {
         "custodial": "Non-custodial by design: Your assets remain in your wallet and in audited smart contracts; Myrmidons Strategies never takes custody.",
         "morpho": "Built on Morpho: The vaults use Morpho's open-source, extensively audited contracts and risk parameters on HyperEVM.",
         "transparency": "Full transparency: All positions, transactions, and share accounting are verifiable on-chain."
       }
+    },
+    "sideIndex": {
+      "overview": "Overview",
+      "strategy": "Strategy",
+      "faq": "FAQ",
+      "risks": "Risks"
     },
     "notes": "Notes: No guaranteed returns. Crypto and DeFi involve risk (smart-contract, market/liquidity, oracle/parameter, and stablecoin/bridge risks). Fees and other operational details are outlined in the FAQ.",
     "strategy": {

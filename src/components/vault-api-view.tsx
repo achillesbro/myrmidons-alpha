@@ -15,12 +15,15 @@ import {
 import { hyperPublicClient } from "../viem/clients";
 import vaultAbi from "../abis/vault.json";
 import { useVaultCurrentApyParallel } from "../hooks/useVaultCurrentApyParallel";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useVaultAllocationsOptimized } from "../hooks/useVaultAllocationsOptimized";
 import { GroupedAllocationList } from "./grouped-allocation-list";
 import { AllocationPieChart } from "./allocation-pie-chart";
 import { LiFiQuoteTest } from "./lifi-quote-test";
 import { WithdrawalDialog } from "./withdrawal-dialog";
+import InnerPageHero from "./InnerPageHero";
+import MetricCard from "./MetricCard";
+import CopyableAddress from "./CopyableAddress";
 // Inline AllocationList component for on-chain allocations
 
 // Simple error boundary to isolate rendering errors in the API View
@@ -231,6 +234,12 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   }, [depositDialogOpen, withdrawalDialogOpen]);
   // Force re-mount allocations after confirmed txs
   const [allocRefreshKey, setAllocRefreshKey] = useState(0);
+  
+  // Stable callback for onSettled to prevent infinite loops
+  const handleAllocationsSettled = useCallback((ts: number) => {
+    setLastUpdated(ts);
+  }, []);
+  
   useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -487,50 +496,52 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   // HyperEVM on-chain path
   if (onchainLoading) {
     return (
-      <div className="space-y-4">
-        {/* Top section: Vault header skeleton */}
-        <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4 animate-pulse">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className="w-10 h-10 bg-[#E1E1D6] rounded-lg"></div>
-            <div className="flex-1">
-              <div className="h-5 bg-[#E1E1D6] rounded w-1/2 mb-1"></div>
-              <div className="h-3 bg-[#E1E1D6] rounded w-3/4"></div>
-            </div>
-          </div>
-          <div className="h-3 bg-[#E1E1D6] rounded w-full"></div>
-        </div>
-        
-        {/* Middle section: Actions and Current Position skeleton */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Actions skeleton - 2/3 width */}
-          <div className="lg:col-span-2">
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 animate-pulse">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="text-center space-y-2">
-                  <div className="h-5 bg-[#E1E1D6] rounded w-3/4 mx-auto"></div>
-                  <div className="h-4 bg-[#E1E1D6] rounded w-5/6 mx-auto"></div>
-                  <div className="h-8 bg-[#E1E1D6] rounded"></div>
+      <div className="space-y-6">
+        {/* Hero Section Skeleton */}
+        <div className="relative w-full py-10 md:py-12" style={{ background: 'var(--bg, #FFFFF5)' }}>
+          <div className="relative max-w-6xl mx-auto px-4">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+              <div className="flex-1">
+                <div className="h-8 md:h-10 bg-[#E1E1D6] rounded w-3/4 mb-3 animate-pulse"></div>
+                <div className="h-5 bg-[#E1E1D6] rounded w-full mb-4 animate-pulse"></div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="h-6 bg-[#E1E1D6] rounded-full w-20 animate-pulse"></div>
+                  ))}
                 </div>
-                <div className="text-center space-y-2">
-                  <div className="h-5 bg-[#E1E1D6] rounded w-3/4 mx-auto"></div>
-                  <div className="h-4 bg-[#E1E1D6] rounded w-5/6 mx-auto"></div>
-                  <div className="h-8 bg-[#E1E1D6] rounded"></div>
-                </div>
+              </div>
+              <div className="flex-shrink-0">
+                <div className="h-16 bg-[#E1E1D6] rounded w-48 animate-pulse"></div>
               </div>
             </div>
           </div>
-          {/* Current Position skeleton - 1/3 width */}
-          <div className="lg:col-span-1">
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 animate-pulse">
-              <div className="h-5 bg-[#E1E1D6] rounded w-24 mb-3"></div>
+        </div>
+        
+        {/* Middle section: Actions (8/12) and Current Position (4/12) skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          {/* Actions skeleton - 8/12 width */}
+          <div className="lg:col-span-8">
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 h-full flex flex-col animate-pulse">
+              <div className="h-6 bg-[#E1E1D6] rounded w-16 mb-4"></div>
+              <div className="flex gap-3 mb-3">
+                <div className="flex-1 h-12 bg-[#E1E1D6] rounded-2xl"></div>
+                <div className="flex-1 h-12 bg-[#E1E1D6] rounded-2xl"></div>
+              </div>
+              <div className="h-3 bg-[#E1E1D6] rounded w-full"></div>
+            </div>
+          </div>
+          {/* Current Position skeleton - 4/12 width */}
+          <div className="lg:col-span-4">
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 h-full flex flex-col animate-pulse">
+              <div className="h-6 bg-[#E1E1D6] rounded w-32 mb-4"></div>
               <div className="space-y-3">
-                <div className="text-center">
-                  <div className="h-4 bg-[#E1E1D6] rounded w-16 mx-auto mb-1"></div>
-                  <div className="h-5 bg-[#E1E1D6] rounded w-20 mx-auto"></div>
+                <div>
+                  <div className="h-3 bg-[#E1E1D6] rounded w-12 mb-1"></div>
+                  <div className="h-5 bg-[#E1E1D6] rounded w-20"></div>
                 </div>
-                <div className="text-center">
-                  <div className="h-4 bg-[#E1E1D6] rounded w-16 mx-auto mb-1"></div>
-                  <div className="h-5 bg-[#E1E1D6] rounded w-20 mx-auto"></div>
+                <div>
+                  <div className="h-3 bg-[#E1E1D6] rounded w-16 mb-1"></div>
+                  <div className="h-5 bg-[#E1E1D6] rounded w-24"></div>
                 </div>
               </div>
             </div>
@@ -541,25 +552,41 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         <div className="space-y-4">
           
           {/* Metrics skeleton */}
-          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4 animate-pulse">
-            <div className="h-4 bg-[#E1E1D6] rounded w-20 mb-3"></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 animate-pulse">
+            <div className="h-6 bg-[#E1E1D6] rounded w-24 mb-4"></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="text-center">
                   <div className="h-4 bg-[#E1E1D6] rounded w-16 mx-auto mb-1"></div>
-                  <div className="h-3 bg-[#E1E1D6] rounded w-12 mx-auto"></div>
+                  <div className="h-7 bg-[#E1E1D6] rounded w-20 mx-auto mb-1"></div>
                 </div>
               ))}
             </div>
+            <div className="mt-3 h-3 bg-[#E1E1D6] rounded w-32 mx-auto"></div>
           </div>
           
           {/* Allocations skeleton */}
-          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 animate-pulse">
-            <div className="h-4 bg-[#E1E1D6] rounded w-20 mb-3"></div>
-            <div className="space-y-1">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-8 bg-[#E1E1D6] rounded"></div>
-              ))}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Allocations List skeleton - 2/3 width */}
+            <div className="lg:col-span-2">
+              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full animate-pulse">
+                <div className="h-5 bg-[#E1E1D6] rounded w-20 mb-3"></div>
+                <div className="h-3 bg-[#E1E1D6] rounded w-full mb-4"></div>
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="h-12 bg-[#E1E1D6] rounded"></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Pie Chart skeleton - 1/3 width */}
+            <div className="lg:col-span-1">
+              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-96 animate-pulse">
+                <div className="flex items-center justify-center h-full">
+                  <div className="w-32 h-32 bg-[#E1E1D6] rounded-full"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -580,43 +607,33 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       <ErrorBoundary>
         <div className="space-y-6">
 
+        {/* Hero Section */}
+        <InnerPageHero
+          title={onchainData.name}
+          subtitle={t("vaultInfo.vaultHeader.description")}
+          badges={[
+            { label: "Powered by Morpho", href: "https://morpho.org/" },
+            { label: "HyperEVM" },
+            { label: "ERC-4626" },
+            { label: "Non-custodial" },
+          ]}
+        rightSlot={
+          <CopyableAddress
+            address={VAULT_ADDRESS}
+            explorerUrl={`https://hyperevmscan.io/address/${VAULT_ADDRESS}`}
+            label={t("vaultInfo.vaultHeader.address")}
+            loading={onchainLoading}
+          />
+        }
+        />
+
         {/* Vault Info on top, Actions (2/3) & Current Position (1/3) below, then Metrics, Allocations */}
         <div className="space-y-4">
-          {/* Top section: Vault Information */}
-          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex-1">
-                <div className="flex items-center space-x-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <img 
-                      src="/Myrmidons-logo-dark-no-bg.png" 
-                      alt="Myrmidons Strategies" 
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h1 
-                      className="text-xs font-bold text-[#00295B] mb-1 break-words"
-                      style={{ fontSize: '36px', lineHeight: '1.2' }}
-                    >
-                      {onchainData.name}
-                    </h1>
-                    <p className="text-[#101720]/70 text-sm">
-                      {t("vaultInfo.vaultHeader.address")} <span className="font-mono break-all">{VAULT_ADDRESS}</span>
-                    </p>
-                  </div>
-                </div>
-                <p className="text-[#101720]/80 text-sm leading-relaxed">
-                  {t("vaultInfo.vaultHeader.description")}
-                </p>
-              </div>
-            </div>
-          </div>
           
-          {/* Middle section: Actions (2/3) and Current Position (1/3) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Actions section - takes 2/3 of the grid */}
-            <div className="lg:col-span-2">
+          {/* Middle section: Actions (8/12) and Current Position (4/12) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Actions section - takes 8/12 of the grid */}
+            <div className="lg:col-span-8">
               <ChainVaultGuard
                 requiredChainId={999}
                 requiredChainName="HyperEVM"
@@ -624,76 +641,58 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                 allowedVaultsByChain={ALLOWED_VAULTS}
                 warnOnly={false}
               >
-                {/* Enhanced Actions: Deposit and Withdraw */}
-                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full flex flex-col">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
-                    {/* Deposit Button */}
-                    <div className="flex flex-col justify-center text-center">
-                      <h4 className="text-base font-semibold text-[#00295B] mb-2">
-                        {t("vaultInfo.actions.depositTitle")}
-                      </h4>
-                      <p className="text-sm text-[#101720]/70 mb-3 leading-relaxed">
-                        {t("vaultInfo.actions.depositDescription")}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setDepositDialogOpen(true)}
-                        className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
-                        style={{ backgroundColor: '#101720', color: '#FFFFF5' }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0d1419'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#101720'}
-                      >
-                        {t("vaultInfo.actions.deposit")}
-                      </button>
-                    </div>
-                    
-                    {/* Withdraw Button */}
-                    <div className="flex flex-col justify-center text-center">
-                      <h4 className="text-base font-semibold text-[#00295B] mb-2">
-                        {t("vaultInfo.actions.withdrawTitle")}
-                      </h4>
-                      <p className="text-sm text-[#101720]/70 mb-3 leading-relaxed">
-                        {t("vaultInfo.actions.withdrawDescription")}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setWithdrawalDialogOpen(true)}
-                        className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md"
-                        style={{ backgroundColor: '#101720', color: '#FFFFF5' }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#0d1419'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#101720'}
-                      >
-                        {t("vaultInfo.actions.withdraw")}
-                      </button>
-                    </div>
+                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 h-full flex flex-col">
+                  <h3 className="text-lg font-semibold text-[#00295B] mb-4">
+                    {t("vaultInfo.actions.title")}
+                  </h3>
+                  <div className="flex gap-3 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => setDepositDialogOpen(true)}
+                      className="flex-1 px-5 py-3 text-sm font-semibold rounded-2xl transition-all duration-200"
+                      style={{ background: 'var(--muted-brass, #B08D57)', color: '#fff' }}
+                    >
+                      {t("vaultInfo.actions.deposit")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawalDialogOpen(true)}
+                      className="flex-1 px-5 py-3 text-sm font-semibold rounded-2xl border transition-all duration-200"
+                      style={{ borderColor: 'var(--heading, #00295B)', color: 'var(--heading, #00295B)' }}
+                    >
+                      {t("vaultInfo.actions.withdraw")}
+                    </button>
                   </div>
+                  <p className="text-xs text-center" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                    {t("vaultInfo.actions.depositDescription")}
+                  </p>
                 </div>
               </ChainVaultGuard>
             </div>
             
-            {/* Current Position section - takes 1/3 of the grid */}
-            <div className="lg:col-span-1">
-              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full flex flex-col">
-                <h3 className="text-base font-semibold text-[#00295B] mb-2">
+            {/* Current Position section - takes 4/12 of the grid */}
+            <div className="lg:col-span-4">
+              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 h-full flex flex-col">
+                <h3 className="text-lg font-semibold text-[#00295B] mb-4">
                   {t("vaultInfo.position.title")}
                 </h3>
                 {!clientW.data?.account ? (
-                  <div className="text-sm text-[#101720]/70 text-center py-3">
+                  <div className="text-sm text-[#101720]/70 text-center py-4">
                     {t("vaultInfo.position.connectToView")}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3 flex-1">
-                    <div className="text-center">
-                      <div className="text-sm text-[#101720]/70 mb-1">
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
                         {t("vaultInfo.position.shares")}
                       </div>
-                      <div className="text-base font-semibold text-[#00295B]">{fmtToken(userShares, onchainData.shareDecimals)}</div>
+                      <div className="text-lg font-semibold text-[#00295B]">{fmtToken(userShares, onchainData.shareDecimals)}</div>
                     </div>
-                    <div className="text-center">
-                      <div className="text-sm text-[#101720]/70 mb-1">
+                    <div>
+                      <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
                         {t("vaultInfo.position.usdValue")}
                       </div>
-                      <div className="text-base font-semibold text-[#00295B]">{priceLoading ? <Skeleton className="h-5 w-20 mx-auto"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
+                      <div className="text-lg font-semibold text-[#00295B]">{priceLoading ? <Skeleton className="h-5 w-20"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
                     </div>
                   </div>
                 )}
@@ -704,82 +703,56 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
           {/* Bottom section: metrics, allocations */}
           <div className="space-y-4">
             {/* Enhanced Metrics Section */}
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
-              <div className="mb-3">
-                <h2 className="text-lg font-bold text-[#00295B]">
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-[#00295B]">
                   {t("vaultInfo.metrics.title")}
                 </h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="text-center">
-                  <div className="text-xl font-bold text-[#00295B] mb-1">
-                    {priceLoading ? (
-                      <div className="h-7 bg-[#E1E1D6] rounded animate-pulse"></div>
-                    ) : tvlUsd !== undefined ? (
-                      `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                    ) : (
-                      "N/A"
-                    )}
-                  </div>
-                  <p className="text-[#101720]/70 text-sm font-medium">
-                    {t("vaultInfo.metrics.tvlUsd")}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-[#00295B] mb-1">
-                    {(() => {
-                      // Compute share price = (assets/shares) * underlying USD, aligning decimals
-                      const assetsUnderlying = Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals));
-                      const shares = Number(formatUnits(onchainData.totalSupply, onchainData.shareDecimals));
-                      const underlyingPriceUSD = typeof usdPrice === "number" && usdPrice > 0 ? usdPrice : 1; // USDT0-safe fallback
-                      const sharePriceUSD = shares === 0 ? 0 : (assetsUnderlying / shares) * underlyingPriceUSD;
-                      return priceLoading
-                        ? <div className="h-7 bg-[#E1E1D6] rounded animate-pulse"></div>
-                        : `$${sharePriceUSD.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
-                    })()}
-                  </div>
-                  <p className="text-[#101720]/70 text-sm font-medium">
-                    {t("vaultInfo.metrics.sharePrice")}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-[#00295B] mb-1">
-                    {apyLoading ? (
-                      <div className="h-7 bg-[#E1E1D6] rounded animate-pulse"></div>
-                    ) : apyError ? (
-                      t("vaultInfo.errors.error")
-                    ) : apy != null ? (
-                      `${(apy * 100).toFixed(2)}%`
-                    ) : (
-                      "N/A"
-                    )}
-                  </div>
-                  <p className="text-[#101720]/70 text-sm font-medium">
-                    {t("vaultInfo.metrics.yield")}
-                  </p>
-                  {apyLoading && (
-                    <p className="text-[#101720]/60 text-sm mt-1">
-                      {t("vaultInfo.metrics.yieldHint")}
-                    </p>
-                  )}
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-bold text-[#00295B] mb-1">
-                    {feeLoading ? (
-                      <div className="h-7 bg-[#E1E1D6] rounded animate-pulse"></div>
-                    ) : feeWad != null ? (
-                      `${(Number(formatUnits(feeWad, 18)) * 100).toFixed(2)}%`
-                    ) : feeError ? (
-                      t("vaultInfo.errors.error")
-                    ) : (
-                      "N/A"
-                    )}
-                  </div>
-                  <p className="text-[#101720]/70 text-sm font-medium">
-                    {t("vaultInfo.metrics.performanceFee")}
-                  </p>
-                  {feeRecipient && (
-                    <p className="text-[#101720]/60 text-sm mt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <MetricCard
+                  label={t("vaultInfo.metrics.tvlUsd")}
+                  value={
+                    tvlUsd !== undefined
+                      ? `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                      : "N/A"
+                  }
+                  loading={priceLoading}
+                />
+                <MetricCard
+                  label={t("vaultInfo.metrics.sharePrice")}
+                  value={(() => {
+                    const assetsUnderlying = Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals));
+                    const shares = Number(formatUnits(onchainData.totalSupply, onchainData.shareDecimals));
+                    const underlyingPriceUSD = typeof usdPrice === "number" && usdPrice > 0 ? usdPrice : 1;
+                    const sharePriceUSD = shares === 0 ? 0 : (assetsUnderlying / shares) * underlyingPriceUSD;
+                    return `$${sharePriceUSD.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
+                  })()}
+                  loading={priceLoading}
+                />
+                <MetricCard
+                  label={t("vaultInfo.metrics.yield")}
+                  value={
+                    apyError
+                      ? t("vaultInfo.errors.error")
+                      : apy != null
+                      ? `${(apy * 100).toFixed(2)}%`
+                      : "N/A"
+                  }
+                  tooltip="Current net supply APY of underlying allocation; variable."
+                  loading={apyLoading}
+                />
+                <MetricCard
+                  label={t("vaultInfo.metrics.performanceFee")}
+                  value={
+                    feeWad != null
+                      ? `${(Number(formatUnits(feeWad, 18)) * 100).toFixed(2)}%`
+                      : feeError
+                      ? t("vaultInfo.errors.error")
+                      : "N/A"
+                  }
+                  footnote={
+                    feeRecipient ? (
                       <a
                         href={`https://purrsec.com/address/${feeRecipient}`}
                         target="_blank"
@@ -788,10 +761,16 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                       >
                         {`${feeRecipient.slice(0, 6)}…${feeRecipient.slice(-4)}`}
                       </a>
-                    </p>
-                  )}
-                </div>
+                    ) : undefined
+                  }
+                  loading={feeLoading}
+                />
               </div>
+              {lastUpdated && (
+                <div className="mt-3 text-xs text-center" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+                  Last updated · {new Date(lastUpdated).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' })} UTC
+                </div>
+              )}
             </div>
             {/* Enhanced Allocations with Pie Chart */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -809,7 +788,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                   <OnchainAllocations
                     key={allocRefreshKey}
                     vaultAddress={VAULT_ADDRESS as `0x${string}`}
-                    onSettled={(ts) => setLastUpdated(ts)}
+                    onSettled={handleAllocationsSettled}
                   />
                 </div>
               </div>
@@ -934,6 +913,28 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         )}
 
         <Toasts toasts={toasts} />
+
+        {/* Mobile Sticky Bottom CTA Bar */}
+        <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#FFFFF5] border-t border-[#E5E2D6] p-4 z-40 shadow-lg">
+          <div className="flex gap-3 max-w-6xl mx-auto">
+            <button
+              type="button"
+              onClick={() => setDepositDialogOpen(true)}
+              className="flex-1 px-4 py-3 text-sm font-semibold rounded-2xl transition-all duration-200"
+              style={{ background: 'var(--muted-brass, #B08D57)', color: '#fff' }}
+            >
+              {t("vaultInfo.actions.deposit")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setWithdrawalDialogOpen(true)}
+              className="flex-1 px-4 py-3 text-sm font-semibold rounded-2xl border transition-all duration-200"
+              style={{ borderColor: 'var(--heading, #00295B)', color: 'var(--heading, #00295B)' }}
+            >
+              {t("vaultInfo.actions.withdraw")}
+            </button>
+          </div>
+        </div>
 
       </div>
       </ErrorBoundary>

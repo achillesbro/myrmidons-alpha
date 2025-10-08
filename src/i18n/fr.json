@@ -83,8 +83,36 @@
   },
   "aboutView": {
     "title": "À propos de Myrmidons Strategies",
-    "motto": "\"L'excellence forgée dans la chaleur du combat.\"",
+    "motto": "L'excellence forgée dans la chaleur du combat.",
     "p1": "Myrmidons Strategies conçoit et gère des vaults ERC-4626 qui allouent des liquidités sur des marchés Morpho sélectionnés sur HyperEVM (Hyperliquid). L'objectif est simple : offrir des rendements crypto-natifs diversifiés avec une gestion des risques disciplinée et transparente.",
+    "featureCards": {
+      "curated": {
+        "title": "Exposition Sélectionnée",
+        "description": "Stratégies diversifiées sans complexité."
+      },
+      "riskFirst": {
+        "title": "Risque en Premier",
+        "description": "Allocation disciplinée, vérifiabilité on-chain."
+      },
+      "frictionless": {
+        "title": "Financement sans Friction",
+        "description": "Bridge et dépôt en quelques minutes."
+      }
+    },
+    "timeline": {
+      "connect": {
+        "title": "Connecter",
+        "description": "Connectez votre wallet sur HyperEVM."
+      },
+      "allocate": {
+        "title": "Allouer",
+        "description": "Le vault fournit des liquidités sur des marchés Morpho pré-sélectionnés."
+      },
+      "withdraw": {
+        "title": "Retirer",
+        "description": "Sortez à tout moment ; toutes les positions sont vérifiables on-chain."
+      }
+    },
     "whatWeDo": {
       "title": "Ce que nous faisons",
       "bullets": {
@@ -105,11 +133,18 @@
     },
     "securityTrust": {
       "title": "Sécurité et confiance",
+      "description": "Vos actifs ne sont jamais détenus par Myrmidons Strategies. Ce vault est non-custodial, construit sur l'infrastructure audité de Morpho, avec toutes les opérations transparentes et vérifiables on-chain.",
       "bullets": {
         "custodial": "Non-custodial par conception : Vos actifs restent dans votre wallet et dans des smart contracts audités ; Myrmidons Strategies ne détient jamais vos actifs.",
         "morpho": "Construit sur Morpho : Les vaults utilisent les contrats open-source et largement audités de Morpho ainsi que ses paramètres de risque sur HyperEVM.",
         "transparency": "Transparence totale : Toutes les positions, transactions et circulation des parts sont vérifiables on-chain."
       }
+    },
+    "sideIndex": {
+      "overview": "Aperçu",
+      "strategy": "Stratégie",
+      "faq": "FAQ",
+      "risks": "Risques"
     },
     "notes": "Notes : Aucun rendement garanti. La crypto et la DeFi impliquent des risques (smart-contract, marché/liquidité, oracle/paramètre, et stablecoin/bridge). Les frais et autres détails opérationnels sont décrits dans la FAQ.",
     "strategy": {
