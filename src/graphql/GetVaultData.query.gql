@@ -1,0 +1,58 @@
+query GetVaultData($address: String!, $chainId: Int!) {
+  vaultByAddress(address: $address, chainId: $chainId) {
+    address
+    name
+    symbol
+    asset {
+      address
+      symbol
+      decimals
+      priceUsd
+    }
+    state {
+      # APY metrics
+      apy
+      netApy
+      netApyWithoutRewards
+      dailyApy
+      dailyNetApy
+      weeklyApy
+      weeklyNetApy
+      monthlyApy
+      monthlyNetApy
+
+      # TVL & Share Price
+      totalAssets
+      totalAssetsUsd
+      totalSupply
+      sharePrice
+      sharePriceUsd
+
+      # Allocations
+      allocation {
+        supplyAssets
+        supplyAssetsUsd
+        market {
+          uniqueKey
+          loanAsset {
+            name
+            symbol
+            address
+            decimals
+            priceUsd
+          }
+          collateralAsset {
+            name
+            symbol
+            address
+            logoURI
+          }
+          lltv
+          state {
+            supplyApy
+          }
+        }
+      }
+    }
+  }
+}

@@ -213,7 +213,7 @@ MIT License - see LICENSE file for details
 ## Support
 
 For questions or issues:
-- Email: myrmidons.strategies@gmail.com
+- Email: contact@myrmidons-strategies.com
 - Check the About page in the app for more information
 
 ---

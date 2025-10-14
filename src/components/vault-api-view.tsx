@@ -14,17 +14,17 @@ import {
 } from "./vault-shared";
 import { hyperPublicClient } from "../viem/clients";
 import vaultAbi from "../abis/vault.json";
-import { useVaultCurrentApyParallel } from "../hooks/useVaultCurrentApyParallel";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useVaultAllocationsOptimized } from "../hooks/useVaultAllocationsOptimized";
-import { GroupedAllocationList } from "./grouped-allocation-list";
-import { AllocationPieChart } from "./allocation-pie-chart";
+import { useState, useEffect, useRef } from "react";
 import { LiFiQuoteTest } from "./lifi-quote-test";
 import { WithdrawalDialog } from "./withdrawal-dialog";
 import InnerPageHero from "./InnerPageHero";
-import MetricCard from "./MetricCard";
 import CopyableAddress from "./CopyableAddress";
-// Inline AllocationList component for on-chain allocations
+import { ApyHistoryChart } from "./apy-history-chart";
+import { AllocationPieChartAPI } from "./allocation-pie-chart-api";
+import { useVaultDataAPI } from "../hooks/useVaultDataAPI";
+import { GroupedAllocationList } from "./grouped-allocation-list";
+import { MetricCard, InfoTooltip } from "./metric-card";
+import { useMetricsData } from "../hooks/useMetricsData";
 
 // Simple error boundary to isolate rendering errors in the API View
 import React from "react";
@@ -68,18 +68,17 @@ const ALLOWED_VAULTS: Record<number, readonly `0x${string}`[]> = {
 
 
 export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` }) {
-  // UX: last refresh timestamp for data shown on this page
-  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
-  const [, setTimeAgoTick] = useState<number>(0);
   const { t } = useTranslation();
-  useEffect(() => {
-    if (lastUpdated == null) return;
-    const id = setInterval(() => setTimeAgoTick((x) => x + 1), 1000);
-    return () => clearInterval(id);
-  }, [lastUpdated]);
 
-  // If using HyperEVM (chainId 999), fetch vault data on-chain instead of via GraphQL
+  // Vault address and chain ID
   const VAULT_ADDRESS = (vaultAddress ?? "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42") as `0x${string}`;
+  const CHAIN_ID = 999; // HyperEVM
+
+  // Fetch vault data from Morpho API
+  const apiData = useVaultDataAPI(VAULT_ADDRESS, CHAIN_ID);
+  
+  // Fetch metrics data for sparklines and derived values (always call hooks at top level)
+  const metricsData = useMetricsData(VAULT_ADDRESS, CHAIN_ID, apiData.sharePriceUsd);
 
   // Reset on address change so we refetch everything cleanly
   useEffect(() => {
@@ -175,7 +174,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         setUserShares(shares);
         setUserAssets(assets);
         setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
-        setAllocRefreshKey((k) => k + 1);
         await refreshVaultTotalsFast();
       }
     } catch (error) {
@@ -207,7 +205,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         setUserShares(shares);
         setUserAssets(assets);
         setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
-        setAllocRefreshKey((k) => k + 1);
         await refreshVaultTotalsFast();
       }
     } catch (error) {
@@ -232,13 +229,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       return () => document.removeEventListener('keydown', handleEscapeKey);
     }
   }, [depositDialogOpen, withdrawalDialogOpen]);
-  // Force re-mount allocations after confirmed txs
-  const [allocRefreshKey, setAllocRefreshKey] = useState(0);
-  
-  // Stable callback for onSettled to prevent infinite loops
-  const handleAllocationsSettled = useCallback((ts: number) => {
-    setLastUpdated(ts);
-  }, []);
   
   useEffect(() => {
     let cancelled = false;
@@ -266,7 +256,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         if (!cancelled) setFeeError(e as Error);
       } finally {
         if (!cancelled) setFeeLoading(false);
-        if (!cancelled) setLastUpdated(Date.now());
+        // Last updated timestamp now handled by metricsData hook
       }
     }
     run();
@@ -319,7 +309,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
           setOnchainError(e as Error);
         } finally {
           setOnchainLoading(false);
-          setLastUpdated(Date.now());
+          // Last updated timestamp now handled by metricsData hook
         }
       })();
     }
@@ -332,6 +322,13 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
     }
   }, [onchainData?.underlyingAddress, onchainData?.underlyingDecimals]);
 
+  // Update lastUpdated when API data finishes loading
+  useEffect(() => {
+    if (!apiData.loading) {
+      // Last updated timestamp now handled by metricsData hook
+    }
+  }, [apiData.loading]);
+
   // Fast-refresh TVL totals via wallet provider (avoids laggy public RPC)
   const refreshVaultTotalsFast = async () => {
     try {
@@ -343,7 +340,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         vaultR.totalSupply() as Promise<bigint>,
       ]);
       setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
-      setLastUpdated(Date.now());
+      // Last updated timestamp now handled by metricsData hook
     } catch {}
   };
 
@@ -402,7 +399,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         console.warn(t("vaultInfo.errors.approvalTimeout"), err);
       } finally {
         // Allowance refresh removed - not needed for new deposit flow
-        setLastUpdated(Date.now());
+        // Last updated timestamp now handled by metricsData hook
         setPending(null);
       }
     } catch (e) {
@@ -449,9 +446,6 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
       // Update TVL totals immediately without waiting for public client
       setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
 
-      // Re-mount allocations to force on-chain refresh for the table
-      setAllocRefreshKey((k) => k + 1);
-
       // Extra: immediate + delayed TVL refresh via wallet RPC
       await refreshVaultTotalsFast();
       setTimeout(() => { refreshVaultTotalsFast(); }, 2000);
@@ -472,7 +466,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         setPriceLoading(true);
         const p = await getUsdt0Usd({ token: onchainData.underlyingAddress });
         if (!cancelled) setUsdPrice(p ?? null);
-        if (!cancelled) setLastUpdated(Date.now());
+        // Last updated timestamp now handled by metricsData hook
       } finally {
         if (!cancelled) setPriceLoading(false);
       }
@@ -483,15 +477,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
   }, [onchainData?.underlyingAddress]);
 
 
-  // Always call APY hook so it's available for skeleton and metrics
-  const { apy, loading: apyLoading, error: apyError } = useVaultCurrentApyParallel(
-    VAULT_ADDRESS as `0x${string}`
-  );
-  useEffect(() => {
-    if (!apyLoading) {
-      setLastUpdated(Date.now());
-    }
-  }, [apyLoading]);
+  // APY data is now fetched from apiData hook (no separate hook needed)
 
   // HyperEVM on-chain path
   if (onchainLoading) {
@@ -597,9 +583,8 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
     return <p>Error loading on-chain vault: {onchainError.message}</p>;
   }
   if (onchainData) {
-    // Compute TVL in USD using underlying decimals and live USD price
-    const tvlUnits = Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals));
-    const tvlUsd = typeof usdPrice === "number" ? tvlUnits * usdPrice : undefined;
+    // Use API data for TVL and metrics, fallback to onchain if needed
+    const tvlUsd = apiData.totalAssetsUsd ?? (typeof usdPrice === "number" ? Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals)) * usdPrice : undefined);
 
     const userUsd = typeof usdPrice === "number" ? Number(formatUnits(userAssets, onchainData.underlyingDecimals)) * usdPrice : undefined;
 
@@ -700,78 +685,95 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
             </div>
           </div>
           
-          {/* Bottom section: metrics, allocations */}
-          <div className="space-y-4">
-            {/* Enhanced Metrics Section */}
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5">
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold text-[#00295B]">
-                  {t("vaultInfo.metrics.title")}
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <MetricCard
-                  label={t("vaultInfo.metrics.tvlUsd")}
-                  value={
-                    tvlUsd !== undefined
-                      ? `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                      : "N/A"
-                  }
-                  loading={priceLoading}
-                />
-                <MetricCard
-                  label={t("vaultInfo.metrics.sharePrice")}
-                  value={(() => {
-                    const assetsUnderlying = Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals));
-                    const shares = Number(formatUnits(onchainData.totalSupply, onchainData.shareDecimals));
-                    const underlyingPriceUSD = typeof usdPrice === "number" && usdPrice > 0 ? usdPrice : 1;
-                    const sharePriceUSD = shares === 0 ? 0 : (assetsUnderlying / shares) * underlyingPriceUSD;
-                    return `$${sharePriceUSD.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
-                  })()}
-                  loading={priceLoading}
-                />
-                <MetricCard
-                  label={t("vaultInfo.metrics.yield")}
-                  value={
-                    apyError
-                      ? t("vaultInfo.errors.error")
-                      : apy != null
-                      ? `${(apy * 100).toFixed(2)}%`
-                      : "N/A"
-                  }
-                  tooltip="Current net supply APY of underlying allocation; variable."
-                  loading={apyLoading}
-                />
-                <MetricCard
-                  label={t("vaultInfo.metrics.performanceFee")}
-                  value={
-                    feeWad != null
-                      ? `${(Number(formatUnits(feeWad, 18)) * 100).toFixed(2)}%`
-                      : feeError
-                      ? t("vaultInfo.errors.error")
-                      : "N/A"
-                  }
-                  footnote={
-                    feeRecipient ? (
-                      <a
-                        href={`https://purrsec.com/address/${feeRecipient}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:underline"
-                      >
-                        {`${feeRecipient.slice(0, 6)}…${feeRecipient.slice(-4)}`}
-                      </a>
-                    ) : undefined
-                  }
-                  loading={feeLoading}
-                />
-              </div>
-              {lastUpdated && (
-                <div className="mt-3 text-xs text-center" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
-                  Last updated · {new Date(lastUpdated).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' })} UTC
+          {/* Bottom section: Key Metrics (1/3) and APY History (2/3) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Key Metrics Section - 1/3 width */}
+            <div className="lg:col-span-1">
+              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4 h-full">
+                {/* Header with live indicator */}
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-[#00295B]">
+                    {t("vaultInfo.metrics.title")}
+                  </h2>
+                  <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                    <span>Live · {metricsData.lastUpdated} UTC</span>
+                  </div>
                 </div>
-              )}
+
+                {/* 2x3 Metrics Grid (2 per row, 3 rows) */}
+                <div className="space-y-4">
+                  {/* Row 1: TVL */}
+                  <div className="grid grid-cols-1">
+                    <MetricCard
+                      num={priceLoading || tvlUsd === undefined ? "—" : 
+                        tvlUsd >= 1000000 ? `$${(tvlUsd / 1000000).toFixed(2)}M` :
+                        tvlUsd >= 1000 ? `$${(tvlUsd / 1000).toFixed(1)}K` :
+                        `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                      }
+                      sub="TVL"
+                    />
+                  </div>
+
+                  {/* Row 2: Current APY (full width with sparkline) */}
+                  <div className="grid grid-cols-1">
+                    <MetricCard
+                      num={apiData.loading || apiData.instantApy === null ? "—" :
+                        `${(apiData.instantApy * 100).toFixed(2)}%`
+                      }
+                      sub={
+                        <span>
+                          Current APY
+                          <InfoTooltip label="Annualized from latest net rate; variable" />
+                        </span>
+                      }
+                      delta={metricsData.apy7dAvg !== null ? 
+                        `7D avg ${(metricsData.apy7dAvg * 100).toFixed(2)}%` : undefined
+                      }
+                      sparkline={metricsData.apySparkline.length > 0 ? metricsData.apySparkline : undefined}
+                    />
+                  </div>
+
+                  {/* Row 3: Share Price and Since Inception */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <MetricCard
+                      num={apiData.loading || priceLoading || apiData.sharePriceUsd === null ? "—" :
+                        `$${apiData.sharePriceUsd.toFixed(4)}`
+                      }
+                      sub={
+                        <span>
+                          Share Price
+                          <InfoTooltip label="Vault assets per share (ERC-4626)" />
+                        </span>
+                      }
+                    />
+
+                    <MetricCard
+                      num={metricsData.sinceInceptionReturn !== null ?
+                        `${metricsData.sinceInceptionReturn >= 0 ? '+' : ''}${metricsData.sinceInceptionReturn.toFixed(2)}%` :
+                        "—"
+                      }
+                      sub="Since Inception"
+                      deltaType={
+                        metricsData.sinceInceptionReturn !== null ?
+                          metricsData.sinceInceptionReturn >= 0 ? "positive" : "negative" :
+                          "neutral"
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
+            
+            {/* APY Chart Section - 2/3 width */}
+            <div className="lg:col-span-2">
+              <ApyHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} />
+            </div>
+          </div>
+
+          {/* Allocations section */}
+          <div className="space-y-4">
+
             {/* Enhanced Allocations with Pie Chart */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Allocations List - 2/3 width */}
@@ -785,21 +787,86 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                       {t("vaultInfo.allocations.subtitle")}
                     </p>
                   </div>
-                  <OnchainAllocations
-                    key={allocRefreshKey}
-                    vaultAddress={VAULT_ADDRESS as `0x${string}`}
-                    onSettled={handleAllocationsSettled}
-                  />
+                  {apiData.loading ? (
+                    <div className="space-y-1">
+                      {/* Skeleton Rows */}
+                      <div className="space-y-1">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div key={i} className="h-12 bg-[#E1E1D6] rounded animate-pulse"></div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : apiData.groupedAllocations && apiData.groupingResult ? (
+                    <GroupedAllocationList
+                      groupedItems={apiData.groupedAllocations}
+                      ungroupedItems={apiData.groupingResult.ungroupedItems}
+                      totalAssets={apiData.totalAssets ?? 0n}
+                    />
+                  ) : (
+                    <p className="text-sm text-[#101720]/70 text-center py-8">
+                      {t("vaultInfo.allocations.empty")}
+                    </p>
+                  )}
                 </div>
               </div>
               
               {/* Pie Chart - 1/3 width */}
               <div className="lg:col-span-1">
                 <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-96">
-                  <AllocationPieChartWrapper
-                    key={allocRefreshKey}
-                    vaultAddress={VAULT_ADDRESS as `0x${string}`}
-                  />
+                  {apiData.loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-pulse">
+                        <div className="w-32 h-32 bg-[#E1E1D6] rounded-full mx-auto mb-4"></div>
+                      </div>
+                    </div>
+                  ) : apiData.groupedAllocations ? (
+                    <AllocationPieChartAPI
+                      groupedAllocations={apiData.groupedAllocations}
+                      loading={false}
+                    />
+                  ) : (
+                    <p className="text-sm text-[#101720]/70 text-center py-8">No data</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Performance Fee Indicator */}
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium text-[#00295B]">
+                    {t("vaultInfo.metrics.performanceFee")}
+                  </div>
+                  <div className="text-xs text-[#101720]/70 mt-1">
+                    Fee charged on yield earned
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-semibold text-[#00295B]">
+                    {feeLoading ? (
+                      <Skeleton className="h-5 w-16" />
+                    ) : (
+                      feeWad != null
+                        ? `${(Number(formatUnits(feeWad, 18)) * 100).toFixed(2)}%`
+                        : feeError
+                        ? t("vaultInfo.errors.error")
+                        : "N/A"
+                    )}
+                  </div>
+                  {feeRecipient && (
+                    <div className="text-xs mt-1">
+                      <a
+                        href={`https://purrsec.com/address/${feeRecipient}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline"
+                        style={{ color: 'var(--text, #101720)', opacity: 0.6 }}
+                      >
+                        {`${feeRecipient.slice(0, 6)}…${feeRecipient.slice(-4)}`}
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -941,123 +1008,4 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
     );
   }
 
-}
-
-// Pie Chart wrapper component
-function AllocationPieChartWrapper({ vaultAddress }: { vaultAddress: `0x${string}` }) {
-  const { t } = useTranslation();
-  const { 
-    groupedItems, 
-    totalAssets, 
-    loading, 
-    error 
-  } = useVaultAllocationsOptimized(vaultAddress);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse">
-          <div className="w-32 h-32 bg-[#E1E1D6] rounded-full mx-auto mb-4"></div>
-          <div className="space-y-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-[#E1E1D6] rounded-full"></div>
-                <div className="h-4 bg-[#E1E1D6] rounded w-20"></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  if (error) {
-    return <p className="text-sm text-red-500 text-center py-8">{t("vaultInfo.allocations.error", { error })}</p>;
-  }
-  
-  if (!groupedItems || totalAssets === null) {
-    return <p className="text-sm text-[#101720]/70 text-center py-8">{t("vaultInfo.allocations.empty")}</p>;
-  }
-
-  return <AllocationPieChart groupedItems={groupedItems} totalAssets={totalAssets} />;
-}
-
-// Removed AllocationRow type - now using AllocationItem from allocation-grouper
-
-// Removed AllocationList function - now using GroupedAllocationList
-
-function OnchainAllocations({ vaultAddress, onSettled }: { vaultAddress: `0x${string}`; onSettled?: (ts: number) => void }) {
-  const { t } = useTranslation();
-  const { 
-    groupedItems, 
-    groupingResult, 
-    totalAssets, 
-    loading, 
-    error 
-  } = useVaultAllocationsOptimized(vaultAddress);
-
-  useEffect(() => {
-    if (!loading) {
-      onSettled?.(Date.now());
-    }
-  }, [loading, onSettled]);
-
-  if (loading) {
-    return (
-      <div className="space-y-1">
-        {/* Enhanced Skeleton Header - Hidden on mobile */}
-        <div className="hidden sm:grid grid-cols-12 text-xs font-semibold text-[#00295B] py-3 px-4 border-b-2 border-gray-300">
-          <div className="col-span-5">{t("vaultInfo.allocations.columns.market")}</div>
-          <div className="col-span-3 text-right">{t("vaultInfo.allocations.columns.share")}</div>
-          <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.usd")}</div>
-          <div className="col-span-2 text-right">{t("vaultInfo.allocations.columns.supplyApy")}</div>
-        </div>
-        {/* Enhanced Skeleton Rows */}
-        <div className="space-y-1">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className={`grid grid-cols-1 sm:grid-cols-12 items-center py-3 sm:py-4 px-3 sm:px-4 animate-pulse border-b border-gray-200`}>
-              {/* Mobile Skeleton */}
-              <div className="sm:hidden space-y-1">
-                <div className="flex items-center space-x-2">
-                  <div className="w-5 h-5 bg-[#E1E1D6] rounded-full"></div>
-                  <div className="h-4 bg-[#E1E1D6] rounded flex-1"></div>
-                  <div className="h-4 bg-[#E1E1D6] rounded w-10"></div>
-                </div>
-                <div className="flex justify-between">
-                  <div className="h-3 bg-[#E1E1D6] rounded w-16"></div>
-                  <div className="h-3 bg-[#E1E1D6] rounded w-12"></div>
-                </div>
-              </div>
-              {/* Desktop Skeleton */}
-              <div className="hidden sm:contents">
-                <div className="col-span-5 flex items-center space-x-2">
-                  <div className="w-5 h-5 bg-[#E1E1D6] rounded-full"></div>
-                  <div className="h-4 bg-[#E1E1D6] rounded w-20"></div>
-                </div>
-                <div className="col-span-3 text-right">
-                  <div className="h-4 bg-[#E1E1D6] rounded w-10 ml-auto"></div>
-                </div>
-                <div className="col-span-2 text-right">
-                  <div className="h-3 bg-[#E1E1D6] rounded w-12 ml-auto"></div>
-                </div>
-                <div className="col-span-2 text-right">
-                  <div className="h-3 bg-[#E1E1D6] rounded w-10 ml-auto"></div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-  if (error) return <p className="text-sm text-red-500">{t("vaultInfo.allocations.error", { error })}</p>;
-  if (!groupedItems || !groupingResult || totalAssets === null) return <p className="text-sm text-[#101720]/70">{t("vaultInfo.allocations.empty")}</p>;
-
-  return (
-    <GroupedAllocationList
-      groupedItems={groupedItems}
-      ungroupedItems={groupingResult.ungroupedItems}
-      totalAssets={totalAssets}
-    />
-  );
 }

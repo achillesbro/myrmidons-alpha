@@ -28,11 +28,11 @@ export function SiteFooter() {
             </a>
             <span className="opacity-40">•</span>
             <a
-              href="mailto:myrmidons.strategies@gmail.com"
+              href="mailto:contact@myrmidons-strategies.com"
               className="underline hover:no-underline hover:opacity-80"
               aria-label="Email Myrmidons Strategies"
             >
-              myrmidons.strategies@gmail.com
+              contact@myrmidons-strategies.com
             </a>
           </nav>
           <LanguageSwitcher />

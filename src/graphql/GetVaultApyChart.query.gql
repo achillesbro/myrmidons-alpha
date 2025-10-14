@@ -1,0 +1,33 @@
+query GetVaultApyChart(
+  $address: String!
+  $chainId: Int!
+  $startTimestamp: Int
+  $endTimestamp: Int
+  $interval: TimeseriesInterval!
+) {
+  vaultByAddress(address: $address, chainId: $chainId) {
+    address
+    historicalState {
+      apy(
+        options: {
+          startTimestamp: $startTimestamp
+          endTimestamp: $endTimestamp
+          interval: $interval
+        }
+      ) {
+        x
+        y
+      }
+      netApy(
+        options: {
+          startTimestamp: $startTimestamp
+          endTimestamp: $endTimestamp
+          interval: $interval
+        }
+      ) {
+        x
+        y
+      }
+    }
+  }
+}

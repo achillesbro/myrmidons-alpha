@@ -1,0 +1,32 @@
+query GetVaultTxHistory(
+  $vaultAddress: [String!]
+  $first: Int
+  $orderBy: TransactionsOrderBy
+  $orderDirection: OrderDirection
+) {
+  transactions(
+    first: $first
+    orderBy: $orderBy
+    orderDirection: $orderDirection
+    where: { vaultAddress_in: $vaultAddress }
+  ) {
+    items {
+      hash
+      timestamp
+      type
+      blockNumber
+      user {
+        address
+      }
+      data {
+        ... on VaultTransactionData {
+          shares
+          assets
+          vault {
+            address
+          }
+        }
+      }
+    }
+  }
+}

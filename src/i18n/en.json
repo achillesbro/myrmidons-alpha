@@ -52,7 +52,7 @@
     },
     "social": {
       "contact": "Questions or diligence? Connect on social or email",
-      "email": "myrmidons.strategies@gmail.com"
+      "email": "contact@myrmidons-strategies.com"
     },
     "footer": {
       "disclaimer": "DeFi carries risk, including smart-contract and market risk. Do your own research."
@@ -279,11 +279,11 @@
   "vaultInfo": {
     "about": {
       "title": "About",
-      "body": "MYRMIDONS USDT0 PHALANX allocates liquidity across selected Morpho markets on HyperEVM to capture yield while respecting strict risk limits."
+      "body": "MYRMIDONS USDT0 PHALANX provides non-directional yield: funds are lent across pre-screened Morpho markets on HyperEVM to earn interest, not underlying asset exposure."
     },
     "vaultHeader": {
       "address": "Vault Address:",
-      "description": "MYRMIDONS USDT0 PHALANX allocates liquidity across selected Morpho markets on HyperEVM to capture yield while respecting strict risk limits."
+      "description": "MYRMIDONS USDT0 PHALANX provides non-directional yield: funds are lent across pre-screened Morpho markets on HyperEVM to earn interest, not underlying asset exposure."
     },
     "metrics": {
       "title": "Key Metrics",
