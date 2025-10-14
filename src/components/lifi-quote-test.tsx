@@ -189,11 +189,9 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     } else if (path === 'B') {
       const steps: Record<number, StepInfo> = {
         1: { label: 'Select Token', component: 'TokenSelection', canGoBack: false },
-        2: { label: 'Enter Amount', component: 'AmountInput', canGoBack: true },
-        3: { label: 'Confirm Bridge', component: 'BridgeConfirmation', canGoBack: true },
-        4: { label: 'Bridge Success', component: 'BridgeSuccess', canGoBack: false },
-        5: { label: 'Confirm Deposit', component: 'DepositConfirmation', canGoBack: false },
-        6: { label: 'Success', component: 'DepositSuccess', canGoBack: false },
+        2: { label: 'Bridge & Swap', component: 'BridgeExecution', canGoBack: true },
+        3: { label: 'Deposit to Vault', component: 'VaultDeposit', canGoBack: false },
+        4: { label: 'Success', component: 'DepositSuccess', canGoBack: false },
       };
       return steps[step] || { label: 'Unknown', component: 'Unknown', canGoBack: false };
     }
@@ -203,7 +201,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
 
   // Get total steps for current path
   const getTotalSteps = (path: DepositPath): number => {
-    return path === 'A' ? 4 : path === 'B' ? 6 : 0;
+    return path === 'A' ? 4 : path === 'B' ? 4 : 0;
   };
 
   // Update deposit state helper
@@ -584,7 +582,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       const newlyMintedFormatted = formatUnits(BigInt(newlyMintedShares.toString()), 18);
       
       // Update state with success information
-      const nextStep = selectedPath === 'A' ? 4 : 6; // Path A goes to step 4, Path B goes to step 6
+      const nextStep = selectedPath === 'A' ? 4 : 4; // Both paths go to step 4 (success)
       updateDepositState({
         vaultSharesBefore: sharesBeforeFormatted,
         vaultSharesMinted: newlyMintedFormatted,
@@ -632,7 +630,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       pushToast('error', errorMessage);
       
       // Reset to previous step to allow retry
-      const previousStep = selectedPath === 'A' ? 3 : 5;
+      const previousStep = selectedPath === 'A' ? 3 : 3;
       updateDepositState({
         currentStep: previousStep,
       });
@@ -796,7 +794,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       // Update state with bridge transaction hash and mark as completed
       updateDepositState({
         bridgeTxHash: finalTxHash,
-        currentStep: 4, // Move to bridge success step
+        currentStep: 3, // Move to deposit step (was 4)
         transactionSubsteps: [
           { 
             label: 'Execute bridge transaction', 
@@ -861,76 +859,30 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       // Show error toast
       pushToast('error', errorMessage);
       
-      // Reset to step 3 to allow retry
+      // Reset to step 2 to allow retry (user can re-enter amount and retry bridge)
       updateDepositState({
-        currentStep: 3,
+        currentStep: 2,
       });
     } finally {
       setExecuting(false);
     }
   };
 
-  const handleBridgeSuccessDeposit = async () => {
-    const { bridgeTxHash, selectedToken } = depositState;
-    
-    if (!bridgeTxHash || !selectedToken) {
-      console.error('Missing bridge transaction hash or selected token');
-      return;
-    }
-
-    try {
-      
-      // Monitor bridge status and get received amount
-      const result = await pollBridgeStatus(
-        bridgeTxHash, 
-        selectedToken.chainId, 
-        CHAIN_IDS.HYPEREVM
-      );
-      
-      if (result.success && result.receivedAmount) {
-        // Convert received amount from wei to USDT0 (6 decimals)
-        const receivedAmountFormatted = formatUnits(BigInt(result.receivedAmount), 6);
-        
-        updateDepositState({
-          bridgedUsdt0Amount: receivedAmountFormatted,
-          currentStep: 5, // Move to deposit confirmation
-          transactionSubsteps: [], // Reset substeps for deposit step
-        });
-        
-      } else {
-        console.error('Bridge monitoring failed:', result.error || 'Unknown error');
-      }
-    } catch (error: any) {
-      console.error('Bridge status check failed:', error);
-      console.error('Failed to check bridge status:', error.message);
-    }
-  };
-
   const handlePathBStep2 = () => {
-    // Move to step 3 (bridge confirmation) when amount is entered
+    // Execute bridge directly when amount is entered (no confirmation step)
     if (depositState.amount && parseFloat(depositState.amount) > 0) {
-      navigateToStep(3);
+      handleBridgeExecution();
     } else {
       console.error('Please enter a valid amount');
     }
   };
 
   const handlePathBStep3 = () => {
-    // Execute bridge
-    handleBridgeExecution();
-  };
-
-  const handlePathBStep4 = () => {
-    // Move to deposit step
-    handleBridgeSuccessDeposit();
-  };
-
-  const handlePathBStep5 = () => {
-    // Execute USDT0 deposit (same as Path A)
+    // Execute vault deposit directly (no confirmation step)
     handleUSDT0Deposit();
   };
 
-  const handlePathBStep6 = () => {
+  const handlePathBStep4 = () => {
     // Close dialog or reset to step 1 (same as Path A)
     handlePathAStep4();
   };
@@ -1093,7 +1045,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         return null;
         
       case 2:
-        // Step 2b: Enter USD Amount
+        // Step 2b: Enter USD Amount & Execute Bridge
         return (
           <div className="p-4 bg-gray-50 rounded-lg">
             
@@ -1135,6 +1087,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                 min="0"
                 max={selectedToken?.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken?.balanceFormatted || '0')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                disabled={executing}
               />
               
               {/* Percentage selector buttons */}
@@ -1148,6 +1101,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                       handleAmountEnter(amount);
                     }}
                     className="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors duration-200"
+                    disabled={executing}
                   >
                     {percentage === 100 ? 'MAX' : `${percentage}%`}
                   </button>
@@ -1155,105 +1109,27 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               </div>
             </div>
 
+            {/* Transaction substeps for bridge execution */}
+            {executing && depositState.transactionSubsteps && depositState.transactionSubsteps.length > 0 && (
+              renderTransactionSubsteps(depositState.transactionSubsteps)
+            )}
+
             <button
               onClick={handlePathBStep2}
-              disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > (selectedToken?.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken?.balanceFormatted || '0'))}
-              className="w-full py-3 px-4 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={executing || !amount || parseFloat(amount) <= 0 || parseFloat(amount) > (selectedToken?.balanceUSD ? parseFloat(selectedToken.balanceUSD) : parseFloat(selectedToken?.balanceFormatted || '0'))}
+              className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Continue to Bridge Confirmation
+              {executing ? 'Executing Bridge...' : 'Execute Bridge & Swap'}
             </button>
           </div>
         );
         
       case 3:
-        // Step 3b: Confirm Bridge
-        return (
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-blue-800">Confirm Bridge</h3>
-              {!executing && (
-                <button
-                  onClick={() => navigateToStep(2)}
-                  className="text-sm text-blue-600 hover:text-blue-800 flex items-center space-x-1"
-                >
-                  <span>←</span>
-                  <span>Back to Amount</span>
-                </button>
-              )}
-            </div>
-            
-            <div className="space-y-4">
-              <div className="bg-white p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-gray-800 mb-3">Bridge Summary</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">From:</span>
-                    <div className="flex items-center space-x-2">
-                      {selectedToken?.logoURI && (
-                        <img
-                          src={selectedToken.logoURI}
-                          alt={selectedToken.tokenSymbol}
-                          className="w-4 h-4 rounded-full"
-                          onError={(e) => (e.currentTarget.style.display = 'none')}
-                        />
-                      )}
-                      <span className="font-medium">{selectedToken?.tokenSymbol} on {selectedToken?.chainName}</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">To:</span>
-                    <div className="flex items-center space-x-2">
-                      {usdt0Balance?.logoURI ? (
-                        <img
-                          src={usdt0Balance.logoURI}
-                          alt="USDT0"
-                          className="w-4 h-4 rounded-full"
-                          onError={(e) => (e.currentTarget.style.display = 'none')}
-                        />
-                      ) : (
-                        <img
-                          src="/Myrmidons-logo-dark-no-bg.png"
-                          alt="USDT0"
-                          className="w-4 h-4 rounded-full"
-                          onError={(e) => (e.currentTarget.style.display = 'none')}
-                        />
-                      )}
-                      <span className="font-medium">USDT0 on HyperEVM</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Amount:</span>
-                    <span className="font-medium">${amount} USD</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Method:</span>
-                    <span className="font-medium">Bridge & Swap via Li.Fi</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Transaction substeps for bridge execution */}
-              {executing && depositState.transactionSubsteps && depositState.transactionSubsteps.length > 0 && (
-                renderTransactionSubsteps(depositState.transactionSubsteps)
-              )}
-              
-              <button
-                onClick={handlePathBStep3}
-                disabled={executing}
-                className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {executing ? 'Executing Bridge...' : 'Confirm & Execute Bridge'}
-              </button>
-            </div>
-          </div>
-        );
-        
-      case 4:
-        // Step 4b: Bridge Success
+        // Step 3b: Execute Vault Deposit
         return (
           <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
             <div className="text-center">
-              {/* Enhanced success icon */}
+              {/* Success icon for bridge completion */}
               <div className="relative w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -1261,7 +1137,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               </div>
               
               <h3 className="text-xl font-bold text-blue-800 mb-2">Bridge Successful!</h3>
-              <p className="text-blue-700 mb-4 text-base">Your deposit has been completed successfully. The funds have been converted to USDT0</p>
+              <p className="text-blue-700 mb-4 text-base">Your deposit has been converted to USDT0</p>
               
               {/* Enhanced bridge summary */}
               <div className="bg-white p-4 rounded-xl border border-blue-200 mb-4 shadow-sm">
@@ -1312,82 +1188,32 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                 </div>
               </div>
               
-              {/* Enhanced deposit button */}
-              <button
-                onClick={handlePathBStep4}
-                className="w-full py-4 px-6 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-semibold text-lg transition-all duration-200 transform hover:-translate-y-0.5"
-              >
-                Deposit USDT0 to Vault
-              </button>
-            </div>
-          </div>
-        );
-        
-      case 5:
-        // Step 5b: Confirm Vault Deposit (same as Path A step 3a)
-        return (
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-blue-800">Confirm USDT0 Deposit</h3>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="bg-white p-3 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-gray-800 mb-2">Deposit Summary</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">From:</span>
-                    <div className="flex items-center space-x-2">
-                      {usdt0Balance?.logoURI && (
-                        <img
-                          src={usdt0Balance.logoURI}
-                          alt="USDT0"
-                          className="w-4 h-4 rounded-full"
-                          onError={(e) => (e.currentTarget.style.display = 'none')}
-                        />
-                      )}
-                      <span className="font-medium">USDT0 on HyperEVM</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">To:</span>
-                    <div className="flex items-center space-x-2">
-                      <img
-                        src="/Myrmidons-logo-dark-no-bg.png"
-                        alt="Myrmidons Vault"
-                        className="w-5 h-5 rounded-full"
-                        onError={(e) => (e.currentTarget.style.display = 'none')}
-                      />
-                      <span className="font-medium">USDT0 PHALANX</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Amount:</span>
-                    <span className="font-medium">{bridgedUsdt0Amount || '0.00'} USDT0</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Method:</span>
-                    <span className="font-medium">Direct Deposit</span>
-                  </div>
-                </div>
-              </div>
+              {/* Transaction substeps for deposit execution */}
+              {executing && depositState.transactionSubsteps && depositState.transactionSubsteps.length > 0 && (
+                renderTransactionSubsteps(depositState.transactionSubsteps)
+              )}
               
-              {/* Transaction substeps */}
-              {depositState.transactionSubsteps.length > 0 && renderTransactionSubsteps(depositState.transactionSubsteps)}
-              
+              {/* Execute deposit button */}
               <button
-                onClick={handlePathBStep5}
+                onClick={handlePathBStep3}
                 disabled={executing}
-                className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 px-6 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg transition-all duration-200 transform hover:-translate-y-0.5 disabled:transform-none"
               >
-                {executing ? 'Processing Deposit...' : 'Confirm & Execute Deposit'}
+                {executing ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                    <span>Processing Deposit...</span>
+                  </div>
+                ) : (
+                  'Deposit USDT0 to Vault'
+                )}
               </button>
             </div>
           </div>
         );
         
-      case 6:
-        // Step 6b: Final Success (same as Path A step 4a)
+      case 4:
+        // Step 4b: Final Success
         return (
           <div className="p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-200 shadow-lg">
             <div className="text-center">
@@ -1435,7 +1261,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               
               {/* Enhanced close button */}
               <button
-                onClick={handlePathBStep6}
+                onClick={handlePathBStep4}
                 className="w-full py-4 px-6 bg-green-600 text-white rounded-xl hover:bg-green-700 font-semibold text-lg transition-all duration-200 transform hover:-translate-y-0.5"
               >
                 Close
@@ -1770,3 +1596,4 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     </div>
   );
 }
+
