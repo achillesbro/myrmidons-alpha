@@ -1,7 +1,5 @@
 import type { Address } from 'viem';
 import { useVaultDataAPI } from './useVaultDataAPI';
-import { VAULT_CONFIGS } from '../config/vaults.config';
-import { useMemo } from 'react';
 
 export type VaultSummary = {
   id: string;
@@ -11,45 +9,28 @@ export type VaultSummary = {
   updatedAt?: number;
 };
 
-// Get all configured vaults (excluding placeholder addresses)
-const ACTIVE_VAULTS = Object.values(VAULT_CONFIGS).filter(
-  v => v.vaultAddress !== '0x0000000000000000000000000000000000000000'
-);
+// Default vault address - PHALANX vault
+const DEFAULT_VAULT_ADDRESS = (import.meta.env.VITE_MORPHO_VAULT || "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42") as Address;
+const CHAIN_ID = 999; // HyperEVM
 
 export function useVaultSummaries() {
-  // Fetch data for all active vaults
-  // Note: This creates multiple hooks calls, one per vault
-  // For now we only have PHALANX active, but this scales automatically
-  const vaultData = useMemo(() => 
-    ACTIVE_VAULTS.map(config => ({
-      config,
-      // eslint-disable-next-line react-hooks/rules-of-hooks
-      data: useVaultDataAPI(config.vaultAddress as Address, config.chainId)
-    })), 
-    [] // Empty deps - vault list is static
-  );
+  // Use Morpho API for vault data - same as vault-api-view.tsx
+  // Hooks must be called unconditionally at the top level
+  const apiData = useVaultDataAPI(DEFAULT_VAULT_ADDRESS, CHAIN_ID);
 
-  // Build summaries from vault data
-  const summaries: Record<string, VaultSummary> = {};
-  let hasError = false;
-  let isLoading = false;
-
-  vaultData.forEach(({ config, data }) => {
-    summaries[config.id] = {
-      id: config.id,
-      tvlUSD: data.totalAssetsUsd ?? undefined,
-      apy: data.instantApy ?? undefined,
-      marketsCount: data.allocations?.length ?? undefined,
+  const summaries: Record<string, VaultSummary> = {
+    phalanx: {
+      id: 'phalanx',
+      tvlUSD: apiData.totalAssetsUsd ?? undefined,
+      apy: apiData.instantApy ?? undefined,
+      marketsCount: apiData.allocations?.length ?? undefined,
       updatedAt: Date.now(),
-    };
-    
-    if (data.loading) isLoading = true;
-    if (data.error) hasError = true;
-  });
+    },
+  };
 
   return { 
     summaries, 
-    error: hasError ? 'Failed to load some vault data' : null, 
-    isLoading 
+    error: apiData.error ?? null, 
+    isLoading: apiData.loading 
   };
 }
