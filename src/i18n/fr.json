@@ -34,6 +34,15 @@
         "marketsLabel": "# Marchés",
         "viewDetails": "Voir les détails du vault",
         "deposit": "Déposer"
+      },
+      "whype": {
+        "objective": "Stratégies de rendement WHYPE optimisées sur HyperEVM.",
+        "tags": ["Non-custodial", "Morpho", "ERC-4626"],
+        "tvlLabel": "TVL",
+        "apyLabel": "APY Actuel",
+        "marketsLabel": "# Marchés",
+        "viewDetails": "Voir les détails du vault",
+        "deposit": "Déposer"
       }
     },
     "trust": {

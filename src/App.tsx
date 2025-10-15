@@ -27,12 +27,15 @@ import LandingPage from "./components/landing/LandingPage";
 import SiteHeader from "./components/layout/SiteHeader";
 import { useTranslation } from 'react-i18next'
 import i18n from "./i18n";
+import { DEFAULT_VAULT_CONFIG, getVaultConfigById, type VaultConfig } from "./config/vaults.config";
 
-const DEFAULT_VAULT: Address = (import.meta.env.VITE_MORPHO_VAULT || "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42") as Address;
+// Support env override for default vault address (legacy support)
+const DEFAULT_VAULT: Address = (import.meta.env.VITE_MORPHO_VAULT || DEFAULT_VAULT_CONFIG.vaultAddress) as Address;
 
 const TABS = ["VAULTINFO", "ABOUT", "LIFI_TEST"] as const;
 type Tab = typeof TABS[number];
 const TAB_PARAM = "tab";
+const VAULT_PARAM = "vault"; // New: vault selection parameter
 const STORAGE_KEY = "myrmidons_activeTab";
 
 function normalizeTabParam(value: string | null): Tab | null {
@@ -57,8 +60,24 @@ function getInitialTab(): Tab | null {
   }
 }
 
+// Get vault config from URL param or default
+function getVaultFromUrl(): VaultConfig {
+  try {
+    const url = new URL(window.location.href);
+    const vaultId = url.searchParams.get(VAULT_PARAM);
+    if (vaultId) {
+      const config = getVaultConfigById(vaultId);
+      if (config) return config;
+    }
+  } catch {
+    // noop
+  }
+  return DEFAULT_VAULT_CONFIG;
+}
+
 const TestInterface = () => {
   const [activeTab, setActiveTab] = useState<Tab | null>(() => getInitialTab());
+  const [vaultConfig, setVaultConfig] = useState<VaultConfig>(() => getVaultFromUrl());
   const [vaultAddressInput] = useState<string>(DEFAULT_VAULT);
   // `vaultAddress` is validated to be an Address
   const [vaultAddress, setVaultAddress] = useState(DEFAULT_VAULT);
@@ -75,36 +94,44 @@ const TestInterface = () => {
     }
   }, [vaultAddressInput]);
 
-  // Persist + deep-link (URL ?tab=...)
+  // Persist + deep-link (URL ?tab=... & ?vault=...)
   useEffect(() => {
     try {
+      const url = new URL(window.location.href);
+      
       if (activeTab) {
         localStorage.setItem(STORAGE_KEY, activeTab);
-        const url = new URL(window.location.href);
         url.searchParams.set(TAB_PARAM, activeTab.toLowerCase());
-        // replaceState so we don't spam history on every click
-        window.history.replaceState(null, "", url.toString());
+        
+        // Add vault param if we're on vault info tab
+        if (activeTab === "VAULTINFO" && vaultConfig) {
+          url.searchParams.set(VAULT_PARAM, vaultConfig.id);
+        }
       } else {
-        // Landing page - remove tab param
-        const url = new URL(window.location.href);
+        // Landing page - remove tab param but keep vault param for links
         url.searchParams.delete(TAB_PARAM);
-        window.history.replaceState(null, "", url.toString());
       }
+      
+      // replaceState so we don't spam history on every click
+      window.history.replaceState(null, "", url.toString());
     } catch {
       /* noop */
     }
-  }, [activeTab]);
+  }, [activeTab, vaultConfig]);
 
   // Optional: keep in sync if user uses back/forward with external links
   useEffect(() => {
     const onPop = () => {
       const url = new URL(window.location.href);
       const tab = normalizeTabParam(url.searchParams.get(TAB_PARAM));
+      const newVaultConfig = getVaultFromUrl();
+      
       if (tab && tab !== activeTab) setActiveTab(tab);
+      if (newVaultConfig.id !== vaultConfig.id) setVaultConfig(newVaultConfig);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [activeTab]);
+  }, [activeTab, vaultConfig]);
 
   useEffect(() => {
     if (activeTab) {
@@ -127,7 +154,7 @@ const TestInterface = () => {
               // Landing page
               <LandingPage />
             ) : activeTab === "VAULTINFO" ? (
-              <VaultAPIView vaultAddress={vaultAddress} />
+              <VaultAPIView vaultAddress={vaultAddress} vaultConfig={vaultConfig} />
             ) : (
               <AboutView />
             )}

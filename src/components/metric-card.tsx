@@ -13,14 +13,32 @@ interface MetricCardProps {
 export function MetricCard({ num, sub, delta, deltaType = "neutral", sparkline }: MetricCardProps) {
   return (
     <div className="flex flex-col">
-      {/* Number */}
-      <div className="text-lg font-semibold text-[#00295B] mb-0.5" style={{ fontFeatureSettings: '"tnum"' }}>
+      {/* Label first */}
+      <div className="text-xs uppercase tracking-wide mb-1.5" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+        {sub}
+      </div>
+      
+      {/* Number - larger and more prominent */}
+      <div className="text-2xl font-bold text-[#00295B] mb-1" style={{ fontFeatureSettings: '"tnum"' }}>
         {num}
       </div>
       
+      {/* Delta badge */}
+      {delta && (
+        <div className={`text-xs inline-flex items-center gap-1 mb-1.5 ${
+          deltaType === "positive" ? "text-green-700" :
+          deltaType === "negative" ? "text-red-700" :
+          "text-[#101720]/70"
+        }`} style={{ fontFeatureSettings: '"tnum"' }}>
+          {deltaType === "positive" && "▲"}
+          {deltaType === "negative" && "▼"}
+          <span>{delta}</span>
+        </div>
+      )}
+      
       {/* Sparkline (if present) */}
       {sparkline && sparkline.length > 0 && (
-        <div className="h-6 -mx-1 mb-1">
+        <div className="h-5 -mx-1">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={sparkline} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <defs>
@@ -40,24 +58,6 @@ export function MetricCard({ num, sub, delta, deltaType = "neutral", sparkline }
               />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
-      )}
-      
-      {/* Label */}
-      <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
-        {sub}
-      </div>
-      
-      {/* Delta badge */}
-      {delta && (
-        <div className={`text-xs inline-flex items-center gap-1 ${
-          deltaType === "positive" ? "text-green-700" :
-          deltaType === "negative" ? "text-red-700" :
-          "text-[#101720]/70"
-        }`} style={{ fontFeatureSettings: '"tnum"' }}>
-          {deltaType === "positive" && "▲"}
-          {deltaType === "negative" && "▼"}
-          <span>{delta}</span>
         </div>
       )}
     </div>

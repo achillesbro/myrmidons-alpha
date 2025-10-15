@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getRoutes, executeRoute, getToken, getTokenBalances } from '@lifi/sdk';
-import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
+import { CHAIN_IDS } from '../lib/lifi-config';
 import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain, getWalletClient } from '@wagmi/core';
 import { formatUnits, parseUnits } from 'viem';
@@ -10,9 +10,7 @@ import { LiFiBalanceFetcher } from './lifi-balance-fetcher';
 import { erc20Abi } from 'viem';
 import vaultAbi from '../abis/vault.json';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
-
-// Vault address for direct deposits
-const VAULT_ADDRESS = (import.meta.env.VITE_MORPHO_VAULT || '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42') as `0x${string}`;
+import { DEFAULT_VAULT_CONFIG, type VaultConfig } from '../config/vaults.config';
 
 // Helper functions for chain names and explorer URLs
 const getChainName = (chainId: number): string => {
@@ -44,6 +42,7 @@ const getExplorerUrl = (chainId: number, txHash: string): string => {
 interface LiFiQuoteTestProps {
   onStepChange?: (step: number) => void;
   onClose?: () => void;
+  vaultConfig?: VaultConfig; // Vault configuration (optional, defaults to DEFAULT_VAULT_CONFIG)
 }
 
 // Path types for deposit flows
@@ -80,8 +79,14 @@ interface StepInfo {
     transactionSubsteps: Array<{label: string, status: 'pending' | 'processing' | 'completed' | 'failed', txHash?: string, chainId?: number}>;
   }
 
-export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}) {
+export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteTestProps = {}) {
   const [executing, setExecuting] = useState(false);
+  
+  // Use provided vault config or default
+  const config = vaultConfig || DEFAULT_VAULT_CONFIG;
+  const VAULT_ADDRESS = config.vaultAddress;
+  const UNDERLYING_SYMBOL = config.underlyingSymbol;
+  const UNDERLYING_ADDRESS = config.underlyingAddress;
   
   // Comprehensive deposit state
   const [depositState, setDepositState] = useState<DepositState>({
@@ -112,8 +117,8 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   const [amount, setAmount] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(1);
   
-  // USDT0 balance for direct deposits (fetched separately)
-  const [usdt0Balance, setUsdt0Balance] = useState<{
+  // Underlying token balance for direct deposits (fetched separately)
+  const [underlyingBalance, setUnderlyingBalance] = useState<{
     chainId: number;
     chainName: string;
     tokenSymbol: string;
@@ -125,7 +130,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     priceUSD?: string;
     balanceUSD?: string;
   } | null>(null);
-  const [usdt0Loading, setUsdt0Loading] = useState(false);
+  const [underlyingLoading, setUnderlyingLoading] = useState(false);
   
   // Toast system for error handling
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -167,8 +172,8 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   const detectPath = (token: DepositState['selectedToken']): DepositPath => {
     if (!token) return null;
     
-    // Path A: USDT0 on HyperEVM (direct deposit)
-    if (token.tokenSymbol === 'USDT0' && token.chainId === CHAIN_IDS.HYPEREVM) {
+    // Path A: Underlying token on HyperEVM (direct deposit)
+    if (token.tokenSymbol === UNDERLYING_SYMBOL && token.chainId === CHAIN_IDS.HYPEREVM) {
       return 'A';
     }
     
@@ -180,7 +185,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   const getStepInfo = (path: DepositPath, step: number): StepInfo => {
     if (path === 'A') {
       const steps: Record<number, StepInfo> = {
-        1: { label: 'Select USDT0', component: 'TokenSelection', canGoBack: false },
+        1: { label: `Select ${UNDERLYING_SYMBOL}`, component: 'TokenSelection', canGoBack: false },
         2: { label: 'Enter Amount', component: 'AmountInput', canGoBack: true },
         3: { label: 'Confirm Deposit', component: 'DepositConfirmation', canGoBack: true },
         4: { label: 'Success', component: 'DepositSuccess', canGoBack: false },
@@ -233,10 +238,10 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   //   }
   // };
 
-  // Fetch USDT0 balance when wallet connects AND SDK is initialized
+  // Fetch underlying token balance when wallet connects AND SDK is initialized
   useEffect(() => {
     if (clientW.data?.account?.address && sdkInitialized) {
-      fetchUSDT0Balance();
+      fetchUnderlyingBalance();
     }
   }, [clientW.data?.account?.address, sdkInitialized]);
 
@@ -420,8 +425,8 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     setAmount(enteredAmount);
   };
 
-  // USDT0 Deposit Functions (works for both Path A and Path B)
-  const handleUSDT0Deposit = async () => {
+  // Underlying Token Deposit Functions (works for both Path A and Path B)
+  const handleUnderlyingDeposit = async () => {
     const { selectedPath, selectedToken, amount, bridgedUsdt0Amount } = depositState;
     
     // Determine the amount to use based on path
@@ -444,16 +449,16 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         return;
       }
 
-      // Convert amount to wei (USDT0 has 6 decimals)
-      const amountWei = parseUnits(depositAmount, 6);
+      // Convert amount to wei using config decimals
+      const amountWei = parseUnits(depositAmount, config.underlyingDecimals);
       
       // Check if approval is needed
       const provider = new BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
       
-      // For Path B, we need to get the USDT0 token address
+      // For Path B, we need to get the underlying token address
       const tokenAddress = selectedPath === 'B' 
-        ? TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0 
+        ? UNDERLYING_ADDRESS
         : selectedToken?.tokenAddress;
         
       if (!tokenAddress) {
@@ -476,7 +481,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         // Update substeps for approval
         updateDepositState({
           transactionSubsteps: [
-            { label: 'Approve USDT0 spending', status: 'processing' as const, chainId: CHAIN_IDS.HYPEREVM }
+            { label: `Approve ${UNDERLYING_SYMBOL} spending`, status: 'processing' as const, chainId: CHAIN_IDS.HYPEREVM }
           ]
         });
         
@@ -485,7 +490,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         // Update substeps with transaction hash
         updateDepositState({
           transactionSubsteps: [
-            { label: 'Approve USDT0 spending', status: 'processing' as const, txHash: approveTx.hash, chainId: CHAIN_IDS.HYPEREVM }
+            { label: `Approve ${UNDERLYING_SYMBOL} spending`, status: 'processing' as const, txHash: approveTx.hash, chainId: CHAIN_IDS.HYPEREVM }
           ]
         });
         
@@ -494,7 +499,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         // Mark approval as completed
         updateDepositState({
           transactionSubsteps: [
-            { label: 'Approve USDT0 spending', status: 'completed' as const, txHash: approveTx.hash, chainId: CHAIN_IDS.HYPEREVM }
+            { label: `Approve ${UNDERLYING_SYMBOL} spending`, status: 'completed' as const, txHash: approveTx.hash, chainId: CHAIN_IDS.HYPEREVM }
           ]
         });
       }
@@ -508,7 +513,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       const depositSubsteps = [];
       if (needsApproval && approveTx) {
         depositSubsteps.push({ 
-          label: 'Approve USDT0 spending', 
+          label: `Approve ${UNDERLYING_SYMBOL} spending`, 
           status: 'completed' as const, 
           txHash: approveTx.hash, 
           chainId: CHAIN_IDS.HYPEREVM 
@@ -532,7 +537,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       const processingSubsteps = [];
       if (needsApproval && approveTx) {
         processingSubsteps.push({ 
-          label: 'Approve USDT0 spending', 
+          label: `Approve ${UNDERLYING_SYMBOL} spending`, 
           status: 'completed' as const, 
           txHash: approveTx.hash, 
           chainId: CHAIN_IDS.HYPEREVM 
@@ -556,7 +561,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       const completedSubsteps = [];
       if (needsApproval && approveTx) {
         completedSubsteps.push({ 
-          label: 'Approve USDT0 spending', 
+          label: `Approve ${UNDERLYING_SYMBOL} spending`, 
           status: 'completed' as const, 
           txHash: approveTx.hash, 
           chainId: CHAIN_IDS.HYPEREVM 
@@ -590,20 +595,20 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       });
       
       
-      // Refresh USDT0 balance
-      await fetchUSDT0Balance();
+      // Refresh underlying token balance
+      await fetchUnderlyingBalance();
       
     } catch (error: any) {
-      console.error('USDT0 deposit failed:', error);
+      console.error(`${UNDERLYING_SYMBOL} deposit failed:`, error);
       
-      // Enhanced error handling for USDT0 deposits
+      // Enhanced error handling for deposits
       let errorMessage = 'Deposit failed. Please try again.';
       const errorMsg = error.message?.toLowerCase() || '';
       
       if (errorMsg.includes('user rejected') || errorMsg.includes('user denied')) {
         errorMessage = 'Transaction was cancelled. Please try again.';
       } else if (errorMsg.includes('insufficient balance')) {
-        errorMessage = 'Insufficient USDT0 balance for deposit.';
+        errorMessage = `Insufficient ${UNDERLYING_SYMBOL} balance for deposit.`;
       } else if (errorMsg.includes('gas estimation failed') || errorMsg.includes('cannot estimate gas')) {
         errorMessage = 'Gas estimation failed. Please try again with higher gas limit.';
       } else if (errorMsg.includes('network error') || errorMsg.includes('connection') || errorMsg.includes('timeout')) {
@@ -650,8 +655,8 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
   };
 
   const handlePathAStep3 = () => {
-    // Execute USDT0 deposit
-    handleUSDT0Deposit();
+    // Execute underlying token deposit
+    handleUnderlyingDeposit();
   };
 
   const handlePathAStep4 = () => {
@@ -695,7 +700,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
 
       // Get token addresses
       const fromToken = selectedToken.tokenAddress;
-      const toToken = TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0;
+      const toToken = UNDERLYING_ADDRESS;
       
       // Ensure ETH is properly formatted as zero address
       const normalizedFromToken = fromToken === '0x0000000000000000000000000000000000000000' 
@@ -781,20 +786,38 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         },
       });
 
-      // Extract final transaction hash
+      // Extract final transaction hash and estimated output amount
       let finalTxHash = 'Unknown';
+      let estimatedOutputAmount: string | null = null;
+      
       if (executedRoute.steps && executedRoute.steps.length > 0) {
         const lastStep = executedRoute.steps[executedRoute.steps.length - 1];
         if (lastStep.execution?.process && lastStep.execution.process.length > 0) {
           const lastProcess = lastStep.execution.process[lastStep.execution.process.length - 1];
           finalTxHash = lastProcess.txHash || finalTxHash;
         }
+        
+        // Extract estimated output amount from route estimate
+        // This gives us the amount immediately without waiting for monitoring
+        if (lastStep.estimate?.toAmount) {
+          estimatedOutputAmount = formatUnits(
+            BigInt(lastStep.estimate.toAmount), 
+            config.underlyingDecimals
+          );
+        } else if (lastStep.estimate?.toAmountMin) {
+          // Fallback to minimum amount if toAmount not available
+          estimatedOutputAmount = formatUnits(
+            BigInt(lastStep.estimate.toAmountMin), 
+            config.underlyingDecimals
+          );
+        }
       }
 
-      // Update state with bridge transaction hash and mark as completed
+      // Update state with bridge transaction hash and estimated amount (immediate)
       updateDepositState({
         bridgeTxHash: finalTxHash,
-        currentStep: 3, // Move to deposit step (was 4)
+        bridgedUsdt0Amount: estimatedOutputAmount, // Set immediately from route estimate
+        currentStep: 3, // Move to deposit step
         transactionSubsteps: [
           { 
             label: 'Execute bridge transaction', 
@@ -805,21 +828,23 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         ]
       });
 
-      // Start monitoring bridge status in the background
-      
-      // Start background monitoring (don't await to avoid blocking UI)
-      pollBridgeStatus(finalTxHash, selectedToken.chainId, CHAIN_IDS.HYPEREVM)
-        .then(result => {
-          if (result.success && result.receivedAmount) {
-            const receivedAmountFormatted = formatUnits(BigInt(result.receivedAmount), 6);
-            updateDepositState({
-              bridgedUsdt0Amount: receivedAmountFormatted
-            });
-          }
-        })
-        .catch(error => {
-          console.error('Background bridge monitoring failed:', error);
-        });
+      // Start background monitoring to verify actual received amount (optional refinement)
+      // This will update the amount if it differs from the estimate
+      if (!estimatedOutputAmount) {
+        // Only poll if we couldn't get estimate from route
+        pollBridgeStatus(finalTxHash, selectedToken.chainId, CHAIN_IDS.HYPEREVM)
+          .then(result => {
+            if (result.success && result.receivedAmount) {
+              const receivedAmountFormatted = formatUnits(BigInt(result.receivedAmount), config.underlyingDecimals);
+              updateDepositState({
+                bridgedUsdt0Amount: receivedAmountFormatted
+              });
+            }
+          })
+          .catch(error => {
+            console.error('Background bridge monitoring failed:', error);
+          });
+      }
 
     } catch (error: any) {
       console.error('Bridge execution failed:', error);
@@ -879,7 +904,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
 
   const handlePathBStep3 = () => {
     // Execute vault deposit directly (no confirmation step)
-    handleUSDT0Deposit();
+    handleUnderlyingDeposit();
   };
 
   const handlePathBStep4 = () => {
@@ -887,16 +912,16 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     handlePathAStep4();
   };
 
-  // Fetch USDT0 balance using Li.Fi APIs
-  const fetchUSDT0Balance = async () => {
+  // Fetch underlying token balance using Li.Fi APIs
+  const fetchUnderlyingBalance = async () => {
     if (!clientW.data?.account?.address) return;
     
-    setUsdt0Loading(true);
+    setUnderlyingLoading(true);
     try {
-      console.log('Fetching USDT0 balance for address:', clientW.data.account.address);
+      console.log(`Fetching ${UNDERLYING_SYMBOL} balance for address:`, clientW.data.account.address);
       
-      // Get USDT0 token info from Li.Fi
-      const tokenInfo = await getToken(CHAIN_IDS.HYPEREVM, TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0);
+      // Get underlying token info from Li.Fi
+      const tokenInfo = await getToken(CHAIN_IDS.HYPEREVM, UNDERLYING_ADDRESS);
       
       // Get token balances using Li.Fi (correct API usage)
       const balances = await getTokenBalances(clientW.data.account.address, [tokenInfo]);
@@ -904,12 +929,12 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
       if (balances && balances.length > 0) {
         const balance = balances[0];
         const amountStr = balance.amount?.toString() || '0';
-        const balanceFormatted = formatUnits(BigInt(amountStr), balance.decimals || 6);
+        const balanceFormatted = formatUnits(BigInt(amountStr), balance.decimals || config.underlyingDecimals);
         const balanceUSD = tokenInfo.priceUSD ? 
           (parseFloat(balanceFormatted) * parseFloat(tokenInfo.priceUSD)).toFixed(2) : 
           '0';
         
-        console.log('USDT0 balance fetched:', {
+        console.log(`${UNDERLYING_SYMBOL} balance fetched:`, {
           balance: amountStr,
           balanceFormatted,
           balanceUSD,
@@ -918,29 +943,29 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         
         // Only set balance if it's greater than 0
         if (parseFloat(balanceFormatted) > 0) {
-          setUsdt0Balance({
+          setUnderlyingBalance({
             chainId: CHAIN_IDS.HYPEREVM,
             chainName: 'HyperEVM',
-            tokenSymbol: 'USDT0',
-            tokenAddress: TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0,
+            tokenSymbol: UNDERLYING_SYMBOL,
+            tokenAddress: UNDERLYING_ADDRESS,
             balance: amountStr,
             balanceFormatted,
-            decimals: balance.decimals || 6,
+            decimals: balance.decimals || config.underlyingDecimals,
             logoURI: tokenInfo.logoURI,
             priceUSD: tokenInfo.priceUSD,
             balanceUSD: balanceUSD
           });
         } else {
-          setUsdt0Balance(null);
+          setUnderlyingBalance(null);
         }
       } else {
-        setUsdt0Balance(null);
+        setUnderlyingBalance(null);
       }
     } catch (error) {
-      console.error('Error fetching USDT0 balance:', error);
-      setUsdt0Balance(null);
+      console.error(`Error fetching ${UNDERLYING_SYMBOL} balance:`, error);
+      setUnderlyingBalance(null);
     } finally {
-      setUsdt0Loading(false);
+      setUnderlyingLoading(false);
     }
   };
 
@@ -975,7 +1000,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
             <div className={`w-2 h-2 rounded-full mr-2 ${
               isPathA ? 'bg-green-500' : 'bg-blue-500'
             }`}></div>
-            {isPathA ? 'Direct USDT0 Deposit' : 'Bridge & Deposit'}
+            {isPathA ? `Direct ${UNDERLYING_SYMBOL} Deposit` : 'Bridge & Deposit'}
           </div>
         </div>
         
@@ -1137,7 +1162,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               </div>
               
               <h3 className="text-xl font-bold text-blue-800 mb-2">Bridge Successful!</h3>
-              <p className="text-blue-700 mb-4 text-base">Your deposit has been converted to USDT0</p>
+              <p className="text-blue-700 mb-4 text-base">Your deposit has been converted to {UNDERLYING_SYMBOL}</p>
               
               {/* Enhanced bridge summary */}
               <div className="bg-white p-4 rounded-xl border border-blue-200 mb-4 shadow-sm">
@@ -1163,27 +1188,27 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">To:</span>
                     <div className="flex items-center space-x-2">
-                      {usdt0Balance?.logoURI ? (
+                      {underlyingBalance?.logoURI ? (
                         <img
-                          src={usdt0Balance.logoURI}
-                          alt="USDT0"
+                          src={underlyingBalance.logoURI}
+                          alt={UNDERLYING_SYMBOL}
                           className="w-5 h-5 rounded-full"
                           onError={(e) => (e.currentTarget.style.display = 'none')}
                         />
                       ) : (
                         <img
                           src="/Myrmidons-logo-dark-no-bg.png"
-                          alt="USDT0"
+                          alt={UNDERLYING_SYMBOL}
                           className="w-5 h-5 rounded-full"
                           onError={(e) => (e.currentTarget.style.display = 'none')}
                         />
                       )}
-                      <span className="font-bold text-gray-900">USDT0 on HyperEVM</span>
+                      <span className="font-bold text-gray-900">{UNDERLYING_SYMBOL} on HyperEVM</span>
                     </div>
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600 font-medium">Amount:</span>
-                    <span className="font-bold text-gray-900">{bridgedUsdt0Amount || 'Calculating...'} USDT0</span>
+                    <span className="font-bold text-gray-900">{bridgedUsdt0Amount || 'Calculating...'} {UNDERLYING_SYMBOL}</span>
                   </div>
                 </div>
               </div>
@@ -1205,7 +1230,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                     <span>Processing Deposit...</span>
                   </div>
                 ) : (
-                  'Deposit USDT0 to Vault'
+                  `Deposit ${UNDERLYING_SYMBOL} to Vault`
                 )}
               </button>
             </div>
@@ -1236,19 +1261,19 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Amount:</span>
-                    <span className="font-bold text-gray-900">{bridgedUsdt0Amount || '0.00'} USDT0</span>
+                    <span className="font-bold text-gray-900">{bridgedUsdt0Amount || '0.00'} {UNDERLYING_SYMBOL}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Vault Shares:</span>
                     <div className="flex items-center space-x-2">
                       <img
                         src="/Myrmidons-logo-dark-no-bg.png"
-                        alt="USDT0 PHALANX"
+                        alt={config.displayName}
                         className="w-5 h-5 rounded-full"
                         onError={(e) => (e.currentTarget.style.display = 'none')}
                       />
                       <span className="font-bold text-gray-900">
-                        {vaultSharesMinted ? parseFloat(vaultSharesMinted).toFixed(2) : 'Calculating...'} USDT0 PHALANX
+                        {vaultSharesMinted ? parseFloat(vaultSharesMinted).toFixed(2) : 'Calculating...'} {config.displayName}
                       </span>
                     </div>
                   </div>
@@ -1281,11 +1306,11 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
     
     switch (currentStep) {
       case 1:
-        // Step 1a: Select USDT0 (handled by LiFiBalanceFetcher)
+        // Step 1a: Select underlying token (handled by LiFiBalanceFetcher)
         return null;
         
       case 2:
-        // Step 2a: Enter USDT0 Amount
+        // Step 2a: Enter Amount
         return (
           <div className="p-4 bg-gray-50 rounded-lg">
             
@@ -1306,7 +1331,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
               </div>
               <div className="text-right">
                 <div className="font-mono text-lg">
-                  {selectedToken ? parseFloat(selectedToken.balanceFormatted).toFixed(6) : '0.000000'} USDT0
+                  {selectedToken ? parseFloat(selectedToken.balanceFormatted).toFixed(6) : '0.000000'} {UNDERLYING_SYMBOL}
                 </div>
                 <div className="text-sm text-gray-600">
                   {selectedToken?.balanceUSD || 'USD value unavailable'}
@@ -1316,7 +1341,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
             
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Enter USDT0 Amount
+                Enter {UNDERLYING_SYMBOL} Amount
               </label>
               <input
                 type="number"
@@ -1362,7 +1387,7 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
         return (
           <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-blue-800">Confirm USDT0 Deposit</h3>
+              <h3 className="text-xl font-bold text-blue-800">Confirm {UNDERLYING_SYMBOL} Deposit</h3>
               {!executing && (
                 <button
                   onClick={() => navigateToStep(2)}
@@ -1405,12 +1430,12 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                         className="w-5 h-5 rounded-full"
                         onError={(e) => (e.currentTarget.style.display = 'none')}
                       />
-                      <span className="font-bold text-gray-900">USDT0 PHALANX</span>
+                      <span className="font-bold text-gray-900">{config.displayName}</span>
                     </div>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Amount:</span>
-                    <span className="font-bold text-gray-900">{amount} USDT0</span>
+                    <span className="font-bold text-gray-900">{amount} {UNDERLYING_SYMBOL}</span>
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600 font-medium">Method:</span>
@@ -1465,19 +1490,19 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Amount:</span>
-                    <span className="font-bold text-gray-900">{amount} USDT0</span>
+                    <span className="font-bold text-gray-900">{amount} {UNDERLYING_SYMBOL}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Vault Shares:</span>
                     <div className="flex items-center space-x-2">
                       <img
                         src="/Myrmidons-logo-dark-no-bg.png"
-                        alt="USDT0 PHALANX"
+                        alt={config.displayName}
                         className="w-5 h-5 rounded-full"
                         onError={(e) => (e.currentTarget.style.display = 'none')}
                       />
                       <span className="font-bold text-gray-900">
-                        {vaultSharesMinted ? parseFloat(vaultSharesMinted).toFixed(2) : 'Calculating...'} USDT0 PHALANX
+                        {vaultSharesMinted ? parseFloat(vaultSharesMinted).toFixed(2) : 'Calculating...'} {config.displayName}
                       </span>
                     </div>
                   </div>
@@ -1579,8 +1604,8 @@ export function LiFiQuoteTest({ onStepChange, onClose }: LiFiQuoteTestProps = {}
           selectedToken={depositState.selectedToken || selectedTokenInfo}
           amount={depositState.amount || amount}
           isExecuting={executing}
-          usdt0Balance={usdt0Balance}
-          usdt0Loading={usdt0Loading}
+          underlyingBalance={underlyingBalance}
+          underlyingLoading={underlyingLoading}
           currentStep={depositState.currentStep || currentStep}
           onStepChange={(step) => {
             navigateToStep(step);

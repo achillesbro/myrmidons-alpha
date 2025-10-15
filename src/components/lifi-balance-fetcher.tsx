@@ -34,8 +34,8 @@ interface BalanceFetcherProps {
   selectedToken: TokenBalance | null;
   amount: string;
   isExecuting: boolean;
-  usdt0Balance?: TokenBalance | null;
-  usdt0Loading?: boolean;
+  underlyingBalance?: TokenBalance | null;
+  underlyingLoading?: boolean;
   currentStep: number;
   onStepChange: (step: number) => void;
 }
@@ -56,8 +56,8 @@ export const LiFiBalanceFetcher = ({
   selectedToken, 
   amount, 
   isExecuting,
-  usdt0Balance,
-  usdt0Loading,
+  underlyingBalance,
+  underlyingLoading,
   currentStep,
   onStepChange
 }: BalanceFetcherProps) => {
@@ -265,22 +265,22 @@ export const LiFiBalanceFetcher = ({
       )}
 
       {/* USDT0 Direct Deposit Section - Only show in step 1 */}
-      {usdt0Balance && currentStep === 1 && (
+      {underlyingBalance && currentStep === 1 && (
         <div
-          onClick={() => handleTokenClick(usdt0Balance)}
+          onClick={() => handleTokenClick(underlyingBalance)}
           className={`p-3 border rounded cursor-pointer transition-colors ${
-            selectedToken?.chainId === usdt0Balance.chainId && 
-            selectedToken?.tokenSymbol === usdt0Balance.tokenSymbol
+            selectedToken?.chainId === underlyingBalance.chainId && 
+            selectedToken?.tokenSymbol === underlyingBalance.tokenSymbol
               ? 'border-green-500 bg-green-100'
               : 'border-green-300 hover:border-green-400 bg-green-50'
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              {usdt0Balance.logoURI && (
+              {underlyingBalance.logoURI && (
                 <img
-                  src={usdt0Balance.logoURI}
-                  alt={usdt0Balance.tokenSymbol}
+                  src={underlyingBalance.logoURI}
+                  alt={underlyingBalance.tokenSymbol}
                   className="w-5 h-5 rounded-full"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
@@ -288,16 +288,16 @@ export const LiFiBalanceFetcher = ({
                 />
               )}
               <div>
-                <div className="font-semibold text-sm text-green-800">{usdt0Balance.tokenSymbol}</div>
+                <div className="font-semibold text-sm text-green-800">{underlyingBalance.tokenSymbol}</div>
                 <div className="text-xs text-green-600">Direct Deposit</div>
               </div>
             </div>
             <div className="text-right">
               <div className="font-mono text-sm font-semibold text-green-800">
-                {parseFloat(usdt0Balance.balanceFormatted).toFixed(4)}
+                {parseFloat(underlyingBalance.balanceFormatted).toFixed(4)}
               </div>
               <div className="text-xs text-green-600">
-                ${formatUSD(usdt0Balance.balanceUSD || '0')}
+                ${formatUSD(underlyingBalance.balanceUSD || '0')}
               </div>
             </div>
           </div>
@@ -305,8 +305,8 @@ export const LiFiBalanceFetcher = ({
       )}
 
 
-      {/* USDT0 Loading State - Only show in step 1 */}
-      {usdt0Loading && currentStep === 1 && (
+      {/* Underlying balance Loading State - Only show in step 1 */}
+      {underlyingLoading && currentStep === 1 && (
         <div className="p-4 border border-gray-300 bg-gray-50 rounded-lg">
           <div className="text-center text-gray-600">Loading USDT0 balance...</div>
         </div>

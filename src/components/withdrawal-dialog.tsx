@@ -3,13 +3,11 @@ import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain } from '@wagmi/core';
 import { formatUnits, parseUnits } from 'viem';
 import { BrowserProvider, Contract } from 'ethers';
-import { CHAIN_IDS, TOKEN_ADDRESSES } from '../lib/lifi-config';
+import { CHAIN_IDS } from '../lib/lifi-config';
 import vaultAbi from '../abis/vault.json';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
 import { getToken } from '@lifi/sdk';
-
-// Vault address for withdrawals
-const VAULT_ADDRESS = (import.meta.env.VITE_MORPHO_VAULT || '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42') as `0x${string}`;
+import { DEFAULT_VAULT_CONFIG, type VaultConfig } from '../config/vaults.config';
 
 // Helper functions for explorer URLs
 
@@ -51,15 +49,23 @@ interface WithdrawalDialogProps {
   userShares?: bigint;
   shareDecimals?: number;
   underlyingDecimals?: number;
+  vaultConfig?: VaultConfig; // Vault configuration (optional, defaults to DEFAULT_VAULT_CONFIG)
 }
 
 export function WithdrawalDialog({ 
   onClose, 
   userShares = 0n, 
   shareDecimals = 18, 
-  underlyingDecimals = 6 
+  underlyingDecimals = 6,
+  vaultConfig
 }: WithdrawalDialogProps) {
   const [executing, setExecuting] = useState(false);
+  
+  // Use provided vault config or default
+  const config = vaultConfig || DEFAULT_VAULT_CONFIG;
+  const VAULT_ADDRESS = config.vaultAddress;
+  const UNDERLYING_SYMBOL = config.underlyingSymbol;
+  const UNDERLYING_ADDRESS = config.underlyingAddress;
   
   // Withdrawal state
   const [withdrawalState, setWithdrawalState] = useState<WithdrawalState>({
@@ -82,13 +88,13 @@ export function WithdrawalDialog({
     if (ttl > 0) setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
   };
   
-  // USDT0 logo state
-  const [usdt0LogoURI, setUsdt0LogoURI] = useState<string | null>(null);
+  // Underlying token logo state
+  const [underlyingLogoURI, setUnderlyingLogoURI] = useState<string | null>(null);
   
   const clientW = useWalletClient();
   const wagmiConfig = useConfig();
   
-  // Initialize vault shares token info and fetch USDT0 logo
+  // Initialize vault shares token info and fetch underlying token logo
   useEffect(() => {
     if (userShares > 0n) {
       const sharesFormatted = formatUnits(userShares, shareDecimals);
@@ -97,7 +103,7 @@ export function WithdrawalDialog({
         selectedToken: {
           chainId: CHAIN_IDS.HYPEREVM,
           chainName: 'HyperEVM',
-          tokenSymbol: 'USDT0 PHALANX',
+          tokenSymbol: config.displayName,
           tokenAddress: VAULT_ADDRESS,
           balance: userShares.toString(),
           balanceFormatted: sharesFormatted,
@@ -107,17 +113,17 @@ export function WithdrawalDialog({
       }));
     }
     
-    // Fetch USDT0 logo
-    const fetchUSDT0Logo = async () => {
+    // Fetch underlying token logo
+    const fetchUnderlyingLogo = async () => {
       try {
-        const usdt0Token = await getToken(CHAIN_IDS.HYPEREVM, TOKEN_ADDRESSES[CHAIN_IDS.HYPEREVM].USDT0);
-        setUsdt0LogoURI(usdt0Token.logoURI || null);
+        const underlyingToken = await getToken(CHAIN_IDS.HYPEREVM, UNDERLYING_ADDRESS);
+        setUnderlyingLogoURI(underlyingToken.logoURI || null);
       } catch (error) {
-        console.error('Failed to fetch USDT0 logo:', error);
+        console.error(`Failed to fetch ${UNDERLYING_SYMBOL} logo:`, error);
       }
     };
     
-    fetchUSDT0Logo();
+    fetchUnderlyingLogo();
   }, [userShares, shareDecimals]);
   
   // Update withdrawal state helper
@@ -136,7 +142,7 @@ export function WithdrawalDialog({
   };
   
   // Main withdrawal execution function
-  const handleUSDT0Withdrawal = async () => {
+  const handleUnderlyingWithdrawal = async () => {
     if (!clientW.data?.account?.address) {
       pushToast('error', 'Please connect your wallet');
       return;
@@ -215,7 +221,7 @@ export function WithdrawalDialog({
         currentStep: 3, // Success step
       });
       
-      // Calculate actual USDT0 amount received (from assetsOut)
+      // Calculate actual underlying token amount received (from assetsOut)
       const actualUsdt0Amount = formatUnits(assetsOut, underlyingDecimals);
       updateWithdrawalState({
         withdrawnUsdt0Amount: actualUsdt0Amount
@@ -267,7 +273,7 @@ export function WithdrawalDialog({
   };
   
   const handleStep2 = () => {
-    handleUSDT0Withdrawal();
+    handleUnderlyingWithdrawal();
   };
   
   const handleStep3 = () => {
@@ -368,18 +374,18 @@ export function WithdrawalDialog({
               <div className="flex items-center space-x-3">
                 <img
                   src="/Myrmidons-logo-dark-no-bg.png"
-                  alt="USDT0 PHALANX"
+                  alt={config.displayName}
                   className="w-10 h-10 rounded-full"
                   onError={(e) => (e.currentTarget.style.display = 'none')}
                 />
                 <div>
-                  <div className="font-semibold text-lg">USDT0 PHALANX</div>
+                  <div className="font-semibold text-lg">{config.displayName}</div>
                   <div className="text-sm text-gray-600">HyperEVM</div>
                 </div>
               </div>
               <div className="text-right">
                 <div className="font-mono text-lg">
-                  {withdrawalState.selectedToken ? parseFloat(withdrawalState.selectedToken.balanceFormatted).toFixed(4) : '0.0000'} USDT0 PHALANX
+                  {withdrawalState.selectedToken ? parseFloat(withdrawalState.selectedToken.balanceFormatted).toFixed(4) : '0.0000'} {config.displayName}
                 </div>
                 <div className="text-sm text-gray-600">
                   Vault Shares
@@ -435,7 +441,7 @@ export function WithdrawalDialog({
         return (
           <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 shadow-lg">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-blue-800">Confirm USDT0 Withdrawal</h3>
+              <h3 className="text-xl font-bold text-blue-800">Confirm {UNDERLYING_SYMBOL} Withdrawal</h3>
             </div>
             
             <div className="space-y-3">
@@ -447,29 +453,32 @@ export function WithdrawalDialog({
                     <div className="flex items-center space-x-2">
                       <img
                         src="/Myrmidons-logo-dark-no-bg.png"
-                        alt="USDT0 PHALANX"
+                        alt={config.displayName}
                         className="w-4 h-4 rounded-full"
                         onError={(e) => (e.currentTarget.style.display = 'none')}
                       />
-                      <span className="font-medium">USDT0 PHALANX on HyperEVM</span>
+                      <span className="font-medium">{config.displayName} on HyperEVM</span>
                     </div>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">To:</span>
                     <div className="flex items-center space-x-2">
-                      {usdt0LogoURI ? (
+                      {underlyingLogoURI ? (
                         <img
-                          src={usdt0LogoURI}
-                          alt="USDT0"
+                          src={underlyingLogoURI}
+                          alt={UNDERLYING_SYMBOL}
                           className="w-4 h-4 rounded-full"
                           onError={(e) => (e.currentTarget.style.display = 'none')}
                         />
                       ) : (
-                        <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
-                          U
-                        </div>
+                        <img
+                          src="/Myrmidons-logo-dark-no-bg.png"
+                          alt={UNDERLYING_SYMBOL}
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
                       )}
-                      <span className="font-medium">USDT0 on HyperEVM</span>
+                      <span className="font-medium">{UNDERLYING_SYMBOL} on HyperEVM</span>
                     </div>
                   </div>
                   <div className="flex justify-between">
@@ -528,20 +537,23 @@ export function WithdrawalDialog({
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Received:</span>
                     <div className="flex items-center space-x-2">
-                      {usdt0LogoURI ? (
+                      {underlyingLogoURI ? (
                         <img
-                          src={usdt0LogoURI}
-                          alt="USDT0"
+                          src={underlyingLogoURI}
+                          alt={UNDERLYING_SYMBOL}
                           className="w-5 h-5 rounded-full"
                           onError={(e) => (e.currentTarget.style.display = 'none')}
                         />
                       ) : (
-                        <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
-                          U
-                        </div>
+                        <img
+                          src="/Myrmidons-logo-dark-no-bg.png"
+                          alt={UNDERLYING_SYMBOL}
+                          className="w-5 h-5 rounded-full"
+                          onError={(e) => (e.currentTarget.style.display = 'none')}
+                        />
                       )}
                       <span className="font-bold text-gray-900">
-                        {withdrawalState.withdrawnUsdt0Amount || 'Calculating...'} USDT0
+                        {withdrawalState.withdrawnUsdt0Amount || 'Calculating...'} {UNDERLYING_SYMBOL}
                       </span>
                     </div>
                   </div>

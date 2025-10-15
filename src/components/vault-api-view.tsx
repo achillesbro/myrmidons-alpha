@@ -54,25 +54,33 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
-import { getUsdt0Usd } from "../lib/prices"; // keeping current util; tooltips/UX polish below
+import { getUsdt0Usd } from "../lib/prices"; // Generic price fetcher (name is legacy)
 import { ChainVaultGuard } from "./ChainVaultGuard";
+import { getVaultAddressesByChain, getVaultConfigByAddress, DEFAULT_VAULT_CONFIG, type VaultConfig } from "../config/vaults.config";
 
-// Allowed vaults per chain (checksum addresses)
+// Dynamically build allowed vaults from config
 const ALLOWED_VAULTS: Record<number, readonly `0x${string}`[]> = {
-  999: [
-    "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42", // HyperEVM MYRMIDONS USDT0 PHALANX
-  ],
-  // 8453: ["0x..."], // Example for Base if needed later
+  999: getVaultAddressesByChain(999),
+  // Future chains can be added here automatically
 } as const;
 
-
-
-export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` }) {
+export function VaultAPIView({ 
+  vaultAddress, 
+  vaultConfig 
+}: { 
+  vaultAddress?: `0x${string}`; 
+  vaultConfig?: VaultConfig;
+}) {
   const { t } = useTranslation();
 
-  // Vault address and chain ID
-  const VAULT_ADDRESS = (vaultAddress ?? "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42") as `0x${string}`;
-  const CHAIN_ID = 999; // HyperEVM
+  // Vault config priority: prop > derived from address > default
+  const config = vaultConfig 
+    || (vaultAddress ? getVaultConfigByAddress(vaultAddress) : undefined) 
+    || DEFAULT_VAULT_CONFIG;
+
+  // Vault address and chain ID from config
+  const VAULT_ADDRESS = (vaultAddress ?? config.vaultAddress) as `0x${string}`;
+  const CHAIN_ID = config.chainId;
 
   // Fetch vault data from Morpho API
   const apiData = useVaultDataAPI(VAULT_ADDRESS, CHAIN_ID);
@@ -538,33 +546,36 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Key Metrics skeleton - 1/3 */}
           <div className="lg:col-span-1">
-            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4 h-full animate-pulse">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 h-full flex flex-col animate-pulse">
+              <div className="flex items-center justify-between mb-5">
                 <div className="h-6 bg-[#E1E1D6] rounded w-24"></div>
                 <div className="h-3 bg-[#E1E1D6] rounded w-32"></div>
               </div>
-              <div className="space-y-4">
-                {/* TVL */}
-                <div className="text-center">
-                  <div className="h-3 bg-[#E1E1D6] rounded w-12 mx-auto mb-1"></div>
-                  <div className="h-6 bg-[#E1E1D6] rounded w-20 mx-auto"></div>
-                </div>
-                {/* Current APY with sparkline */}
-                <div className="text-center">
-                  <div className="h-3 bg-[#E1E1D6] rounded w-20 mx-auto mb-1"></div>
-                  <div className="h-6 bg-[#E1E1D6] rounded w-16 mx-auto mb-1"></div>
-                  <div className="h-3 bg-[#E1E1D6] rounded w-24 mx-auto mb-2"></div>
-                  <div className="h-6 bg-[#E1E1D6] rounded w-full"></div>
-                </div>
-                {/* Share Price and Since Inception */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center">
-                    <div className="h-3 bg-[#E1E1D6] rounded w-16 mx-auto mb-1"></div>
-                    <div className="h-6 bg-[#E1E1D6] rounded w-20 mx-auto"></div>
+              <div className="flex-1 flex items-center">
+                <div className="w-full space-y-6">
+                  {/* Row 1: TVL and Current APY */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="h-3 bg-[#E1E1D6] rounded w-10 mb-1.5"></div>
+                      <div className="h-7 bg-[#E1E1D6] rounded w-20 mb-1"></div>
+                    </div>
+                    <div>
+                      <div className="h-3 bg-[#E1E1D6] rounded w-16 mb-1.5"></div>
+                      <div className="h-7 bg-[#E1E1D6] rounded w-16 mb-1"></div>
+                      <div className="h-3 bg-[#E1E1D6] rounded w-24 mb-1.5"></div>
+                      <div className="h-5 bg-[#E1E1D6] rounded w-full"></div>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <div className="h-3 bg-[#E1E1D6] rounded w-20 mx-auto mb-1"></div>
-                    <div className="h-6 bg-[#E1E1D6] rounded w-16 mx-auto"></div>
+                  {/* Row 2: Share Price and Since Inception */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="h-3 bg-[#E1E1D6] rounded w-16 mb-1.5"></div>
+                      <div className="h-7 bg-[#E1E1D6] rounded w-20"></div>
+                    </div>
+                    <div>
+                      <div className="h-3 bg-[#E1E1D6] rounded w-20 mb-1.5"></div>
+                      <div className="h-7 bg-[#E1E1D6] rounded w-16"></div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -724,9 +735,9 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Key Metrics Section - 1/3 width */}
             <div className="lg:col-span-1">
-              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4 h-full">
+              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 h-full flex flex-col">
                 {/* Header with live indicator */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-5">
                   <h2 className="text-lg font-semibold text-[#00295B]">
                     {t("vaultInfo.metrics.title")}
                   </h2>
@@ -736,65 +747,64 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                   </div>
                 </div>
 
-                {/* 2x3 Metrics Grid (2 per row, 3 rows) */}
-                <div className="space-y-4">
-                  {/* Row 1: TVL */}
-                  <div className="grid grid-cols-1">
-                    <MetricCard
-                      num={priceLoading || tvlUsd === undefined ? "—" : 
-                        tvlUsd >= 1000000 ? `$${(tvlUsd / 1000000).toFixed(2)}M` :
-                        tvlUsd >= 1000 ? `$${(tvlUsd / 1000).toFixed(1)}K` :
-                        `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                      }
-                      sub="TVL"
-                    />
-                  </div>
+                {/* 2x2 Metrics Grid - centered */}
+                <div className="flex-1 flex items-center">
+                  <div className="w-full space-y-6">
+                    {/* Row 1: TVL and Current APY with sparkline */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <MetricCard
+                        num={priceLoading || tvlUsd === undefined ? "—" : 
+                          tvlUsd >= 1000000 ? `$${(tvlUsd / 1000000).toFixed(2)}M` :
+                          tvlUsd >= 1000 ? `$${(tvlUsd / 1000).toFixed(1)}K` :
+                          `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                        }
+                        sub="TVL"
+                      />
+                      
+                      <MetricCard
+                        num={apiData.loading || apiData.instantApy === null ? "—" :
+                          `${(apiData.instantApy * 100).toFixed(2)}%`
+                        }
+                        sub={
+                          <span>
+                            Current APY
+                            <InfoTooltip label="Annualized from latest net rate; variable" />
+                          </span>
+                        }
+                        delta={metricsData.apy7dAvg !== null ? 
+                          `7D avg ${(metricsData.apy7dAvg * 100).toFixed(2)}%` : undefined
+                        }
+                        sparkline={metricsData.apySparkline.length > 0 ? metricsData.apySparkline : undefined}
+                      />
+                    </div>
 
-                  {/* Row 2: Current APY (full width with sparkline) */}
-                  <div className="grid grid-cols-1">
-                    <MetricCard
-                      num={apiData.loading || apiData.instantApy === null ? "—" :
-                        `${(apiData.instantApy * 100).toFixed(2)}%`
-                      }
-                      sub={
-                        <span>
-                          Current APY
-                          <InfoTooltip label="Annualized from latest net rate; variable" />
-                        </span>
-                      }
-                      delta={metricsData.apy7dAvg !== null ? 
-                        `7D avg ${(metricsData.apy7dAvg * 100).toFixed(2)}%` : undefined
-                      }
-                      sparkline={metricsData.apySparkline.length > 0 ? metricsData.apySparkline : undefined}
-                    />
-                  </div>
+                    {/* Row 2: Share Price and Since Inception */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <MetricCard
+                        num={apiData.loading || priceLoading || apiData.sharePriceUsd === null ? "—" :
+                          `$${apiData.sharePriceUsd.toFixed(4)}`
+                        }
+                        sub={
+                          <span>
+                            Share Price
+                            <InfoTooltip label="Vault assets per share (ERC-4626)" />
+                          </span>
+                        }
+                      />
 
-                  {/* Row 3: Share Price and Since Inception */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <MetricCard
-                      num={apiData.loading || priceLoading || apiData.sharePriceUsd === null ? "—" :
-                        `$${apiData.sharePriceUsd.toFixed(4)}`
-                      }
-                      sub={
-                        <span>
-                          Share Price
-                          <InfoTooltip label="Vault assets per share (ERC-4626)" />
-                        </span>
-                      }
-                    />
-
-                    <MetricCard
-                      num={metricsData.sinceInceptionReturn !== null ?
-                        `${metricsData.sinceInceptionReturn >= 0 ? '+' : ''}${metricsData.sinceInceptionReturn.toFixed(2)}%` :
-                        "—"
-                      }
-                      sub="Since Inception"
-                      deltaType={
-                        metricsData.sinceInceptionReturn !== null ?
-                          metricsData.sinceInceptionReturn >= 0 ? "positive" : "negative" :
-                          "neutral"
-                      }
-                    />
+                      <MetricCard
+                        num={metricsData.sinceInceptionReturn !== null ?
+                          `${metricsData.sinceInceptionReturn >= 0 ? '+' : ''}${metricsData.sinceInceptionReturn.toFixed(2)}%` :
+                          "—"
+                        }
+                        sub="Since Inception"
+                        deltaType={
+                          metricsData.sinceInceptionReturn !== null ?
+                            metricsData.sinceInceptionReturn >= 0 ? "positive" : "negative" :
+                            "neutral"
+                        }
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -911,14 +921,14 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
         {/* Confirm dialog for approval */}
         <ConfirmDialog
           open={approveConfirmOpen}
-          title={t("vaultInfo.actions.approveTitle", { symbol: "USDT0" })}
+          title={t("vaultInfo.actions.approveTitle", { symbol: config.underlyingSymbol })}
           body={
             <div className="text-sm">
               {t("vaultInfo.actions.approveBody", {
                 defaultValue:
                   "This approval allows the vault to transfer exactly the amount you entered ({{amount}} {{symbol}}) on your behalf to complete the deposit. You will sign a separate transaction to confirm the deposit after approval.",
                 amount: depAmount || "0",
-                symbol: "USDT0"
+                symbol: config.underlyingSymbol
               })}
             </div>
           }
@@ -965,7 +975,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                 </div>
               </div>
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-                <LiFiQuoteTest onClose={handleDialogClose} />
+                <LiFiQuoteTest onClose={handleDialogClose} vaultConfig={config} />
               </div>
             </div>
           </div>
@@ -1008,6 +1018,7 @@ export function VaultAPIView({ vaultAddress }: { vaultAddress?: `0x${string}` })
                   userShares={userShares}
                   shareDecimals={onchainData?.shareDecimals || 18}
                   underlyingDecimals={onchainData?.underlyingDecimals || 6}
+                  vaultConfig={config}
                 />
               </div>
             </div>
