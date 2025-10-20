@@ -1,4 +1,3 @@
-import type { Address } from 'viem';
 import { useVaultDataAPI } from './useVaultDataAPI';
 import { VAULT_CONFIGS } from '../config/vaults.config';
 
