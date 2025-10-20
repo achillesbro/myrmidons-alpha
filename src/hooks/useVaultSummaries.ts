@@ -1,5 +1,6 @@
 import type { Address } from 'viem';
 import { useVaultDataAPI } from './useVaultDataAPI';
+import { VAULT_CONFIGS } from '../config/vaults.config';
 
 export type VaultSummary = {
   id: string;
@@ -9,28 +10,33 @@ export type VaultSummary = {
   updatedAt?: number;
 };
 
-// Default vault address - PHALANX vault
-const DEFAULT_VAULT_ADDRESS = (import.meta.env.VITE_MORPHO_VAULT || "0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42") as Address;
 const CHAIN_ID = 999; // HyperEVM
 
 export function useVaultSummaries() {
-  // Use Morpho API for vault data - same as vault-api-view.tsx
-  // Hooks must be called unconditionally at the top level
-  const apiData = useVaultDataAPI(DEFAULT_VAULT_ADDRESS, CHAIN_ID);
+  // Fetch data for all vaults - hooks must be called unconditionally at the top level
+  const usdt0Data = useVaultDataAPI(VAULT_CONFIGS.usdt0.vaultAddress, CHAIN_ID);
+  const whypeData = useVaultDataAPI(VAULT_CONFIGS.whype.vaultAddress, CHAIN_ID);
 
   const summaries: Record<string, VaultSummary> = {
-    phalanx: {
-      id: 'phalanx',
-      tvlUSD: apiData.totalAssetsUsd ?? undefined,
-      apy: apiData.instantApy ?? undefined,
-      marketsCount: apiData.allocations?.length ?? undefined,
+    usdt0: {
+      id: 'usdt0',
+      tvlUSD: usdt0Data.totalAssetsUsd ?? undefined,
+      apy: usdt0Data.instantApy ?? undefined,
+      marketsCount: usdt0Data.allocations?.length ?? undefined,
+      updatedAt: Date.now(),
+    },
+    whype: {
+      id: 'whype',
+      tvlUSD: whypeData.totalAssetsUsd ?? undefined,
+      apy: whypeData.instantApy ?? undefined,
+      marketsCount: whypeData.allocations?.length ?? undefined,
       updatedAt: Date.now(),
     },
   };
 
   return { 
     summaries, 
-    error: apiData.error ?? null, 
-    isLoading: apiData.loading 
+    error: usdt0Data.error || whypeData.error || null, 
+    isLoading: usdt0Data.loading || whypeData.loading 
   };
 }

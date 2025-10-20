@@ -7,7 +7,7 @@
       "subtitle": "Myrmidons Strategies propose des vaults ERC-4626 sur Morpho. Transparent, on-chain, et prêt pour HyperEVM.",
       "poweredBy": "Propulsé par Morpho",
       "learnMore": "En savoir plus",
-      "ctaPrimary": "Déposer dans PHALANX",
+      "ctaPrimary": "Déposer dans nos vaults",
       "ctaSecondary": "À propos de nous"
     },
     "valueProps": {
@@ -26,8 +26,8 @@
     },
     "vaults": {
       "title": "Vaults",
-      "phalanx": {
-        "objective": "Rendement USDT0 cohérent et ajusté au risque sur HyperEVM.",
+      "usdt0": {
+        "objective": "Rendement USDT0 non directionnel via des prêts diversifiés sur des marchés Morpho présélectionnés.",
         "tags": ["Non-custodial", "Morpho", "ERC-4626"],
         "tvlLabel": "TVL",
         "apyLabel": "APY Actuel",
@@ -36,7 +36,7 @@
         "deposit": "Déposer"
       },
       "whype": {
-        "objective": "Stratégies de rendement WHYPE optimisées sur HyperEVM.",
+        "objective": "Générez du rendement sur WHYPE, le token natif de gas sur HyperEVM et actif de règlement principal d'Hyperliquid.",
         "tags": ["Non-custodial", "Morpho", "ERC-4626"],
         "tvlLabel": "TVL",
         "apyLabel": "APY Actuel",
@@ -55,7 +55,7 @@
         "steps": [
           "Connecter le wallet",
           "(Optionnel) Bridge des fonds",
-          "Déposer dans PHALANX"
+          "Déposer dans l'un de nos vaults"
         ]
       }
     },
@@ -288,11 +288,17 @@
   "vaultInfo": {
     "about": {
       "title": "À propos",
-      "body": "MYRMIDONS USDT0 PHALANX offre un rendement non directionnel : les fonds sont prêtés sur les marchés Morpho présélectionnés sur HyperEVM afin de générer des intérêts, sans exposition aux actifs sous-jacents."
+      "body": {
+        "usdt0": "MYRMIDONS USDT0 offre un rendement non directionnel : les fonds sont prêtés sur les marchés Morpho présélectionnés sur HyperEVM afin de générer des intérêts sans prendre d'exposition directionnelle aux actifs volatils.",
+        "whype": "MYRMIDONS WHYPE vous permet de générer du rendement sur WHYPE, le token natif de gas sur HyperEVM. WHYPE est l'actif de règlement principal pour les applications construites sur l'écosystème Hyperliquid, combinant utilité et génération de rendement."
+      }
     },
     "vaultHeader": {
       "address": "Adresse Vault :",
-      "description": "MYRMIDONS USDT0 PHALANX offre un rendement non directionnel : les fonds sont prêtés sur les marchés Morpho présélectionnés sur HyperEVM afin de générer des intérêts, sans exposition aux actifs sous-jacents."
+      "description": {
+        "usdt0": "MYRMIDONS USDT0 offre un rendement non directionnel : les fonds sont prêtés sur les marchés Morpho présélectionnés sur HyperEVM afin de générer des intérêts sans prendre d'exposition directionnelle aux actifs volatils.",
+        "whype": "MYRMIDONS WHYPE vous permet de générer du rendement sur WHYPE, le token natif de gas sur HyperEVM. WHYPE est l'actif de règlement principal pour les applications construites sur l'écosystème Hyperliquid, combinant utilité et génération de rendement."
+      }
     },
     "metrics": {
       "title": "Métriques Clés",
@@ -323,11 +329,23 @@
       "bridgeCta": "Besoin de fonds sur HyperEVM ? Bridge depuis Arbitrum via Jumper",
       "title": "Actions",
       "deposit": "Déposer",
-      "depositTitle": "Déposer dans USDT0 PHALANX",
-      "depositDescription": "Déposez depuis n'importe quelle chaine",
+      "depositTitle": {
+        "usdt0": "Déposer dans MYRMIDONS USDT0",
+        "whype": "Déposer dans MYRMIDONS WHYPE"
+      },
+      "depositDescription": {
+        "usdt0": "Déposez depuis n'importe quelle chaine",
+        "whype": "Déposez depuis n'importe quelle chaine"
+      },
       "withdraw": "Retirer",
-      "withdrawTitle": "Retirer de USDT0 PHALANX",
-      "withdrawDescription": "Retirez vos parts vault vers USDT0",
+      "withdrawTitle": {
+        "usdt0": "Retirer de MYRMIDONS USDT0",
+        "whype": "Retirer de MYRMIDONS WHYPE"
+      },
+      "withdrawDescription": {
+        "usdt0": "Retirez vos parts vault vers USDT0",
+        "whype": "Retirez vos parts vault vers WHYPE"
+      },
       "placeholderAmount": "0,00",
       "balance": "Solde",
       "max": "Max",

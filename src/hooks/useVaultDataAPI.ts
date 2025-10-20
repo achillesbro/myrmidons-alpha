@@ -36,7 +36,10 @@ export interface VaultDataAPI {
 export function useVaultDataAPI(vaultAddress: Address, chainId: number): VaultDataAPI {
   const { data, loading, error } = useGetVaultDataQuery({
     variables: { address: vaultAddress, chainId },
-    // Only fetch once on mount, user can refresh page to get new data
+    // Poll every 30 seconds to keep data fresh (especially for newly deployed vaults)
+    pollInterval: 30000,
+    // Still use cache between polls
+    fetchPolicy: 'cache-and-network',
   });
 
   const allocations = useMemo<AllocationItem[]>(() => {
@@ -45,12 +48,21 @@ export function useVaultDataAPI(vaultAddress: Address, chainId: number): VaultDa
     const allocs = data.vaultByAddress.state.allocation;
     const totalAssets = data.vaultByAddress.state.totalAssets;
 
-    return allocs
+    // Deduplicate allocations by market uniqueKey (same as on-chain logic)
+    const uniqueAllocs = new Map<string, typeof allocs[0]>();
+    allocs.forEach((alloc) => {
+      const key = alloc.market.uniqueKey;
+      if (!uniqueAllocs.has(key) || BigInt(alloc.supplyAssets) > BigInt(uniqueAllocs.get(key)!.supplyAssets)) {
+        uniqueAllocs.set(key, alloc);
+      }
+    });
+
+    return Array.from(uniqueAllocs.values())
       .map((alloc) => {
         const supplyAssets = BigInt(alloc.supplyAssets);
         const supplyAssetsUsd = alloc.supplyAssetsUsd;
         const loanSymbol = alloc.market.loanAsset.symbol;
-        const collateralSymbol = alloc.market.collateralAsset?.symbol || "Unknown";
+        const collateralSymbol = alloc.market.collateralAsset?.symbol || "Idle";
         const collateralLogo = alloc.market.collateralAsset?.logoURI || null;
         const supplyApy = alloc.market.state?.supplyApy ?? null;
 
@@ -86,9 +98,18 @@ export function useVaultDataAPI(vaultAddress: Address, chainId: number): VaultDa
   // Group allocations by family
   const groupingResult = useMemo<AllocationGroupingResult | null>(() => {
     const totalAssets = data?.vaultByAddress?.state?.totalAssets;
-    if (!allocations.length || !totalAssets) return null;
+    if (!allocations.length || !totalAssets) {
+      // Return empty result instead of null to ensure groupedAllocations is always an array
+      return {
+        groupedItems: [],
+        ungroupedItems: [],
+        totalGroupedAssets: 0n,
+        totalUngroupedAssets: 0n,
+      };
+    }
+    
     return groupAllocationsByFamily(allocations, BigInt(totalAssets));
-  }, [allocations, data?.vaultByAddress?.state?.totalAssets]);
+  }, [allocations, data?.vaultByAddress?.state?.totalAssets, vaultAddress]);
 
   return {
     // APY metrics
@@ -117,7 +138,7 @@ export function useVaultDataAPI(vaultAddress: Address, chainId: number): VaultDa
 
     // Allocations
     allocations,
-    groupedAllocations: groupingResult?.groupedItems ?? null,
+    groupedAllocations: groupingResult?.groupedItems ?? [],
     groupingResult,
 
     // Meta

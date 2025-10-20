@@ -8,7 +8,7 @@ export default function VaultsGrid() {
   const { summaries } = useVaultSummaries();
 
   return (
-    <section className="w-full py-12">
+    <section id="vaults" className="w-full py-12">
       <div className="max-w-6xl mx-auto px-4">
         <h2 className="text-2xl font-semibold" style={{ color:'var(--heading,#00295B)' }}>
           {t('landing.vaults.title')}

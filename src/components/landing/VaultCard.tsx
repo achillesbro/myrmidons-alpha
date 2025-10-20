@@ -19,7 +19,7 @@ const toUtcHm = (ms?: number) => {
 
 export default function VaultCard({ model, kpis }: Props) {
   const { t } = useTranslation();
-  const { name, objectiveKey, tagsKey, links, chainId } = model;
+  const { id, name, objectiveKey, tagsKey, links, chainId } = model;
   
   // Get translated objective and tags
   const objective = t(objectiveKey);
@@ -48,15 +48,15 @@ export default function VaultCard({ model, kpis }: Props) {
 
         <div className="mt-5 grid grid-cols-3 gap-3 text-sm">
           <div>
-            <div className="opacity-70">{t('landing.vaults.phalanx.tvlLabel')}</div>
+            <div className="opacity-70">{t(`landing.vaults.${id}.tvlLabel`)}</div>
             {kpis.tvlUSD == null ? <Skeleton className="w-20 h-4 mt-1"/> : <div className="font-medium mt-1">{fmtUSD(kpis.tvlUSD)}</div>}
           </div>
           <div>
-            <div className="opacity-70">{t('landing.vaults.phalanx.apyLabel')}</div>
+            <div className="opacity-70">{t(`landing.vaults.${id}.apyLabel`)}</div>
             {kpis.apy == null ? <Skeleton className="w-16 h-4 mt-1"/> : <div className="font-medium mt-1">{fmtPct(kpis.apy)}</div>}
           </div>
           <div>
-            <div className="opacity-70">{t('landing.vaults.phalanx.marketsLabel')}</div>
+            <div className="opacity-70">{t(`landing.vaults.${id}.marketsLabel`)}</div>
             {kpis.marketsCount == null ? <Skeleton className="w-10 h-4 mt-1"/> : <div className="font-medium mt-1">{kpis.marketsCount}</div>}
           </div>
         </div>
@@ -74,7 +74,7 @@ export default function VaultCard({ model, kpis }: Props) {
           className="px-4 py-2 rounded-xl border text-sm font-medium"
           style={{ borderColor:'var(--heading,#00295B)', color:'var(--heading,#00295B)' }}
         >
-          {t('landing.vaults.phalanx.viewDetails')}
+          {t(`landing.vaults.${id}.viewDetails`)}
         </a>
         <a
           href={links.deposit}
@@ -82,7 +82,7 @@ export default function VaultCard({ model, kpis }: Props) {
           className="px-4 py-2 rounded-xl text-sm font-medium"
           style={{ background:'var(--muted-brass,#B08D57)', color:'#fff' }}
         >
-          {t('landing.vaults.phalanx.deposit')}
+          {t(`landing.vaults.${id}.deposit`)}
         </a>
       </div>
     </div>

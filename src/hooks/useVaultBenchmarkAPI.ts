@@ -4,13 +4,23 @@ import { useGetVaultApyChartQuery } from "../graphql/__generated__/GetVaultApyCh
 import { TimeseriesInterval } from "@morpho-org/blue-api-sdk";
 import type { TimeRange } from "./useVaultApyChartAPI";
 
-// USDT0 Vault addresses for benchmark
-const BENCHMARK_VAULT_ADDRESSES: Address[] = [
-  "0xe5ADd96840F0B908ddeB3Bd144C0283Ac5ca7cA0", // Hyperithm USDT0 Vault
-  "0x3Bcc0a5a66bB5BdCEEf5dd8a659a4eC75F3834d8", // MEV Capital USDT0
-  "0x53A333e51E96FE288bC9aDd7cdC4B1EAD2CD2FfA", // Gauntlet USDT0 Vault
-  "0x51F64488d03D8B210294dA2BF70D5db0Bc621B0c", // Re7 USDT0
-];
+// Benchmark vault addresses by underlying token
+const BENCHMARK_ADDRESSES: Record<string, Address[]> = {
+  // USDT0 benchmarks
+  USDT0: [
+    "0xe5ADd96840F0B908ddeB3Bd144C0283Ac5ca7cA0", // Hyperithm USDT0 Vault
+    "0x3Bcc0a5a66bB5BdCEEf5dd8a659a4eC75F3834d8", // MEV Capital USDT0
+    "0x53A333e51E96FE288bC9aDd7cdC4B1EAD2CD2FfA", // Gauntlet USDT0 Vault
+    "0x51F64488d03D8B210294dA2BF70D5db0Bc621B0c", // Re7 USDT0
+  ],
+  // WHYPE benchmarks
+  WHYPE: [
+    "0x182b318A8F1c7C92a7884e469442a610B0e69ed2", // Re7 WHYPE
+    "0x92B518e1cD76dD70D3E20624AEdd7D107F332Cff", // Hyperithm WHYPE
+    "0xd19e3d00f8547f7d108abFD4bbb015486437B487", // MEV WHYPE
+    "0x264a06Fd7A7C9E0Bfe75163b475E2A3cc1856578", // Gauntlet WHYPE
+  ],
+};
 
 export interface BenchmarkDataPoint {
   x: number; // Unix timestamp
@@ -41,17 +51,21 @@ function getTimeRangeConfig(range: TimeRange) {
 
 export function useVaultBenchmarkAPI(
   chainId: number,
-  timeRange: TimeRange
+  timeRange: TimeRange,
+  underlyingSymbol: string = 'USDT0'
 ): VaultBenchmarkData {
   const { startTimestamp, endTimestamp, interval } = useMemo(
     () => getTimeRangeConfig(timeRange),
     [timeRange]
   );
 
+  // Get benchmark addresses for the underlying symbol
+  const benchmarkAddresses = BENCHMARK_ADDRESSES[underlyingSymbol] || BENCHMARK_ADDRESSES.USDT0;
+
   // Fetch data from all 4 benchmark vaults
   const vault1 = useGetVaultApyChartQuery({
     variables: {
-      address: BENCHMARK_VAULT_ADDRESSES[0],
+      address: benchmarkAddresses[0],
       chainId,
       startTimestamp,
       endTimestamp,
@@ -62,7 +76,7 @@ export function useVaultBenchmarkAPI(
 
   const vault2 = useGetVaultApyChartQuery({
     variables: {
-      address: BENCHMARK_VAULT_ADDRESSES[1],
+      address: benchmarkAddresses[1],
       chainId,
       startTimestamp,
       endTimestamp,
@@ -73,7 +87,7 @@ export function useVaultBenchmarkAPI(
 
   const vault3 = useGetVaultApyChartQuery({
     variables: {
-      address: BENCHMARK_VAULT_ADDRESSES[2],
+      address: benchmarkAddresses[2],
       chainId,
       startTimestamp,
       endTimestamp,
@@ -84,7 +98,7 @@ export function useVaultBenchmarkAPI(
 
   const vault4 = useGetVaultApyChartQuery({
     variables: {
-      address: BENCHMARK_VAULT_ADDRESSES[3],
+      address: benchmarkAddresses[3],
       chainId,
       startTimestamp,
       endTimestamp,

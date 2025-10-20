@@ -17,6 +17,7 @@ import { useVaultBenchmarkAPI } from "../hooks/useVaultBenchmarkAPI";
 interface ApyHistoryChartProps {
   vaultAddress: Address;
   chainId: number;
+  underlyingSymbol?: string;
 }
 
 interface ChartDataPoint {
@@ -111,10 +112,10 @@ function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
-export function ApyHistoryChart({ vaultAddress, chainId }: ApyHistoryChartProps) {
+export function ApyHistoryChart({ vaultAddress, chainId, underlyingSymbol = 'USDT0' }: ApyHistoryChartProps) {
   const [showBenchmark, setShowBenchmark] = useState(false);
   const { netApyData, loading, error, timeRange, setTimeRange } = useVaultApyChartAPI(vaultAddress, chainId, "30D");
-  const { benchmarkData, loading: benchmarkLoading, error: benchmarkError } = useVaultBenchmarkAPI(chainId, timeRange);
+  const { benchmarkData, loading: benchmarkLoading, error: benchmarkError } = useVaultBenchmarkAPI(chainId, timeRange, underlyingSymbol);
 
   const chartData = useMemo<ChartDataPoint[]>(() => {
     if (!netApyData.length) return [];

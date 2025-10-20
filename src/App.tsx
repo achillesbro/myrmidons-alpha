@@ -10,7 +10,7 @@ import { hyperEVM } from "./chains/hyperEVM";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http } from "wagmi";
 import { useEffect, useState } from "react";
-import { Address, getAddress, isAddress } from "viem";
+import { Address } from "viem";
 import { mainnet, arbitrum, base, optimism, bsc } from "wagmi/chains";
 import {
   metaMaskWallet,
@@ -28,9 +28,6 @@ import SiteHeader from "./components/layout/SiteHeader";
 import { useTranslation } from 'react-i18next'
 import i18n from "./i18n";
 import { DEFAULT_VAULT_CONFIG, getVaultConfigById, type VaultConfig } from "./config/vaults.config";
-
-// Support env override for default vault address (legacy support)
-const DEFAULT_VAULT: Address = (import.meta.env.VITE_MORPHO_VAULT || DEFAULT_VAULT_CONFIG.vaultAddress) as Address;
 
 const TABS = ["VAULTINFO", "ABOUT", "LIFI_TEST"] as const;
 type Tab = typeof TABS[number];
@@ -78,21 +75,15 @@ function getVaultFromUrl(): VaultConfig {
 const TestInterface = () => {
   const [activeTab, setActiveTab] = useState<Tab | null>(() => getInitialTab());
   const [vaultConfig, setVaultConfig] = useState<VaultConfig>(() => getVaultFromUrl());
-  const [vaultAddressInput] = useState<string>(DEFAULT_VAULT);
-  // `vaultAddress` is validated to be an Address
-  const [vaultAddress, setVaultAddress] = useState(DEFAULT_VAULT);
+  // Sync vaultAddress with vaultConfig
+  const [vaultAddress, setVaultAddress] = useState<Address>(vaultConfig.vaultAddress);
 
   const { t } = useTranslation();
 
+  // Update vaultAddress when vaultConfig changes
   useEffect(() => {
-    if (vaultAddressInput.length >= 42) {
-      if (isAddress(vaultAddressInput, { strict: false })) {
-        setVaultAddress(getAddress(vaultAddressInput));
-      } else {
-        window.alert("Please enter a valid address.");
-      }
-    }
-  }, [vaultAddressInput]);
+    setVaultAddress(vaultConfig.vaultAddress);
+  }, [vaultConfig]);
 
   // Persist + deep-link (URL ?tab=... & ?vault=...)
   useEffect(() => {

@@ -40,11 +40,18 @@ export default function SiteHeader() {
               Home
             </a>
             <a 
-              href="/?tab=vaultinfo" 
+              href="/?tab=vaultinfo&vault=usdt0" 
               className="text-sm hover:opacity-75 transition-opacity" 
               style={{ color: 'var(--bg)', opacity: 0.9 }}
             >
-              Vault
+              USDT0 Vault
+            </a>
+            <a 
+              href="/?tab=vaultinfo&vault=whype" 
+              className="text-sm hover:opacity-75 transition-opacity" 
+              style={{ color: 'var(--bg)', opacity: 0.9 }}
+            >
+              WHYPE Vault
             </a>
             <a 
               href="/?tab=about" 
@@ -62,7 +69,7 @@ export default function SiteHeader() {
             <Suspense
               fallback={
                 <a
-                  href="/?tab=vaultinfo"
+                  href="/?tab=vaultinfo&vault=usdt0"
                   className="px-3 py-2 rounded-xl text-sm font-medium transition-opacity hover:opacity-90"
                   style={{ background: 'var(--muted-brass)', color: '#fff' }}
                   aria-label="Connect wallet"
@@ -75,7 +82,7 @@ export default function SiteHeader() {
             </Suspense>
           ) : (
             <a
-              href="/?tab=vaultinfo"
+              href="/?tab=vaultinfo&vault=usdt0"
               className="px-3 py-2 rounded-xl text-sm font-medium transition-opacity hover:opacity-90"
               style={{ background: 'var(--muted-brass)', color: '#fff' }}
               aria-label="Connect wallet"

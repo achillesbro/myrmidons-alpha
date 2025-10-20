@@ -36,6 +36,7 @@ interface BalanceFetcherProps {
   isExecuting: boolean;
   underlyingBalance?: TokenBalance | null;
   underlyingLoading?: boolean;
+  underlyingSymbol?: string;
   currentStep: number;
   onStepChange: (step: number) => void;
 }
@@ -58,6 +59,7 @@ export const LiFiBalanceFetcher = ({
   isExecuting,
   underlyingBalance,
   underlyingLoading,
+  underlyingSymbol = 'USDT0',
   currentStep,
   onStepChange
 }: BalanceFetcherProps) => {
@@ -308,7 +310,7 @@ export const LiFiBalanceFetcher = ({
       {/* Underlying balance Loading State - Only show in step 1 */}
       {underlyingLoading && currentStep === 1 && (
         <div className="p-4 border border-gray-300 bg-gray-50 rounded-lg">
-          <div className="text-center text-gray-600">Loading USDT0 balance...</div>
+          <div className="text-center text-gray-600">Loading {underlyingSymbol} balance...</div>
         </div>
       )}
 

@@ -4,6 +4,14 @@ import { useTranslation } from 'react-i18next';
 export default function Hero() {
   const { t } = useTranslation();
 
+  const scrollToVaults = () => {
+    const vaultsSection = document.getElementById('vaults');
+    if (vaultsSection) {
+      vaultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    track('hero_deposit_click');
+  };
+
   return (
     <section className="relative w-full py-16 md:py-24" style={{ background: 'var(--bg, #FFFFF5)' }}>
       {/* Background image with 20% opacity - full width, starting from header */}
@@ -71,15 +79,14 @@ export default function Hero() {
 
         {/* CTAs */}
         <div className="mt-8 flex gap-3">
-          <a
-            href="/?tab=vaultinfo"
-            onClick={() => track('hero_deposit_click')}
-            className="px-5 py-3 rounded-2xl font-medium"
+          <button
+            onClick={scrollToVaults}
+            className="px-4 py-2 rounded-xl text-sm font-medium"
             style={{ background: 'var(--muted-brass, #B08D57)', color: '#fff' }}
             aria-label={t('landing.hero.ctaPrimary')}
           >
             {t('landing.hero.ctaPrimary')}
-          </a>
+          </button>
           <a
             href="/?tab=about"
             className="px-5 py-3 rounded-2xl font-medium border"

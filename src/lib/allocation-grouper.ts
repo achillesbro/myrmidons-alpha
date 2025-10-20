@@ -6,7 +6,7 @@ const MEGA_FAMILIES = {
   'HYPE': {
     label: 'HYPE',
     logo: '/assets/kHYPE-TokenIcon.png', // Use kHYPE as the main logo
-    families: ['kHYPE', 'WHYPE', 'PT-kHYPE-13NOV2025', 'dnHYPE'],
+    families: ['kHYPE', 'WHYPE', 'PT-kHYPE-13NOV2025', 'dnHYPE', 'wstHYPE', 'hbHYPE', 'beHYPE'],
     description: 'Native token of Hyperliquid and the gas on HyperEVM; core settlement asset for apps built on HyperEVM.',
     descriptionKey: 'family.hype.description'
   },
@@ -86,7 +86,7 @@ export function groupAllocationsByFamily(
   
   // Group items by family
   items.forEach(item => {
-    const family = findFamilyForMarket(item.id);
+    const family = findFamilyForMarket(item.id, item.label);
     if (family) {
       if (!familyMap.has(family.label)) {
         familyMap.set(family.label, []);
@@ -183,13 +183,44 @@ export function groupAllocationsByFamily(
 /**
  * Find the family that contains the given market ID
  */
-function findFamilyForMarket(marketId: `0x${string}`): { label: string; logo: string } | null {
+function findFamilyForMarket(marketId: `0x${string}`, itemLabel?: string): { label: string; logo: string } | null {
+  // Special case: If this is an idle allocation (contains "Idle"), 
+  // determine the family based on the loan token
+  if (itemLabel?.includes("Idle")) {
+    const loanToken = itemLabel.split(" / ")[0]; // Extract loan token from "TOKEN / Idle"
+    return findFamilyByTokenSymbol(loanToken);
+  }
+  
   for (const family of TOKEN_GROUPS) {
     if ((family.ids as readonly string[]).includes(marketId)) {
       return { label: family.label, logo: family.logo };
     }
   }
   return null;
+}
+
+/**
+ * Find family by token symbol (for idle allocations)
+ */
+function findFamilyByTokenSymbol(tokenSymbol: string): { label: string; logo: string } | null {
+  // Map common token symbols to their families
+  const symbolToFamily: Record<string, { label: string; logo: string }> = {
+    // HYPE ecosystem
+    'WHYPE': { label: 'WHYPE', logo: '/assets/WHYPE-TokenIcon.jpg' },
+    'kHYPE': { label: 'kHYPE', logo: '/assets/kHYPE-TokenIcon.png' },
+    'wstHYPE': { label: 'wstHYPE', logo: '/assets/wstHYPE-TokenIcon.svg' },
+    'hbHYPE': { label: 'hbHYPE', logo: '/assets/kHYPE-TokenIcon.png' },
+    'beHYPE': { label: 'beHYPE', logo: '/assets/kHYPE-TokenIcon.png' },
+    'dnHYPE': { label: 'dnHYPE', logo: 'public/dnHYPE-TokenIcon.svg' },
+    'PT-kHYPE-13NOV2025': { label: 'PT-kHYPE-13NOV2025', logo: '/assets/kHYPE-TokenIcon.png' },
+    // Other tokens
+    'USDT0': { label: 'USDT0', logo: '/assets/USDT0-TokenIcon.png' },
+    'BTC': { label: 'BTC', logo: '/assets/BTC-TokenIcon.svg' },
+    'ETH': { label: 'ETH', logo: '/assets/ETH-TokenIcon.svg' },
+    'thBILL': { label: 'thBILL', logo: '/assets/thBILL-TokenIcon.png' },
+  };
+  
+  return symbolToFamily[tokenSymbol] || null;
 }
 
 /**

@@ -7,7 +7,7 @@
       "subtitle": "Myrmidons Strategies offers ERC-4626 vaults on Morpho. Transparent, on-chain, and HyperEVM-ready.",
       "poweredBy": "Powered by Morpho",
       "learnMore": "Learn more",
-      "ctaPrimary": "Deposit into PHALANX",
+      "ctaPrimary": "Deposit into our vaults",
       "ctaSecondary": "About us"
     },
     "valueProps": {
@@ -26,8 +26,8 @@
     },
     "vaults": {
       "title": "Vaults",
-      "phalanx": {
-        "objective": "Consistent, risk-adjusted USDT0 yield on HyperEVM.",
+      "usdt0": {
+        "objective": "Non-directional USDT0 yield through diversified lending across pre-screened Morpho markets.",
         "tags": ["Non-custodial", "Morpho", "ERC-4626"],
         "tvlLabel": "TVL",
         "apyLabel": "Current APY",
@@ -36,7 +36,7 @@
         "deposit": "Deposit"
       },
       "whype": {
-        "objective": "Optimized WHYPE yield strategies on HyperEVM.",
+        "objective": "Earn yield on WHYPE, the native gas token of HyperEVM and core settlement asset of Hyperliquid.",
         "tags": ["Non-custodial", "Morpho", "ERC-4626"],
         "tvlLabel": "TVL",
         "apyLabel": "Current APY",
@@ -55,7 +55,7 @@
         "steps": [
           "Connect wallet",
           "(Optional) Bridge funds",
-          "Deposit to PHALANX"
+          "Deposit to any of our vaults"
         ]
       }
     },
@@ -288,11 +288,17 @@
   "vaultInfo": {
     "about": {
       "title": "About",
-      "body": "MYRMIDONS USDT0 PHALANX provides non-directional yield: funds are lent across pre-screened Morpho markets on HyperEVM to earn interest, not underlying asset exposure."
+      "body": {
+        "usdt0": "MYRMIDONS USDT0 provides non-directional yield: funds are lent across pre-screened Morpho markets on HyperEVM to earn interest without taking directional exposure to volatile assets.",
+        "whype": "MYRMIDONS WHYPE enables you to earn yield on WHYPE, the native gas token of HyperEVM. WHYPE is the core settlement asset for applications built on Hyperliquid's ecosystem, combining utility with yield generation."
+      }
     },
     "vaultHeader": {
       "address": "Vault Address:",
-      "description": "MYRMIDONS USDT0 PHALANX provides non-directional yield: funds are lent across pre-screened Morpho markets on HyperEVM to earn interest, not underlying asset exposure."
+      "description": {
+        "usdt0": "MYRMIDONS USDT0 provides non-directional yield: funds are lent across pre-screened Morpho markets on HyperEVM to earn interest without taking directional exposure to volatile assets.",
+        "whype": "MYRMIDONS WHYPE enables you to earn yield on WHYPE, the native gas token of HyperEVM. WHYPE is the core settlement asset for applications built on Hyperliquid's ecosystem, combining utility with yield generation."
+      }
     },
     "metrics": {
       "title": "Key Metrics",
@@ -323,11 +329,23 @@
       "bridgeCta": "Need funds on HyperEVM? Bridge from Arbitrum via Jumper",
       "title": "Actions",
       "deposit": "Deposit",
-      "depositTitle": "Deposit into USDT0 PHALANX",
-      "depositDescription": "Bridge from any chain or deposit USDT0 directly",
+      "depositTitle": {
+        "usdt0": "Deposit into MYRMIDONS USDT0",
+        "whype": "Deposit into MYRMIDONS WHYPE"
+      },
+      "depositDescription": {
+        "usdt0": "Bridge from any chain or deposit USDT0 directly",
+        "whype": "Bridge from any chain or deposit WHYPE directly"
+      },
       "withdraw": "Withdraw",
-      "withdrawTitle": "Withdraw from USDT0 PHALANX",
-      "withdrawDescription": "Withdraw your vault shares to USDT0",
+      "withdrawTitle": {
+        "usdt0": "Withdraw from MYRMIDONS USDT0",
+        "whype": "Withdraw from MYRMIDONS WHYPE"
+      },
+      "withdrawDescription": {
+        "usdt0": "Withdraw your vault shares to USDT0",
+        "whype": "Withdraw your vault shares to WHYPE"
+      },
       "placeholderAmount": "0.00",
       "balance": "Balance",
       "max": "Max",

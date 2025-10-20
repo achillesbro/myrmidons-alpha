@@ -641,7 +641,7 @@ export function VaultAPIView({
         {/* Hero Section */}
         <InnerPageHero
           title={onchainData.name}
-          subtitle={t("vaultInfo.vaultHeader.description")}
+          subtitle={t(`vaultInfo.vaultHeader.description.${config.id}`)}
           badges={[
             { label: "Powered by Morpho", href: "https://morpho.org/" },
             { label: "HyperEVM" },
@@ -695,7 +695,7 @@ export function VaultAPIView({
                     </button>
                   </div>
                   <p className="text-xs text-center" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
-                    {t("vaultInfo.actions.depositDescription")}
+                    {t(`vaultInfo.actions.depositDescription.${config.id}`)}
                   </p>
                 </div>
               </ChainVaultGuard>
@@ -812,7 +812,7 @@ export function VaultAPIView({
             
             {/* APY Chart Section - 2/3 width */}
             <div className="lg:col-span-2">
-              <ApyHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} />
+              <ApyHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} underlyingSymbol={config.underlyingSymbol} />
             </div>
           </div>
 
@@ -864,13 +864,13 @@ export function VaultAPIView({
                         <div className="w-32 h-32 bg-[#E1E1D6] rounded-full mx-auto mb-4"></div>
                       </div>
                     </div>
-                  ) : apiData.groupedAllocations ? (
+                  ) : apiData.groupedAllocations && apiData.groupedAllocations.length > 0 ? (
                     <AllocationPieChartAPI
                       groupedAllocations={apiData.groupedAllocations}
                       loading={false}
                     />
                   ) : (
-                    <p className="text-sm text-[#101720]/70 text-center py-8">No data</p>
+                    <p className="text-sm text-[#101720]/70 text-center py-8">No allocations to display</p>
                   )}
                 </div>
               </div>
@@ -962,7 +962,7 @@ export function VaultAPIView({
               <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
                 <div className="flex items-center space-x-3">
                   <h2 className="text-xl font-semibold text-[#00295B]">
-                    {t("vaultInfo.actions.depositTitle")}
+                    {t(`vaultInfo.actions.depositTitle.${config.id}`)}
                   </h2>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -1000,7 +1000,7 @@ export function VaultAPIView({
               <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
                 <div className="flex items-center space-x-3">
                   <h2 className="text-xl font-semibold text-[#00295B]">
-                    {t("vaultInfo.actions.withdrawTitle")}
+                    {t(`vaultInfo.actions.withdrawTitle.${config.id}`)}
                   </h2>
                 </div>
                 <div className="flex items-center space-x-2">

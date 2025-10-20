@@ -72,7 +72,7 @@ interface StepInfo {
     } | null;
     amount: string;
     bridgeTxHash: string | null;
-    bridgedUsdt0Amount: string | null;
+    bridgedTokenAmount: string | null;
     vaultSharesMinted: string | null;
     vaultSharesBefore: string | null; // Track shares before deposit to calculate newly minted
     currentStep: number;
@@ -94,7 +94,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
     selectedToken: null,
     amount: '',
     bridgeTxHash: null,
-    bridgedUsdt0Amount: null,
+    bridgedTokenAmount: null,
     vaultSharesMinted: null,
     vaultSharesBefore: null,
     currentStep: 1,
@@ -427,10 +427,10 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
 
   // Underlying Token Deposit Functions (works for both Path A and Path B)
   const handleUnderlyingDeposit = async () => {
-    const { selectedPath, selectedToken, amount, bridgedUsdt0Amount } = depositState;
+    const { selectedPath, selectedToken, amount, bridgedTokenAmount } = depositState;
     
     // Determine the amount to use based on path
-    const depositAmount = selectedPath === 'B' ? bridgedUsdt0Amount : amount;
+    const depositAmount = selectedPath === 'B' ? bridgedTokenAmount : amount;
     
     if (!depositAmount) {
       console.error('No deposit amount available');
@@ -625,6 +625,8 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
         errorMessage = 'Gas price too low. Please try again with higher gas.';
       } else if (errorMsg.includes('cap') && errorMsg.includes('deposit')) {
         errorMessage = 'Vault is currently closed for deposits. Please try again later.';
+      } else if (errorMsg.includes('0x1425ea42') || errorMsg.includes('exceeded') || errorMsg.includes('max deposit')) {
+        errorMessage = 'Deposit amount exceeds vault limits. Please try a smaller amount.';
       } else if (errorMsg.includes('missing revert data') || errorMsg.includes('call_exception') || errorMsg.includes('simulation')) {
         errorMessage = 'Transaction simulation failed. Please try again.';
       }
@@ -816,7 +818,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
       // Update state with bridge transaction hash and estimated amount (immediate)
       updateDepositState({
         bridgeTxHash: finalTxHash,
-        bridgedUsdt0Amount: estimatedOutputAmount, // Set immediately from route estimate
+        bridgedTokenAmount: estimatedOutputAmount, // Set immediately from route estimate
         currentStep: 3, // Move to deposit step
         transactionSubsteps: [
           { 
@@ -837,7 +839,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
             if (result.success && result.receivedAmount) {
               const receivedAmountFormatted = formatUnits(BigInt(result.receivedAmount), config.underlyingDecimals);
               updateDepositState({
-                bridgedUsdt0Amount: receivedAmountFormatted
+                bridgedTokenAmount: receivedAmountFormatted
               });
             }
           })
@@ -1062,7 +1064,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
 
   // Path B specific step rendering
   const renderPathBStep = () => {
-    const { currentStep, selectedToken, amount, bridgedUsdt0Amount, vaultSharesMinted } = depositState;
+    const { currentStep, selectedToken, amount, bridgedTokenAmount, vaultSharesMinted } = depositState;
     
     switch (currentStep) {
       case 1:
@@ -1208,7 +1210,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
                   </div>
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600 font-medium">Amount:</span>
-                    <span className="font-bold text-gray-900">{bridgedUsdt0Amount || 'Calculating...'} {UNDERLYING_SYMBOL}</span>
+                    <span className="font-bold text-gray-900">{bridgedTokenAmount || 'Calculating...'} {UNDERLYING_SYMBOL}</span>
                   </div>
                 </div>
               </div>
@@ -1261,7 +1263,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
                 <div className="space-y-3">
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Amount:</span>
-                    <span className="font-bold text-gray-900">{bridgedUsdt0Amount || '0.00'} {UNDERLYING_SYMBOL}</span>
+                    <span className="font-bold text-gray-900">{bridgedTokenAmount || '0.00'} {UNDERLYING_SYMBOL}</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-gray-100">
                     <span className="text-gray-600 font-medium">Vault Shares:</span>
@@ -1606,6 +1608,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
           isExecuting={executing}
           underlyingBalance={underlyingBalance}
           underlyingLoading={underlyingLoading}
+          underlyingSymbol={UNDERLYING_SYMBOL}
           currentStep={depositState.currentStep || currentStep}
           onStepChange={(step) => {
             navigateToStep(step);
