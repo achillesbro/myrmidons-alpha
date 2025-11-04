@@ -1,5 +1,5 @@
 import { Redis } from '@upstash/redis';
-import type { AllocationItem } from '../../../src/lib/allocation-grouper';
+import type { AllocationItem } from '../../../src/lib/allocation-grouper.js';
 
 export const runtime = 'edge';
 
