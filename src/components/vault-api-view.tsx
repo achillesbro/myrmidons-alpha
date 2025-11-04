@@ -1,5 +1,4 @@
 import { formatUnits, erc20Abi } from "viem";
-import { parseUnits } from "viem";
 import { useWalletClient } from "wagmi";
 import { BrowserProvider, Contract } from "ethers";
 import {
@@ -14,9 +13,9 @@ import {
 } from "./vault-shared";
 import { hyperPublicClient } from "../viem/clients";
 import vaultAbi from "../abis/vault.json";
-import { useState, useEffect, useRef } from "react";
-import { LiFiQuoteTest } from "./lifi-quote-test";
-import { WithdrawalDialog } from "./withdrawal-dialog";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { DepositInline } from "./deposit-inline";
+import { WithdrawInline } from "./withdraw-inline";
 import InnerPageHero from "./InnerPageHero";
 import CopyableAddress from "./CopyableAddress";
 import { ApyHistoryChart } from "./apy-history-chart";
@@ -28,6 +27,7 @@ import { MetricCard, InfoTooltip } from "./metric-card";
 import { useMetricsData } from "../hooks/useMetricsData";
 import { useVaultAdapter } from "../hooks/useVaultAdapter";
 import { useOctavAllocations } from "../hooks/useOctavAllocations";
+import { groupAllocationsByFamily, groupAllocationsByProtocol } from "../lib/allocation-grouper";
 
 // Simple error boundary to isolate rendering errors in the API View
 import React from "react";
@@ -121,8 +121,26 @@ export function VaultAPIView({
   const [onchainLoading, setOnchainLoading] = useState(true);
   const [onchainError, setOnchainError] = useState<Error | null>(null);
 
+  // Group Octav allocations for Lagoon vaults
+  // For HypAirdrop, group by protocol; for other Lagoon vaults, use token family grouping
+  const octavGroupedAllocations = useMemo(() => {
+    if (!octavAllocations.allocations.length || !onchainData?.totalAssets) {
+      return { groupedItems: [], ungroupedItems: [], totalGroupedAssets: 0n, totalUngroupedAssets: 0n };
+    }
+    // Use protocol grouping for HypAirdrop, token family for others
+    if (config.id === 'hypairdrop') {
+      return groupAllocationsByProtocol(octavAllocations.allocations, onchainData.totalAssets);
+    } else {
+      return groupAllocationsByFamily(octavAllocations.allocations, onchainData.totalAssets);
+    }
+  }, [octavAllocations.allocations, onchainData?.totalAssets, config.id]);
+
   const [usdPrice, setUsdPrice] = useState<number | null>(null);
   const [priceLoading, setPriceLoading] = useState<boolean>(true);
+
+  // Lagoon vault share price (on-chain, for vaults not in Morpho API)
+  const [lagoonSharePriceUsd, setLagoonSharePriceUsd] = useState<number | null>(null);
+  const [lagoonSharePriceLoading, setLagoonSharePriceLoading] = useState<boolean>(false);
 
   // Performance fee state
   const [feeWad, setFeeWad] = useState<bigint | null>(null);
@@ -151,103 +169,55 @@ export function VaultAPIView({
   const [userAssets, setUserAssets] = useState<bigint>(0n);
   const [claimableShares, setClaimableShares] = useState<bigint>(0n); // For async vaults (settled)
   const [pendingDepositAssets, setPendingDepositAssets] = useState<bigint>(0n); // For async vaults (unsettled)
-  const [depAmount, setDepAmount] = useState<string>("");
   const [pending, setPending] = useState<"approve" | "deposit" | "claim" | "cancel" | null>(null);
-  
-  // Deposit dialog state
-  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
-  
-  // Withdrawal dialog state
-  const [withdrawalDialogOpen, setWithdrawalDialogOpen] = useState(false);
+  const [actionMode, setActionMode] = useState<'deposit' | 'withdraw'>('deposit');
 
-  // Check for #deposit hash on mount and open dialog
-  useEffect(() => {
-    if (window.location.hash === '#deposit') {
-      setDepositDialogOpen(true);
-      // Remove the hash from URL without triggering page reload
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
-    }
-  }, []);
-  
-  // Dialog close handler with position refresh
-  const handleDialogClose = async () => {
-    setDepositDialogOpen(false);
-    
-    // Refresh position data
+  // Refresh position data (called after successful deposit/withdraw)
+  const refreshPositionData = async () => {
     try {
       if (clientW.data?.account?.address && underlyingAddress) {
-        const provider = new BrowserProvider((window as any).ethereum);
-        const signer = await provider.getSigner();
-        const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
-        const tokenR = new Contract(underlyingAddress, erc20Abi as any, signer);
-        
-        const [bal, shares, totalA, totalS] = await Promise.all([
-          tokenR.balanceOf(clientW.data.account.address) as Promise<bigint>,
-          vaultR.balanceOf(clientW.data.account.address) as Promise<bigint>,
-          vaultR.totalAssets() as Promise<bigint>,
-          vaultR.totalSupply() as Promise<bigint>,
-        ]);
-        const assets = (await vaultR.convertToAssets(shares)) as bigint;
-        
-        setOnchainBalance(bal);
-        setUserShares(shares);
-        setUserAssets(assets);
-        setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
-        await refreshVaultTotalsFast();
-      }
-    } catch (error) {
-      console.error('Failed to refresh position data:', error);
-    }
-  };
-  
-  // Withdrawal dialog close handler with position refresh
-  const handleWithdrawalClose = async () => {
-    setWithdrawalDialogOpen(false);
-    
-    // Refresh position data (same as deposit)
-    try {
-      if (clientW.data?.account?.address && underlyingAddress) {
-        const provider = new BrowserProvider((window as any).ethereum);
-        const signer = await provider.getSigner();
-        const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
-        const tokenR = new Contract(underlyingAddress, erc20Abi as any, signer);
-        
-        const [bal, shares, totalA, totalS] = await Promise.all([
-          tokenR.balanceOf(clientW.data.account.address) as Promise<bigint>,
-          vaultR.balanceOf(clientW.data.account.address) as Promise<bigint>,
-          vaultR.totalAssets() as Promise<bigint>,
-          vaultR.totalSupply() as Promise<bigint>,
-        ]);
-        const assets = (await vaultR.convertToAssets(shares)) as bigint;
-        
-        setOnchainBalance(bal);
-        setUserShares(shares);
-        setUserAssets(assets);
-        setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
-        await refreshVaultTotalsFast();
-      }
-    } catch (error) {
-      console.error('Failed to refresh position data:', error);
-    }
-  };
-  
-  // Handle escape key press
-  useEffect(() => {
-    const handleEscapeKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && (depositDialogOpen || withdrawalDialogOpen)) {
-        if (depositDialogOpen) {
-          handleDialogClose();
-        } else if (withdrawalDialogOpen) {
-          handleWithdrawalClose();
+        if (vaultAdapter) {
+          // Use adapter for Lagoon vaults
+          const [position, balance] = await Promise.all([
+            vaultAdapter.readUserPosition(clientW.data.account.address as `0x${string}`),
+            hyperPublicClient.readContract({
+              address: underlyingAddress,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [clientW.data.account.address],
+            }),
+          ]);
+          setOnchainBalance(balance as bigint);
+          setUserShares(position.walletShares);
+          setUserAssets(position.walletAssets);
+          setClaimableShares(position.claimableShares || 0n);
+          setPendingDepositAssets(position.pendingDepositAssets || 0n);
+        } else {
+          // Direct contract calls for Morpho vaults
+          const provider = new BrowserProvider((window as any).ethereum);
+          const signer = await provider.getSigner();
+          const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+          const tokenR = new Contract(underlyingAddress, erc20Abi as any, signer);
+          
+          const [bal, shares, totalA, totalS] = await Promise.all([
+            tokenR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+            vaultR.balanceOf(clientW.data.account.address) as Promise<bigint>,
+            vaultR.totalAssets() as Promise<bigint>,
+            vaultR.totalSupply() as Promise<bigint>,
+          ]);
+          const assets = (await vaultR.convertToAssets(shares)) as bigint;
+          
+          setOnchainBalance(bal);
+          setUserShares(shares);
+          setUserAssets(assets);
+          setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
         }
+        await refreshVaultTotalsFast();
       }
-    };
-    
-    if (depositDialogOpen || withdrawalDialogOpen) {
-      document.addEventListener('keydown', handleEscapeKey);
-      return () => document.removeEventListener('keydown', handleEscapeKey);
+    } catch (error) {
+      console.error('Failed to refresh position data:', error);
     }
-  }, [depositDialogOpen, withdrawalDialogOpen]);
+  };
   
   useEffect(() => {
     let cancelled = false;
@@ -285,6 +255,62 @@ export function VaultAPIView({
       clearInterval(id);
     };
   }, [VAULT_ADDRESS]);
+
+  // Fetch Lagoon vault share price (on-chain, since Morpho API doesn't have it)
+  useEffect(() => {
+    if (!vaultAdapter || !onchainData) return;
+    
+    const adapter = vaultAdapter; // Capture for closure
+    const data = onchainData; // Capture for closure
+    
+    let cancelled = false;
+    async function fetchLagoonSharePrice() {
+      try {
+        setLagoonSharePriceLoading(true);
+        const state = await adapter.readVaultState();
+        if (cancelled) return;
+        
+        // state.sharePrice is in underlying asset units, scaled by underlying asset decimals
+        // convertToAssets(ONE_SHARE) returns assets per share in underlying asset units
+        // So we need to format using underlying asset decimals
+        const sharePriceRaw = Number(formatUnits(state.sharePrice, data.underlyingDecimals));
+        
+        // Get USD price of underlying asset
+        const underlyingAddr = data.underlyingAddress;
+        if (!underlyingAddr) {
+          setLagoonSharePriceUsd(null);
+          return;
+        }
+        
+        const assetPriceUsd = await getUsdt0Usd({ token: underlyingAddr });
+        if (cancelled) return;
+        
+        if (assetPriceUsd !== null) {
+          // Calculate share price in USD
+          const sharePriceUsd = sharePriceRaw * assetPriceUsd;
+          setLagoonSharePriceUsd(sharePriceUsd);
+        } else {
+          setLagoonSharePriceUsd(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error('Failed to fetch Lagoon share price:', e);
+          setLagoonSharePriceUsd(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLagoonSharePriceLoading(false);
+        }
+      }
+    }
+    
+    fetchLagoonSharePrice();
+    const interval = setInterval(fetchLagoonSharePrice, 30_000); // Refresh every 30s
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [vaultAdapter, onchainData]);
 
   // Fetch vault state - use adapter for Lagoon, direct calls for Morpho
   useEffect(() => {
@@ -570,11 +596,12 @@ export function VaultAPIView({
     }
   };
 
-  const runDeposit = async (overrideAmountWei?: bigint) => {
+  // Legacy deposit function - kept for backward compatibility but not used in inline flow
+  const runDeposit = async (overrideAmountWei: bigint) => {
     try {
       if (!clientW.data) throw new Error(t("vaultInfo.errors.connectWallet"));
       if (!underlyingAddress) throw new Error(t("vaultInfo.errors.tokenUnknown"));
-      const amountWei = overrideAmountWei ?? parseUnits(depAmount, assetDecimals);
+      const amountWei = overrideAmountWei;
       if (amountWei <= 0n) throw new Error(t("vaultInfo.errors.enterAmount"));
       if (amountWei > onchainBalance) throw new Error(t("vaultInfo.errors.insufficientBalance"));
       const provider = new BrowserProvider((window as any).ethereum);
@@ -623,8 +650,6 @@ export function VaultAPIView({
       // Extra: immediate + delayed TVL refresh via wallet RPC
       await refreshVaultTotalsFast();
       setTimeout(() => { refreshVaultTotalsFast(); }, 2000);
-
-      setDepAmount("");
     } catch (e) {
       setPending(null);
       pushToast("error", friendlyError(e));
@@ -855,25 +880,58 @@ export function VaultAPIView({
                   <h3 className="text-lg font-semibold text-[#00295B] mb-4">
                     {t("vaultInfo.actions.title")}
                   </h3>
-                  <div className="flex gap-3 mb-3">
+                  
+                  {/* Deposit/Withdraw Toggle */}
+                  <div className="flex gap-2 mb-4 p-1 bg-gray-100 rounded-lg" style={{ background: 'rgba(0,41,91,0.05)' }}>
                     <button
                       type="button"
-                      onClick={() => setDepositDialogOpen(true)}
-                      className="flex-1 px-5 py-3 text-sm font-semibold rounded-2xl transition-all duration-200"
-                      style={{ background: 'var(--muted-brass, #B08D57)', color: '#fff' }}
+                      onClick={() => setActionMode('deposit')}
+                      className={`flex-1 px-4 py-2 text-sm font-semibold rounded-md transition-all ${
+                        actionMode === 'deposit'
+                          ? 'bg-[#FFFFF5] shadow-sm'
+                          : 'bg-transparent opacity-60 hover:opacity-80'
+                      }`}
+                      style={actionMode === 'deposit' ? { color: 'var(--heading, #00295B)' } : { color: 'var(--text, #101720)' }}
                     >
                       {t("vaultInfo.actions.deposit")}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setWithdrawalDialogOpen(true)}
-                      className="flex-1 px-5 py-3 text-sm font-semibold rounded-2xl border transition-all duration-200"
-                      style={{ borderColor: 'var(--heading, #00295B)', color: 'var(--heading, #00295B)' }}
+                      onClick={() => setActionMode('withdraw')}
+                      className={`flex-1 px-4 py-2 text-sm font-semibold rounded-md transition-all ${
+                        actionMode === 'withdraw'
+                          ? 'bg-[#FFFFF5] shadow-sm'
+                          : 'bg-transparent opacity-60 hover:opacity-80'
+                      }`}
+                      style={actionMode === 'withdraw' ? { color: 'var(--heading, #00295B)' } : { color: 'var(--text, #101720)' }}
                     >
                       {t("vaultInfo.actions.withdraw")}
                     </button>
                   </div>
-                  <p className="text-xs text-center" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+
+                  {/* Action Content */}
+                  {actionMode === 'deposit' ? (
+                    <DepositInline
+                      vaultConfig={config}
+                      vaultAdapter={vaultAdapter}
+                      sharePriceUsd={vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd}
+                      vaultShareSymbol={onchainData?.symbol}
+                      onSuccess={refreshPositionData}
+                    />
+                  ) : (
+                    <WithdrawInline
+                      vaultConfig={config}
+                      vaultAdapter={vaultAdapter}
+                      userShares={userShares}
+                      shareDecimals={onchainData?.shareDecimals || 18}
+                      underlyingDecimals={onchainData?.underlyingDecimals || 6}
+                      sharePriceUsd={vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd}
+                      vaultShareSymbol={onchainData?.symbol}
+                      onSuccess={refreshPositionData}
+                    />
+                  )}
+                  
+                  <p className="text-xs text-center mt-4" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
                     {t(`vaultInfo.actions.depositDescription.${config.id}`)}
                   </p>
                 </div>
@@ -1007,8 +1065,12 @@ export function VaultAPIView({
                     {/* Row 2: Share Price and Since Inception */}
                     <div className="grid grid-cols-2 gap-4">
                       <MetricCard
-                        num={apiData.loading || priceLoading || apiData.sharePriceUsd === null ? "—" :
-                          `$${apiData.sharePriceUsd.toFixed(4)}`
+                        num={
+                          vaultAdapter 
+                            ? (lagoonSharePriceLoading || priceLoading || lagoonSharePriceUsd === null ? "—" :
+                                `$${lagoonSharePriceUsd.toFixed(4)}`)
+                            : (apiData.loading || priceLoading || apiData.sharePriceUsd === null ? "—" :
+                                `$${apiData.sharePriceUsd.toFixed(4)}`)
                         }
                         sub={
                           <span>
@@ -1039,7 +1101,12 @@ export function VaultAPIView({
             {/* APY Chart Section - 2/3 width */}
             <div className="lg:col-span-2">
               {config.type === 'lagoon' ? (
-                <SharePriceHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} />
+                <SharePriceHistoryChart 
+                  vaultAddress={VAULT_ADDRESS} 
+                  chainId={CHAIN_ID} 
+                  underlyingSymbol={config.underlyingSymbol}
+                  underlyingAddress={config.underlyingAddress}
+                />
               ) : (
                 <ApyHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} underlyingSymbol={config.underlyingSymbol} />
               )}
@@ -1055,12 +1122,28 @@ export function VaultAPIView({
               <div className="lg:col-span-2">
                 <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full">
                   <div className="mb-3">
-                    <h2 className="text-base font-bold text-[#00295B]">
-                      {t("vaultInfo.allocations.title")}
-                    </h2>
-                    <p className="text-sm text-[#101720]/70 mt-1">
-                      {t("vaultInfo.allocations.subtitle")}
-                    </p>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h2 className="text-base font-bold text-[#00295B]">
+                          {t("vaultInfo.allocations.title")}
+                        </h2>
+                        <p className="text-sm text-[#101720]/70 mt-1">
+                          {t("vaultInfo.allocations.subtitle")}
+                        </p>
+                      </div>
+                      {octavAllocations.lastUpdated && (
+                        <div className="text-xs text-[#101720]/60 whitespace-nowrap">
+                          Last updated: {new Date(octavAllocations.lastUpdated).toLocaleString('en-GB', { 
+                            day: '2-digit', 
+                            month: 'short', 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            timeZone: 'UTC',
+                            timeZoneName: 'short'
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {octavAllocations.loading ? (
                     <div className="space-y-1">
@@ -1073,9 +1156,10 @@ export function VaultAPIView({
                     </div>
                   ) : octavAllocations.allocations.length > 0 ? (
                     <GroupedAllocationList
-                      groupedItems={[]}
-                      ungroupedItems={octavAllocations.allocations}
+                      groupedItems={octavGroupedAllocations.groupedItems}
+                      ungroupedItems={octavGroupedAllocations.ungroupedItems}
                       totalAssets={onchainData?.totalAssets ?? 0n}
+                      isProtocolGrouping={config.id === 'hypairdrop'}
                     />
                   ) : (
                     <p className="text-sm text-[#101720]/70 text-center py-8">
@@ -1096,8 +1180,9 @@ export function VaultAPIView({
                     </div>
                   ) : octavAllocations.allocations.length > 0 ? (
                     <AllocationPieChartAPI
-                      groupedAllocations={[]}
+                      groupedAllocations={octavGroupedAllocations.groupedItems}
                       loading={false}
+                      isProtocolGrouping={config.id === 'hypairdrop'}
                     />
                   ) : (
                     <p className="text-sm text-[#101720]/70 text-center py-8">No allocations to display</p>
@@ -1213,136 +1298,32 @@ export function VaultAPIView({
         </div>
 
         {/* Confirm dialog for approval */}
-        <ConfirmDialog
-          open={approveConfirmOpen}
-          title={t("vaultInfo.actions.approveTitle", { symbol: config.underlyingSymbol })}
-          body={
-            <div className="text-sm">
-              {t("vaultInfo.actions.approveBody", {
-                defaultValue:
-                  "This approval allows the vault to transfer exactly the amount you entered ({{amount}} {{symbol}}) on your behalf to complete the deposit. You will sign a separate transaction to confirm the deposit after approval.",
-                amount: depAmount || "0",
-                symbol: config.underlyingSymbol
-              })}
-            </div>
-          }
-          confirmLabel={t("vaultInfo.actions.approve")}
-          cancelLabel={t("vaultInfo.actions.cancel")}
-          onConfirm={() => {
-            setApproveConfirmOpen(false);
-            const amountWei = parseUnits(depAmount || "0", onchainData.underlyingDecimals);
-            runApproveExact(amountWei);
-          }}
-          onCancel={() => setApproveConfirmOpen(false)}
-          busy={pending === "approve"}
-        />
-
-        {/* Deposit Dialog */}
-        {depositDialogOpen && (
-          <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={(e) => {
-              // Close dialog when clicking outside
-              if (e.target === e.currentTarget) {
-                handleDialogClose();
-              }
+        {/* Legacy approval dialog - not used in inline flow, but kept for compatibility */}
+        {approveConfirmOpen && (
+          <ConfirmDialog
+            open={approveConfirmOpen}
+            title={t("vaultInfo.actions.approveTitle", { symbol: config.underlyingSymbol })}
+            body={
+              <div className="text-sm">
+                {t("vaultInfo.actions.approveBody", {
+                  defaultValue:
+                    "This approval allows the vault to transfer tokens on your behalf to complete the deposit. You will sign a separate transaction to confirm the deposit after approval.",
+                  symbol: config.underlyingSymbol
+                })}
+              </div>
+            }
+            confirmLabel={t("vaultInfo.actions.approve")}
+            cancelLabel={t("vaultInfo.actions.cancel")}
+            onConfirm={() => {
+              setApproveConfirmOpen(false);
+              // Note: This flow is deprecated - inline components handle approval directly
             }}
-          >
-            {/* Blurred background - transparent with blur effect */}
-            <div className="absolute inset-0 backdrop-blur-sm"></div>
-            
-            {/* Dialog container with cropping effect */}
-            <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl">
-              <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
-                <div className="flex items-center space-x-3">
-                  <h2 className="text-xl font-semibold text-[#00295B]">
-                    {t(`vaultInfo.actions.depositTitle.${config.id}`)}
-                  </h2>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleDialogClose}
-                    className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-              <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-                <LiFiQuoteTest onClose={handleDialogClose} vaultConfig={config} vaultAdapter={vaultAdapter} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Withdrawal Dialog */}
-        {withdrawalDialogOpen && (
-          <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            onClick={(e) => {
-              // Close dialog when clicking outside
-              if (e.target === e.currentTarget) {
-                handleWithdrawalClose();
-              }
-            }}
-          >
-            {/* Blurred background - transparent with blur effect */}
-            <div className="absolute inset-0 backdrop-blur-sm"></div>
-            
-            {/* Dialog container with cropping effect */}
-            <div className="relative bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl">
-              <div className="flex items-center justify-between p-6 border-b border-[#E5E2D6]">
-                <div className="flex items-center space-x-3">
-                  <h2 className="text-xl font-semibold text-[#00295B]">
-                    {t(`vaultInfo.actions.withdrawTitle.${config.id}`)}
-                  </h2>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleWithdrawalClose}
-                    className="text-[#101720]/60 hover:text-[#101720] text-2xl font-bold"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-              <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-                <WithdrawalDialog 
-                  onClose={handleWithdrawalClose}
-                  userShares={userShares}
-                  shareDecimals={onchainData?.shareDecimals || 18}
-                  underlyingDecimals={onchainData?.underlyingDecimals || 6}
-                  vaultConfig={config}
-                  vaultAdapter={vaultAdapter}
-                />
-              </div>
-            </div>
-          </div>
+            onCancel={() => setApproveConfirmOpen(false)}
+            busy={pending === "approve"}
+          />
         )}
 
         <Toasts toasts={toasts} />
-
-        {/* Mobile Sticky Bottom CTA Bar */}
-        <div className="fixed bottom-0 left-0 right-0 lg:hidden bg-[#FFFFF5] border-t border-[#E5E2D6] p-4 z-40 shadow-lg">
-          <div className="flex gap-3 max-w-6xl mx-auto">
-            <button
-              type="button"
-              onClick={() => setDepositDialogOpen(true)}
-              className="flex-1 px-4 py-3 text-sm font-semibold rounded-2xl transition-all duration-200"
-              style={{ background: 'var(--muted-brass, #B08D57)', color: '#fff' }}
-            >
-              {t("vaultInfo.actions.deposit")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setWithdrawalDialogOpen(true)}
-              className="flex-1 px-4 py-3 text-sm font-semibold rounded-2xl border transition-all duration-200"
-              style={{ borderColor: 'var(--heading, #00295B)', color: 'var(--heading, #00295B)' }}
-            >
-              {t("vaultInfo.actions.withdraw")}
-            </button>
-          </div>
-        </div>
 
       </div>
       </ErrorBoundary>

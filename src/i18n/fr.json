@@ -322,7 +322,7 @@
     },
     "allocations": {
       "title": "Allocations",
-      "subtitle": "Stratégie d'allocation actuelle du vault sur les marchés Morpho",
+      "subtitle": "Stratégie d'allocation actuelle du vault",
       "chartTitle": "Aperçu des Allocations",
       "chartSubtitle": "Distribution TVL par famille d'actifs",
       "columns": {

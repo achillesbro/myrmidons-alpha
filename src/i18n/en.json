@@ -322,7 +322,7 @@
     },
     "allocations": {
       "title": "Allocations",
-      "subtitle": "Current vault allocation strategy across Morpho markets",
+      "subtitle": "Current vault allocation strategy",
       "chartTitle": "Allocation Overview",
       "chartSubtitle": "TVL distribution by asset family",
       "columns": {

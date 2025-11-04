@@ -1,9 +1,10 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
-import type { GroupedAllocation } from "../lib/allocation-grouper";
+import type { GroupedAllocation, ProtocolGroupedAllocation } from "../lib/allocation-grouper";
 
 interface AllocationPieChartAPIProps {
-  groupedAllocations: GroupedAllocation[];
+  groupedAllocations: GroupedAllocation[] | ProtocolGroupedAllocation[];
   loading?: boolean;
+  isProtocolGrouping?: boolean;
 }
 
 const COLORS = [
@@ -17,7 +18,7 @@ const COLORS = [
   "#3D5A6B", // Dark slate
 ];
 
-export function AllocationPieChartAPI({ groupedAllocations, loading = false }: AllocationPieChartAPIProps) {
+export function AllocationPieChartAPI({ groupedAllocations, loading = false, isProtocolGrouping = false }: AllocationPieChartAPIProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
@@ -44,12 +45,19 @@ export function AllocationPieChartAPI({ groupedAllocations, loading = false }: A
     );
   }
 
-  const chartData = groupedAllocations.map((group) => ({
-    name: group.familyLabel,
-    value: group.percentage,
-    usd: group.totalUsd,
-    marketCount: group.marketCount,
-  }));
+  const chartData = groupedAllocations.map((group) => {
+    const name = isProtocolGrouping && 'protocolName' in group
+      ? group.protocolName
+      : 'familyLabel' in group
+        ? group.familyLabel
+        : '';
+    return {
+      name,
+      value: group.percentage,
+      usd: group.totalUsd,
+      marketCount: group.marketCount,
+    };
+  });
 
   const renderCustomLabel = (props: any) => {
     const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;

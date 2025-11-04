@@ -6,12 +6,14 @@ export interface OctavAllocationsData {
   allocations: AllocationItem[];
   loading: boolean;
   error: string | null;
+  lastUpdated: number | null;
 }
 
 export function useOctavAllocations(vaultAddress: Address): OctavAllocationsData {
   const [allocations, setAllocations] = useState<AllocationItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -21,38 +23,33 @@ export function useOctavAllocations(vaultAddress: Address): OctavAllocationsData
         setLoading(true);
         setError(null);
 
-        // Get API key from environment
-        const apiKey = import.meta.env.VITE_OCTAV_API_KEY;
-        if (!apiKey) {
-          throw new Error("Octav API key not configured");
-        }
-
-        // Fetch portfolio data from Octav
+        // Fetch from cached API endpoint instead of direct Octav API
         const response = await fetch(
-          `https://api.octav.fi/v1/portfolio?addresses=${vaultAddress}&includeImages=true`,
+          `/api/allocations/${vaultAddress}`,
           {
             headers: {
-              'Authorization': `Bearer ${apiKey}`,
               'Content-Type': 'application/json',
             },
           }
         );
 
         if (!response.ok) {
-          throw new Error(`Octav API error: ${response.status} ${response.statusText}`);
+          throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
 
-        await response.json();
+        const data = await response.json() as {
+          allocations: AllocationItem[];
+          lastUpdated: number;
+          cached: boolean;
+        };
         
         if (cancelled) return;
 
-        // Parse Octav response and convert to AllocationItem format
-        // TODO: Map Octav portfolio data to allocation items
-        // For now, return empty array
-        setAllocations([]);
+        // The API already returns parsed AllocationItem[] format
+        setAllocations(data.allocations || []);
+        setLastUpdated(data.lastUpdated || null);
       } catch (err) {
         if (cancelled) return;
-        // Ignore errors for now since user mentioned API will throw errors without credits
         setError(err instanceof Error ? err.message : "Failed to fetch allocations");
       } finally {
         if (!cancelled) {
@@ -72,6 +69,7 @@ export function useOctavAllocations(vaultAddress: Address): OctavAllocationsData
     allocations,
     loading,
     error,
+    lastUpdated,
   };
 }
 

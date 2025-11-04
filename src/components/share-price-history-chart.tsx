@@ -15,6 +15,7 @@ interface SharePriceHistoryChartProps {
   vaultAddress: Address;
   chainId: number;
   underlyingSymbol?: string;
+  underlyingAddress?: Address;
 }
 
 interface ChartDataPoint {
@@ -82,8 +83,13 @@ function calculateStats(data: ChartDataPoint[]) {
   return { avg, min, max };
 }
 
-export function SharePriceHistoryChart({ vaultAddress, chainId }: SharePriceHistoryChartProps) {
-  const { data, loading, error, timeRange, setTimeRange } = useLagoonSharePriceHistory(vaultAddress, chainId, "30D");
+export function SharePriceHistoryChart({ vaultAddress, chainId, underlyingSymbol, underlyingAddress }: SharePriceHistoryChartProps) {
+  const { data, loading, error, timeRange, setTimeRange } = useLagoonSharePriceHistory(
+    vaultAddress, 
+    chainId, 
+    "30D",
+    underlyingAddress
+  );
 
   const chartData = useMemo<ChartDataPoint[]>(() => {
     return data;

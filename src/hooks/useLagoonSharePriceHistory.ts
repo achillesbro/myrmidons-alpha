@@ -3,6 +3,7 @@ import type { Address } from "viem";
 import { parseAbiItem, GetLogsReturnType, formatUnits } from "viem";
 import { hyperPublicClient } from "../viem/clients";
 import { VaultUtils } from "@lagoon-protocol/v0-core";
+import { getUsdt0Usd } from "../lib/prices";
 
 export type TimeRange = "7D" | "30D" | "90D" | "1Y";
 
@@ -32,7 +33,8 @@ const settleRedeemEvent = parseAbiItem(
 export function useLagoonSharePriceHistory(
   vaultAddress: Address,
   chainId: number,
-  initialRange: TimeRange = "30D"
+  initialRange: TimeRange = "30D",
+  underlyingAddress?: Address
 ): LagoonSharePriceHistoryData {
   const [timeRange, setTimeRange] = useState<TimeRange>(initialRange);
   const [data, setData] = useState<SharePriceDataPoint[]>([]);
@@ -62,11 +64,10 @@ export function useLagoonSharePriceHistory(
         const headBlock = await hyperPublicClient.getBlockNumber();
         const headTimestamp = Number((await hyperPublicClient.getBlock({ blockNumber: headBlock })).timestamp) * 1000;
         
-        // Calculate approximate starting block
-        // HyperEVM avg block time is ~2s, so calculate approximate blocks from timestamp diff
+        // Start from block 0 for new vaults (events should be recent)
+        // For HyperEVM, we can scan from genesis since it's a new chain
+        const fromBlock = 0n;
         const targetTimestamp = headTimestamp - rangeMs;
-        const approximateBlocksAgo = Math.floor(rangeMs / (2 * 1000)); // 2s per block
-        const fromBlock = headBlock - BigInt(Math.min(approximateBlocksAgo, 1_000_000)); // Cap at 1M blocks max
         
         // Fetch settlement events
         const MAX_SPAN = 1000n; // HyperEVM RPC limit per getLogs
@@ -74,18 +75,35 @@ export function useLagoonSharePriceHistory(
         
         const collected: Log[] = [];
         let cursor = fromBlock;
-        while (cursor <= headBlock) {
-          const spanEnd = cursor + (MAX_SPAN - 1n);
-          const toBlock = spanEnd > headBlock ? headBlock : spanEnd;
-          
-          const batch = await hyperPublicClient.getLogs({
-            address: vaultAddress,
-            events: [settleDepositEvent, settleRedeemEvent],
-            fromBlock: cursor,
-            toBlock,
-          });
-          collected.push(...(batch as Log[]));
-          cursor = toBlock + 1n;
+        try {
+          while (cursor <= headBlock) {
+            const spanEnd = cursor + (MAX_SPAN - 1n);
+            const toBlock = spanEnd > headBlock ? headBlock : spanEnd;
+            
+            try {
+              const batch = await hyperPublicClient.getLogs({
+                address: vaultAddress,
+                events: [settleDepositEvent, settleRedeemEvent],
+                fromBlock: cursor,
+                toBlock,
+              });
+              collected.push(...(batch as Log[]));
+            } catch (logError) {
+              // If getLogs fails for a range, log but continue
+              console.warn(`Failed to fetch logs from block ${cursor} to ${toBlock}:`, logError);
+            }
+            
+            cursor = toBlock + 1n;
+          }
+        } catch (fetchError) {
+          console.warn('Error during event fetching:', fetchError);
+          // Continue processing even if some blocks fail
+        }
+        
+        // Get USD price of underlying asset (for conversion)
+        let assetPriceUsd: number | null = null;
+        if (underlyingAddress) {
+          assetPriceUsd = await getUsdt0Usd({ token: underlyingAddress });
         }
         
         // Process events to extract share prices
@@ -107,10 +125,17 @@ export function useLagoonSharePriceHistory(
             // Calculate share price: totalAssets / totalSupply
             // Using ONE_SHARE as the base (1e18)
             const oneShare = VaultUtils.ONE_SHARE;
+            // Handle case where totalSupply is 0 (initial state) - price would be 0
             const priceBigInt = totalSupply > 0n
               ? (totalAssets * oneShare) / totalSupply
               : 0n;
-            const price = Number(formatUnits(priceBigInt, 18));
+            // Format using 18 decimals since ONE_SHARE is 1e18
+            const priceInUnderlying = Number(formatUnits(priceBigInt, 18));
+            
+            // Convert to USD if asset price is available
+            const price = assetPriceUsd !== null 
+              ? priceInUnderlying * assetPriceUsd 
+              : priceInUnderlying;
             
             return {
               date: new Date(timestamp).toISOString().split('T')[0],
@@ -121,8 +146,41 @@ export function useLagoonSharePriceHistory(
         );
         
         // Filter out nulls and sort by timestamp
-        const validPoints = pricePoints.filter((p): p is SharePriceDataPoint => p !== null);
+        let validPoints = pricePoints.filter((p): p is SharePriceDataPoint => p !== null);
         validPoints.sort((a, b) => a.timestamp - b.timestamp);
+        
+        // Always add current share price as a data point (unless we already have a recent point)
+        // This ensures the chart always shows current state even if events are missing
+        if (underlyingAddress) {
+          try {
+            const { Vault } = await import("@lagoon-protocol/v0-viem");
+            const vault = await Vault.fetch(vaultAddress, hyperPublicClient);
+            if (vault && vault.totalSupply > 0n) {
+              const oneShare = VaultUtils.ONE_SHARE;
+              const currentSharePrice = vault.convertToAssets(oneShare);
+              const currentAssetPriceUsd = assetPriceUsd !== null ? assetPriceUsd : await getUsdt0Usd({ token: underlyingAddress });
+              const priceInUnderlying = Number(formatUnits(currentSharePrice, 18));
+              const price = currentAssetPriceUsd !== null ? priceInUnderlying * currentAssetPriceUsd : priceInUnderlying;
+              
+              // Check if we already have a recent point (within last hour)
+              const oneHourAgo = headTimestamp - (60 * 60 * 1000);
+              const hasRecentPoint = validPoints.some(p => p.timestamp >= oneHourAgo);
+              
+              if (!hasRecentPoint) {
+                validPoints.push({
+                  date: new Date(headTimestamp).toISOString().split('T')[0],
+                  price,
+                  timestamp: headTimestamp,
+                });
+                // Re-sort after adding current point
+                validPoints.sort((a, b) => a.timestamp - b.timestamp);
+              }
+            }
+          } catch (err) {
+            // Log but don't fail - historical data is more important
+            console.warn('Failed to fetch current share price for chart:', err);
+          }
+        }
         
         if (cancelled) return;
         setData(validPoints);
@@ -141,7 +199,7 @@ export function useLagoonSharePriceHistory(
     return () => {
       cancelled = true;
     };
-  }, [vaultAddress, chainId, timeRange]);
+  }, [vaultAddress, chainId, timeRange, underlyingAddress]);
 
   return {
     data,

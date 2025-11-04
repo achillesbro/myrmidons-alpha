@@ -1,13 +1,14 @@
 // src/components/grouped-allocation-list.tsx
 import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type GroupedAllocation, type AllocationItem } from '../lib/allocation-grouper';
+import { type GroupedAllocation, type ProtocolGroupedAllocation, type AllocationItem } from '../lib/allocation-grouper';
 
 
 interface GroupedAllocationListProps {
-  groupedItems: GroupedAllocation[];
+  groupedItems: GroupedAllocation[] | ProtocolGroupedAllocation[];
   ungroupedItems: AllocationItem[];
   totalAssets: bigint;
+  isProtocolGrouping?: boolean; // If true, treat groupedItems as ProtocolGroupedAllocation[]
 }
 
 function ceilPct(pct: number): string {
@@ -103,34 +104,53 @@ function AllocationRow({
 function GroupedAllocationRow({ 
   group, 
   totalAssets, 
-  onToggle 
+  onToggle,
+  isProtocolGrouping = false
 }: { 
-  group: GroupedAllocation; 
+  group: GroupedAllocation | ProtocolGroupedAllocation; 
   totalAssets: bigint; 
-  onToggle: (familyLabel: string) => void;
+  onToggle: (label: string) => void;
+  isProtocolGrouping?: boolean;
 }) {
   const pct = totalAssets > 0n ? Number((group.totalAssets * 10000n) / totalAssets) / 100 : 0;
   
+  // Determine label and logo based on grouping type
+  const label = isProtocolGrouping && 'protocolName' in group 
+    ? group.protocolName 
+    : 'familyLabel' in group 
+      ? group.familyLabel 
+      : '';
+  const logo = isProtocolGrouping && 'protocolLogo' in group
+    ? group.protocolLogo
+    : 'familyLogo' in group
+      ? group.familyLogo
+      : null;
+  const description = isProtocolGrouping 
+    ? null // No description for protocol grouping
+    : 'description' in group 
+      ? group.description 
+      : '';
+  
   return (
     <div className="space-y-1">
-      {/* Family Header */}
+      {/* Header */}
       <div 
         className="grid grid-cols-1 sm:grid-cols-12 items-center py-4 sm:py-5 px-3 sm:px-4 cursor-pointer hover:bg-gray-50/30 transition-colors border-b border-gray-200"
-        onClick={() => onToggle(group.familyLabel)}
+        onClick={() => onToggle(label)}
       >
         {/* Mobile Layout */}
         <div className="sm:hidden space-y-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              {group.familyLogo && (
+              {logo && (
                 <img
-                  src={group.familyLogo}
-                  alt={group.familyLabel}
+                  src={logo}
+                  alt={label}
                   className="w-5 h-5 rounded-full border border-[#E5E2D6] object-contain flex-shrink-0"
                   onError={(e) => (e.currentTarget.style.display = 'none')}
                 />
               )}
-              <span className="font-semibold text-base">{group.familyLabel}</span>
+              <span className="font-semibold text-base">{label}</span>
             </div>
             <span className="text-lg">{group.isExpanded ? '▲' : '▼'}</span>
           </div>
@@ -144,9 +164,11 @@ function GroupedAllocationRow({
                   ${group.totalUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
               )}
-              <div className="text-sm text-gray-600">
-                {(group.weightedApy * 100).toFixed(2)}% APY (avg)
-              </div>
+              {group.weightedApy > 0 && (
+                <div className="text-sm text-gray-600">
+                  {(group.weightedApy * 100).toFixed(2)}% APY (avg)
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -154,15 +176,15 @@ function GroupedAllocationRow({
         {/* Desktop Layout */}
         <div className="hidden sm:contents">
           <div className="col-span-5 flex items-center space-x-2 text-[#101720]">
-            {group.familyLogo && (
+            {logo && (
               <img
-                src={group.familyLogo}
-                alt={group.familyLabel}
+                src={logo}
+                alt={label}
                 className="w-5 h-5 rounded-full border border-[#E5E2D6] object-contain flex-shrink-0"
                 onError={(e) => (e.currentTarget.style.display = 'none')}
               />
             )}
-            <span className="font-semibold text-base">{group.familyLabel}</span>
+            <span className="font-semibold text-base">{label}</span>
           </div>
           <div className="col-span-3 text-right">
             <span className="text-base font-semibold text-[#00295B]">
@@ -177,9 +199,11 @@ function GroupedAllocationRow({
             </span>
           </div>
           <div className="col-span-2 text-right flex items-center justify-end space-x-2">
-            <span className="text-sm font-medium text-[#101720]">
-              {(group.weightedApy * 100).toFixed(2)}%
-            </span>
+            {group.weightedApy > 0 && (
+              <span className="text-sm font-medium text-[#101720]">
+                {(group.weightedApy * 100).toFixed(2)}%
+              </span>
+            )}
             <span className="text-lg">{group.isExpanded ? '▲' : '▼'}</span>
           </div>
         </div>
@@ -190,12 +214,14 @@ function GroupedAllocationRow({
         group.isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
       }`}>
         <div className="space-y-1 pt-2">
-          {/* Family Description */}
-          <div className="ml-6 px-3 py-2 bg-gray-50/50 rounded-lg border-l-2 border-gray-200">
-            <p className="text-base text-gray-600 leading-relaxed">
-              {group.description}
-            </p>
-          </div>
+          {/* Description (only for token family grouping) */}
+          {description && (
+            <div className="ml-6 px-3 py-2 bg-gray-50/50 rounded-lg border-l-2 border-gray-200">
+              <p className="text-base text-gray-600 leading-relaxed">
+                {description}
+              </p>
+            </div>
+          )}
           
           {/* Individual Markets */}
           {group.markets.map((market) => (
@@ -216,17 +242,18 @@ export function GroupedAllocationList({
   groupedItems,
   ungroupedItems,
   totalAssets,
+  isProtocolGrouping = false,
 }: GroupedAllocationListProps) {
   const { t } = useTranslation();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  const handleToggleGroup = (familyLabel: string) => {
+  const handleToggleGroup = (label: string) => {
     setExpandedGroups(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(familyLabel)) {
-        newSet.delete(familyLabel);
+      if (newSet.has(label)) {
+        newSet.delete(label);
       } else {
-        newSet.add(familyLabel);
+        newSet.add(label);
       }
       return newSet;
     });
@@ -234,11 +261,18 @@ export function GroupedAllocationList({
 
   // Apply expansion state to groups
   const groupsWithExpansion = useMemo(() => {
-    return groupedItems.map(group => ({
-      ...group,
-      isExpanded: expandedGroups.has(group.familyLabel)
-    }));
-  }, [groupedItems, expandedGroups]);
+    return groupedItems.map(group => {
+      const label = isProtocolGrouping && 'protocolName' in group
+        ? group.protocolName
+        : 'familyLabel' in group
+          ? group.familyLabel
+          : '';
+      return {
+        ...group,
+        isExpanded: expandedGroups.has(label)
+      };
+    });
+  }, [groupedItems, expandedGroups, isProtocolGrouping]);
 
   if (groupedItems.length === 0 && ungroupedItems.length === 0) {
     return <p className="text-sm text-[#101720]/70">No allocations found</p>;
@@ -255,17 +289,28 @@ export function GroupedAllocationList({
       </div>
 
       {/* Grouped Items */}
-      {groupsWithExpansion.map((group) => (
-        <GroupedAllocationRow
-          key={group.familyLabel}
-          group={{
-            ...group,
-            description: t(group.descriptionKey)
-          }}
-          totalAssets={totalAssets}
-          onToggle={handleToggleGroup}
-        />
-      ))}
+      {groupsWithExpansion.map((group) => {
+        const label = isProtocolGrouping && 'protocolName' in group
+          ? group.protocolName
+          : 'familyLabel' in group
+            ? group.familyLabel
+            : '';
+        return (
+          <GroupedAllocationRow
+            key={label}
+            group={isProtocolGrouping 
+              ? group 
+              : {
+                  ...group,
+                  description: 'descriptionKey' in group ? t(group.descriptionKey) : ''
+                }
+            }
+            totalAssets={totalAssets}
+            onToggle={handleToggleGroup}
+            isProtocolGrouping={isProtocolGrouping}
+          />
+        );
+      })}
 
       {/* Ungrouped Items */}
       {ungroupedItems.map((item) => (
