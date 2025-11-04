@@ -36,9 +36,17 @@ export async function GET(request: Request) {
       );
     }
     
-    // Map vault address to curator address for cache lookup
-    // Cron job stores data using curator address as key
-    const curatorAddress = VAULT_TO_CURATOR_MAP[vaultAddress]?.toLowerCase() || vaultAddress;
+    // Determine curator address for cache lookup
+    // Cron job stores data using curator address as key (0x8Ec77176F71F5ff53B71b01FC492F46Ea4e55A77)
+    // Accept either vault address (will be mapped) or curator address (used directly)
+    let curatorAddress: string;
+    if (vaultAddress === '0x8ec77176f71f5ff53b71b01fc492f46ea4e55a77') {
+      // Direct curator address provided
+      curatorAddress = vaultAddress;
+    } else {
+      // Map vault address to curator address
+      curatorAddress = VAULT_TO_CURATOR_MAP[vaultAddress]?.toLowerCase() || vaultAddress;
+    }
     
     const cacheKey = `octav:allocations:${curatorAddress}`;
     const metaKey = `octav:allocations:${curatorAddress}:meta`;
