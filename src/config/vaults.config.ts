@@ -26,9 +26,12 @@ export type VaultCardModel = {
 // Full vault configuration including contract addresses and metadata
 export type VaultConfig = {
   // Identity
-  id: string;                    // Unique identifier (e.g., 'usdt0', 'whype')
+  id: string;                    // Unique identifier (e.g., 'usdt0', 'whype', 'hypairdrop')
   name: string;                  // Display name (e.g., 'USDT0', 'MYRMIDONS WHYPE')
   displayName: string;           // Full display name (e.g., 'MYRMIDONS USDT0', 'MYRMIDONS WHYPE')
+  
+  // Vault type
+  type: 'morpho' | 'lagoon';     // Vault provider type
   
   // Contract addresses (checksummed)
   vaultAddress: `0x${string}`;   // ERC-4626 vault contract
@@ -59,6 +62,7 @@ export const VAULT_CONFIGS: Record<string, VaultConfig> = {
     id: 'usdt0',
     name: 'USDT0',
     displayName: 'MYRMIDONS USDT0',
+    type: 'morpho',
     vaultAddress: '0x4DC97f968B0Ba4Edd32D1b9B8Aaf54776c134d42',
     underlyingAddress: '0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb',
     underlyingSymbol: 'USDT0',
@@ -79,6 +83,7 @@ export const VAULT_CONFIGS: Record<string, VaultConfig> = {
     id: 'whype',
     name: 'WHYPE',
     displayName: 'MYRMIDONS WHYPE',
+    type: 'morpho',
     vaultAddress: '0x889d35426F44A06EE89adF1eC4E5A4C9EB50a4f1',
     underlyingAddress: '0x5555555555555555555555555555555555555555',
     underlyingSymbol: 'WHYPE',
@@ -90,6 +95,27 @@ export const VAULT_CONFIGS: Record<string, VaultConfig> = {
     links: {
       details: '/?tab=vaultinfo&vault=whype',
       deposit: '/?tab=vaultinfo&vault=whype#deposit',
+      explorer: '',
+    },
+  },
+
+  // Lagoon USDT0 Vault on HyperEVM (Async) - HypAirdrop
+  hypairdrop: {
+    id: 'hypairdrop',
+    name: 'HypAirdrop',
+    displayName: 'HDROP',
+    type: 'lagoon',
+    vaultAddress: '0x66894de1ca1e08aaffbe70809512d57d725e30fd',
+    underlyingAddress: '0xB8CE59FC3717ada4C02eaDF9682A9e934F625ebb',
+    underlyingSymbol: 'USDT0',
+    underlyingDecimals: 6,
+    chainId: 999,
+    chainName: 'HyperEVM',
+    objectiveKey: 'landing.vaults.hypairdrop.objective',
+    tagsKey: 'landing.vaults.hypairdrop.tags',
+    links: {
+      details: '/?tab=vaultinfo&vault=hypairdrop',
+      deposit: '/?tab=vaultinfo&vault=hypairdrop#deposit',
       explorer: '',
     },
   },

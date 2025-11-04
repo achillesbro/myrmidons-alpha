@@ -8,6 +8,7 @@ import vaultAbi from '../abis/vault.json';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
 import { getToken } from '@lifi/sdk';
 import { DEFAULT_VAULT_CONFIG, type VaultConfig } from '../config/vaults.config';
+import type { IVaultAdapter } from '../lib/vault-provider';
 
 // Helper functions for explorer URLs
 
@@ -50,6 +51,7 @@ interface WithdrawalDialogProps {
   shareDecimals?: number;
   underlyingDecimals?: number;
   vaultConfig?: VaultConfig; // Vault configuration (optional, defaults to DEFAULT_VAULT_CONFIG)
+  vaultAdapter?: IVaultAdapter | null; // Vault adapter (for Lagoon async vaults)
 }
 
 export function WithdrawalDialog({ 
@@ -57,7 +59,8 @@ export function WithdrawalDialog({
   userShares = 0n, 
   shareDecimals = 18, 
   underlyingDecimals = 6,
-  vaultConfig
+  vaultConfig,
+  vaultAdapter
 }: WithdrawalDialogProps) {
   const [executing, setExecuting] = useState(false);
   
@@ -174,55 +177,78 @@ export function WithdrawalDialog({
         return;
       }
       
-      // Convert shares to assets using previewRedeem (same as runWithdraw)
-      const assetsOut = await vault.previewRedeem(sharesWei);
-      
       // Update substeps for withdrawal
       updateWithdrawalState({
         transactionSubsteps: [
-          { label: 'Withdraw vault shares', status: 'processing' as const, chainId: CHAIN_IDS.HYPEREVM }
+          { label: config.type === 'lagoon' ? 'Request withdrawal (async)' : 'Withdraw vault shares', status: 'processing' as const, chainId: CHAIN_IDS.HYPEREVM }
         ]
       });
       
-      // Execute withdrawal with assets amount (not shares)
-      const tx = await vault.withdraw(assetsOut, clientW.data.account.address, clientW.data.account.address);
+      // Execute withdrawal - use adapter for Lagoon async vaults, direct for others
+      let tx;
+      let assetsOut;
+      
+      if (vaultAdapter) {
+        // Use async vault adapter
+        const result = await vaultAdapter.enqueueRedeem(sharesWei, clientW.data.account.address as `0x${string}`);
+        tx = { hash: result.hash };
+        // For async vaults, assets aren't immediately available
+        assetsOut = 0n;
+      } else {
+        // Use standard ERC-4626 withdraw
+        const assetsOutWei = await vault.previewRedeem(sharesWei);
+        assetsOut = assetsOutWei;
+        tx = await vault.withdraw(assetsOut, clientW.data.account.address, clientW.data.account.address);
+      }
       
       // Update substeps with transaction hash
       updateWithdrawalState({
         transactionSubsteps: [
-          { label: 'Withdraw vault shares', status: 'processing' as const, txHash: tx.hash, chainId: CHAIN_IDS.HYPEREVM }
+          { label: config.type === 'lagoon' ? 'Request withdrawal (async)' : 'Withdraw vault shares', status: 'processing' as const, txHash: tx.hash, chainId: CHAIN_IDS.HYPEREVM }
         ]
       });
       
-      // Wait for transaction confirmation with longer timeout
+      // Wait for transaction confirmation with longer timeout and verify success
       try {
-        await provider.waitForTransaction(tx.hash, 1, 60_000);
-      } catch (timeoutError) {
+        const receipt = await provider.waitForTransaction(tx.hash, 1, 60_000);
+        
+        if (!receipt) {
+          throw new Error('No receipt received');
+        }
+        const isReverted = receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n);
+        if (isReverted) {
+          throw new Error('Transaction reverted on-chain');
+        }
+      } catch (timeoutError: any) {
         // If timeout occurs, check if transaction was actually successful
         console.warn('Transaction wait timed out, checking if successful...');
         try {
           const receipt = await provider.getTransactionReceipt(tx.hash);
           if (!receipt) {
-            throw timeoutError; // Re-throw if no receipt found
+            throw new Error('No receipt received');
+          }
+          const isReverted = receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n);
+          if (isReverted) {
+            throw new Error('Transaction reverted on-chain');
           }
           // Transaction was successful despite timeout
           console.log('Transaction confirmed despite timeout');
         } catch {
-          throw timeoutError; // Re-throw if we can't verify success
+          throw new Error('Transaction failed: ' + (timeoutError.message || 'Unknown error'));
         }
       }
       
       // Mark withdrawal as completed
       updateWithdrawalState({
         transactionSubsteps: [
-          { label: 'Withdraw vault shares', status: 'completed' as const, txHash: tx.hash, chainId: CHAIN_IDS.HYPEREVM }
+          { label: config.type === 'lagoon' ? 'Request withdrawal (async)' : 'Withdraw vault shares', status: 'completed' as const, txHash: tx.hash, chainId: CHAIN_IDS.HYPEREVM }
         ],
         withdrawalTxHash: tx.hash,
         currentStep: 3, // Success step
       });
       
-      // Calculate actual underlying token amount received (from assetsOut)
-      const actualUsdt0Amount = formatUnits(assetsOut, underlyingDecimals);
+      // Calculate actual underlying token amount received
+      const actualUsdt0Amount = assetsOut > 0n ? formatUnits(assetsOut, underlyingDecimals) : '0';
       updateWithdrawalState({
         withdrawnUsdt0Amount: actualUsdt0Amount
       });

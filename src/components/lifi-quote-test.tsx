@@ -11,6 +11,7 @@ import { erc20Abi } from 'viem';
 import vaultAbi from '../abis/vault.json';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
 import { DEFAULT_VAULT_CONFIG, type VaultConfig } from '../config/vaults.config';
+import type { IVaultAdapter } from '../lib/vault-provider';
 
 // Helper functions for chain names and explorer URLs
 const getChainName = (chainId: number): string => {
@@ -43,6 +44,7 @@ interface LiFiQuoteTestProps {
   onStepChange?: (step: number) => void;
   onClose?: () => void;
   vaultConfig?: VaultConfig; // Vault configuration (optional, defaults to DEFAULT_VAULT_CONFIG)
+  vaultAdapter?: IVaultAdapter | null; // Vault adapter (for Lagoon async vaults)
 }
 
 // Path types for deposit flows
@@ -79,7 +81,7 @@ interface StepInfo {
     transactionSubsteps: Array<{label: string, status: 'pending' | 'processing' | 'completed' | 'failed', txHash?: string, chainId?: number}>;
   }
 
-export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteTestProps = {}) {
+export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig, vaultAdapter }: LiFiQuoteTestProps = {}) {
   const [executing, setExecuting] = useState(false);
   
   // Use provided vault config or default
@@ -520,7 +522,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
         });
       }
       depositSubsteps.push({ 
-        label: 'Deposit to vault', 
+        label: config.type === 'lagoon' ? 'Request deposit (async)' : 'Deposit to vault', 
         status: 'processing' as const, 
         chainId: CHAIN_IDS.HYPEREVM 
       });
@@ -529,9 +531,17 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
         transactionSubsteps: depositSubsteps
       });
       
-      // Execute deposit
-      const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
-      const tx = await vault.deposit(amountWei, clientW.data?.account?.address);
+      // Execute deposit - use adapter for Lagoon async vaults, direct for others
+      let tx;
+      if (vaultAdapter) {
+        // Use async vault adapter
+        const result = await vaultAdapter.enqueueDeposit(amountWei, clientW.data?.account?.address as `0x${string}`);
+        tx = { hash: result.hash };
+      } else {
+        // Use standard ERC-4626 deposit
+        const vault = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+        tx = await vault.deposit(amountWei, clientW.data?.account?.address);
+      }
       
       // Update substeps with deposit transaction hash
       const processingSubsteps = [];
@@ -544,7 +554,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
         });
       }
       processingSubsteps.push({ 
-        label: 'Deposit to vault', 
+        label: config.type === 'lagoon' ? 'Request deposit (async)' : 'Deposit to vault', 
         status: 'processing' as const, 
         txHash: tx.hash, 
         chainId: CHAIN_IDS.HYPEREVM 
@@ -554,8 +564,20 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
         transactionSubsteps: processingSubsteps
       });
       
-      // Wait for confirmation using wallet provider
-      await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
+      // Wait for confirmation using wallet provider and verify success
+      try {
+        const receipt = await provider.waitForTransaction(tx.hash, 1, 20_000);
+        if (!receipt) {
+          throw new Error('No receipt received');
+        }
+        const isReverted = receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n);
+        if (isReverted) {
+          throw new Error('Transaction reverted on-chain');
+        }
+      } catch (waitError: any) {
+        console.error('Transaction failed:', waitError);
+        throw new Error('Transaction failed: ' + (waitError.message || 'Unknown error'));
+      }
       
       // Mark deposit as completed
       const completedSubsteps = [];
@@ -568,7 +590,7 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
         });
       }
       completedSubsteps.push({ 
-        label: 'Deposit to vault', 
+        label: config.type === 'lagoon' ? 'Request deposit (async)' : 'Deposit to vault', 
         status: 'completed' as const, 
         txHash: tx.hash, 
         chainId: CHAIN_IDS.HYPEREVM 
@@ -578,22 +600,31 @@ export function LiFiQuoteTest({ onStepChange, onClose, vaultConfig }: LiFiQuoteT
         transactionSubsteps: completedSubsteps
       });
       
-      // Get vault shares after deposit
-      const vaultAfter = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
-      const userShares = await vaultAfter.balanceOf(clientW.data?.account?.address);
-      
-      // Calculate newly minted shares (shares after - shares before)
-      const newlyMintedShares = userShares - sharesBefore;
-      const newlyMintedFormatted = formatUnits(BigInt(newlyMintedShares.toString()), 18);
-      
-      // Update state with success information
-      const nextStep = selectedPath === 'A' ? 4 : 4; // Both paths go to step 4 (success)
-      updateDepositState({
-        vaultSharesBefore: sharesBeforeFormatted,
-        vaultSharesMinted: newlyMintedFormatted,
-        currentStep: nextStep,
-      });
-      
+      // For async vaults, shares won't be minted immediately - show 0 or pending
+      if (config.type === 'lagoon') {
+        const nextStep = selectedPath === 'A' ? 4 : 4;
+        updateDepositState({
+          vaultSharesBefore: sharesBeforeFormatted,
+          vaultSharesMinted: '0', // Shares will be claimable after settlement
+          currentStep: nextStep,
+        });
+      } else {
+        // Get vault shares after deposit for sync vaults
+        const vaultAfter = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+        const userShares = await vaultAfter.balanceOf(clientW.data?.account?.address);
+        
+        // Calculate newly minted shares (shares after - shares before)
+        const newlyMintedShares = userShares - sharesBefore;
+        const newlyMintedFormatted = formatUnits(BigInt(newlyMintedShares.toString()), 18);
+        
+        // Update state with success information
+        const nextStep = selectedPath === 'A' ? 4 : 4;
+        updateDepositState({
+          vaultSharesBefore: sharesBeforeFormatted,
+          vaultSharesMinted: newlyMintedFormatted,
+          currentStep: nextStep,
+        });
+      }
       
       // Refresh underlying token balance
       await fetchUnderlyingBalance();

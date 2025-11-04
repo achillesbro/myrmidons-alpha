@@ -21,7 +21,7 @@
       },
       "frictionless": {
         "title": "Financement sans friction",
-        "description": "Bridge et dépôt en quelques minutes."
+        "description": "Bridge et dépôt en quelques secondes."
       }
     },
     "vaults": {
@@ -41,6 +41,16 @@
         "tvlLabel": "TVL",
         "apyLabel": "APY Actuel",
         "marketsLabel": "# Marchés",
+        "viewDetails": "Voir les détails du vault",
+        "deposit": "Déposer"
+      },
+      "hypairdrop": {
+        "objective": "Maximiser le farm de points HyperEVM via un rendement USDT0 structuré via le vault asynchrone Lagoon.",
+        "tags": ["Custodial", "Lagoon", "Asynchrone", "Points Farming"],
+        "tvlLabel": "TVL",
+        "apyLabel": "APY Actuel",
+        "marketsLabel": "# Marchés",
+        "protocolsLabel": "# Protocoles",
         "viewDetails": "Voir les détails du vault",
         "deposit": "Déposer"
       }
@@ -105,7 +115,7 @@
       },
       "frictionless": {
         "title": "Financement sans Friction",
-        "description": "Bridge et dépôt en quelques minutes."
+        "description": "Bridge et dépôt en quelques secondes."
       }
     },
     "timeline": {
@@ -297,7 +307,8 @@
       "address": "Adresse Vault :",
       "description": {
         "usdt0": "MYRMIDONS USDT0 offre un rendement non directionnel : les fonds sont prêtés sur les marchés Morpho présélectionnés sur HyperEVM afin de générer des intérêts sans prendre d'exposition directionnelle aux actifs volatils.",
-        "whype": "MYRMIDONS WHYPE vous permet de générer du rendement sur WHYPE, le token natif de gas sur HyperEVM. WHYPE est l'actif de règlement principal pour les applications construites sur l'écosystème Hyperliquid, combinant utilité et génération de rendement."
+        "whype": "MYRMIDONS WHYPE vous permet de générer du rendement sur WHYPE, le token natif de gas sur HyperEVM. WHYPE est l'actif de règlement principal pour les applications construites sur l'écosystème Hyperliquid, combinant utilité et génération de rendement.",
+        "hypairdrop": "HypAirdrop priorise le farm de points à travers les dApps Hyperliquid qui intègrent Core + EVM. Les dépôts et retraits sont asynchrones avec un règlement basé sur les époques. Les airdrops et points ne sont pas garantis."
       }
     },
     "metrics": {
@@ -331,20 +342,24 @@
       "deposit": "Déposer",
       "depositTitle": {
         "usdt0": "Déposer dans MYRMIDONS USDT0",
-        "whype": "Déposer dans MYRMIDONS WHYPE"
+        "whype": "Déposer dans MYRMIDONS WHYPE",
+        "hypairdrop": "Déposer dans HypAirdrop"
       },
       "depositDescription": {
         "usdt0": "Déposez depuis n'importe quelle chaine",
-        "whype": "Déposez depuis n'importe quelle chaine"
+        "whype": "Déposez depuis n'importe quelle chaine",
+        "hypairdrop": "Déposez depuis n'importe quelle chaine ou déposez USDT0 directement. Les dépôts sont asynchrones et se règlent dans la prochaine époque."
       },
       "withdraw": "Retirer",
       "withdrawTitle": {
         "usdt0": "Retirer de MYRMIDONS USDT0",
-        "whype": "Retirer de MYRMIDONS WHYPE"
+        "whype": "Retirer de MYRMIDONS WHYPE",
+        "hypairdrop": "Retirer de HypAirdrop"
       },
       "withdrawDescription": {
         "usdt0": "Retirez vos parts vault vers USDT0",
-        "whype": "Retirez vos parts vault vers WHYPE"
+        "whype": "Retirez vos parts vault vers WHYPE",
+        "hypairdrop": "Retirez vos parts vault vers USDT0. Les retraits sont asynchrones et se règlent dans la prochaine époque."
       },
       "placeholderAmount": "0,00",
       "balance": "Solde",
@@ -363,7 +378,13 @@
       "title": "Position Actuelle",
       "connectToView": "Connectez votre wallet pour voir votre position.",
       "shares": "Parts du Vault",
-      "usdValue": "Valeur USD"
+      "usdValue": "Valeur USD",
+      "claimableShares": "Parts Réclamables",
+      "requestedDeposit": "Dépôt Demandé",
+      "claim": "Réclamer les Parts",
+      "claiming": "Réclamation en cours…",
+      "cancelDeposit": "Annuler le Dépôt",
+      "canceling": "Annulation en cours…"
     },
     "errors": {
       "connectWallet": "Connecter un wallet",
@@ -373,7 +394,11 @@
       "approvalConfirmed": "Approbation confirmée",
       "depositSuccessful": "Dépôt réussi",
       "approvalTimeout": "Délai d'attente de réception d'approbation dépassé",
-      "error": "Erreur"
+      "error": "Erreur",
+      "noClaimableShares": "Aucune part réclamable",
+      "claimSuccessful": "Parts réclamées avec succès",
+      "noPendingDeposit": "Aucun dépôt en attente",
+      "cancelSuccessful": "Dépôt annulé avec succès"
     }
   }
 }

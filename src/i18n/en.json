@@ -21,7 +21,7 @@
       },
       "frictionless": {
         "title": "Frictionless funding",
-        "description": "Bridge and deposit in minutes."
+        "description": "Bridge and deposit in seconds."
       }
     },
     "vaults": {
@@ -41,6 +41,16 @@
         "tvlLabel": "TVL",
         "apyLabel": "Current APY",
         "marketsLabel": "# Markets",
+        "viewDetails": "View vault details",
+        "deposit": "Deposit"
+      },
+      "hypairdrop": {
+        "objective": "Maximize HyperEVM points farming through structured USDT0 yield via Lagoon async vault.",
+        "tags": ["Custodial", "Lagoon", "Async", "Points Farming"],
+        "tvlLabel": "TVL",
+        "apyLabel": "Current APY",
+        "marketsLabel": "# Markets",
+        "protocolsLabel": "# Protocols",
         "viewDetails": "View vault details",
         "deposit": "Deposit"
       }
@@ -297,7 +307,8 @@
       "address": "Vault Address:",
       "description": {
         "usdt0": "MYRMIDONS USDT0 provides non-directional yield: funds are lent across pre-screened Morpho markets on HyperEVM to earn interest without taking directional exposure to volatile assets.",
-        "whype": "MYRMIDONS WHYPE enables you to earn yield on WHYPE, the native gas token of HyperEVM. WHYPE is the core settlement asset for applications built on Hyperliquid's ecosystem, combining utility with yield generation."
+        "whype": "MYRMIDONS WHYPE enables you to earn yield on WHYPE, the native gas token of HyperEVM. WHYPE is the core settlement asset for applications built on Hyperliquid's ecosystem, combining utility with yield generation.",
+        "hypairdrop": "HypAirdrop prioritizes points farming across Hyperliquid dApps that integrate Core + EVM. Deposits and withdrawals are async with epoch-based settlement. Airdrops and points are not guaranteed."
       }
     },
     "metrics": {
@@ -331,20 +342,24 @@
       "deposit": "Deposit",
       "depositTitle": {
         "usdt0": "Deposit into MYRMIDONS USDT0",
-        "whype": "Deposit into MYRMIDONS WHYPE"
+        "whype": "Deposit into MYRMIDONS WHYPE",
+        "hypairdrop": "Deposit into HypAirdrop"
       },
       "depositDescription": {
         "usdt0": "Bridge from any chain or deposit USDT0 directly",
-        "whype": "Bridge from any chain or deposit WHYPE directly"
+        "whype": "Bridge from any chain or deposit WHYPE directly",
+        "hypairdrop": "Bridge from any chain or deposit USDT0 directly. Deposits are async and settle in the next epoch."
       },
       "withdraw": "Withdraw",
       "withdrawTitle": {
         "usdt0": "Withdraw from MYRMIDONS USDT0",
-        "whype": "Withdraw from MYRMIDONS WHYPE"
+        "whype": "Withdraw from MYRMIDONS WHYPE",
+        "hypairdrop": "Withdraw from HypAirdrop"
       },
       "withdrawDescription": {
         "usdt0": "Withdraw your vault shares to USDT0",
-        "whype": "Withdraw your vault shares to WHYPE"
+        "whype": "Withdraw your vault shares to WHYPE",
+        "hypairdrop": "Withdraw your vault shares to USDT0. Withdrawals are async and settle in the next epoch."
       },
       "placeholderAmount": "0.00",
       "balance": "Balance",
@@ -363,7 +378,13 @@
       "title": "Current Position",
       "connectToView": "Connect your wallet to view your position.",
       "shares": "Vault Shares",
-      "usdValue": "USD Value"
+      "usdValue": "USD Value",
+      "claimableShares": "Claimable Shares",
+      "requestedDeposit": "Requested Deposit",
+      "claim": "Claim Shares",
+      "claiming": "Claiming…",
+      "cancelDeposit": "Cancel Deposit",
+      "canceling": "Canceling…"
     },
     "errors": {
       "connectWallet": "Connect wallet",
@@ -373,7 +394,11 @@
       "approvalConfirmed": "Approval confirmed",
       "depositSuccessful": "Deposit successful",
       "approvalTimeout": "Approval receipt wait timed out",
-      "error": "Error"
+      "error": "Error",
+      "noClaimableShares": "No claimable shares",
+      "claimSuccessful": "Shares claimed successfully",
+      "noPendingDeposit": "No pending deposit",
+      "cancelSuccessful": "Deposit canceled successfully"
     }
   }
 }

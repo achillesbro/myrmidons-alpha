@@ -78,7 +78,13 @@ export default function VaultCard({ model, kpis }: Props) {
         </a>
         <a
           href={links.deposit}
-          onClick={() => track('vault_deposit_click', { vault: model.id })}
+          onClick={() => {
+            if (model.id === 'hypairdrop') {
+              track('vault_card_cta', { vault: 'hypairdrop', action: 'deposit' });
+            } else {
+              track('vault_deposit_click', { vault: model.id });
+            }
+          }}
           className="px-4 py-2 rounded-xl text-sm font-medium"
           style={{ background:'var(--muted-brass,#B08D57)', color:'#fff' }}
         >

@@ -1,15 +1,13 @@
 import { track } from '../../utils/analytics';
-import { useTranslation } from 'react-i18next';
 
 export default function Hero() {
-  const { t } = useTranslation();
 
   const scrollToVaults = () => {
     const vaultsSection = document.getElementById('vaults');
     if (vaultsSection) {
       vaultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    track('hero_deposit_click');
+    track('cta_click', { where: 'hero', target: 'hypairdrop_deposit' });
   };
 
   return (
@@ -46,36 +44,15 @@ export default function Hero() {
           className="text-3xl md:text-5xl font-semibold leading-tight max-w-[60ch]"
           style={{ color: 'var(--heading, #00295B)' }}
         >
-          {t('landing.hero.title')}
+          Hyperliquid, unified.
         </h1>
 
         <p
           className="mt-4 text-base md:text-lg max-w-[60ch]"
           style={{ color: 'var(--text, #101720)' }}
         >
-          {t('landing.hero.subtitle')}
+          Hyperliquid is not two ecosystems: it is one surface. Myrmidons targets dApps that bridge Core + EVM, farming points with HypAirdrop and offering non-custodial yield via Morpho vaults. Deposit from any chain in seconds.
         </p>
-
-        {/* BADGE ROW — Powered by Morpho */}
-        <div className="mt-3 flex items-center gap-3">
-          <span
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium"
-            style={{ background: 'rgba(0,41,91,0.08)', color: 'var(--heading, #00295B)' }}
-          >
-            {/* Replace with Morpho mono mark if available */}
-            <span aria-hidden="true">◇</span>
-            {t('landing.hero.poweredBy')}
-          </span>
-          <a
-            href="https://morpho.org/"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="text-xs underline"
-            style={{ color: 'var(--heading, #00295B)' }}
-          >
-            {t('landing.hero.learnMore')}
-          </a>
-        </div>
 
         {/* CTAs */}
         <div className="mt-8 flex gap-3">
@@ -83,18 +60,10 @@ export default function Hero() {
             onClick={scrollToVaults}
             className="px-4 py-2 rounded-xl text-sm font-medium"
             style={{ background: 'var(--muted-brass, #B08D57)', color: '#fff' }}
-            aria-label={t('landing.hero.ctaPrimary')}
+            aria-label="Deposit into our vaults"
           >
-            {t('landing.hero.ctaPrimary')}
+            Deposit into our vaults
           </button>
-          <a
-            href="/?tab=about"
-            className="px-5 py-3 rounded-2xl font-medium border"
-            style={{ borderColor: 'var(--heading, #00295B)', color: 'var(--heading, #00295B)' }}
-            aria-label={t('landing.hero.ctaSecondary')}
-          >
-            {t('landing.hero.ctaSecondary')}
-          </a>
         </div>
       </div>
     </section>

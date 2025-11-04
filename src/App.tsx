@@ -21,7 +21,6 @@ import "@rainbow-me/rainbowkit/styles.css";
 import { ApolloProvider } from "@apollo/client";
 import { apolloClient } from "./service/apollo.client";
 import { VaultAPIView } from "./components/vault-api-view";
-import { AboutView } from "./components/about-view";
 import { SiteFooter } from "./components/site-footer";
 import LandingPage from "./components/landing/LandingPage";
 import SiteHeader from "./components/layout/SiteHeader";
@@ -29,7 +28,7 @@ import { useTranslation } from 'react-i18next'
 import i18n from "./i18n";
 import { DEFAULT_VAULT_CONFIG, getVaultConfigById, type VaultConfig } from "./config/vaults.config";
 
-const TABS = ["VAULTINFO", "ABOUT", "LIFI_TEST"] as const;
+const TABS = ["VAULTINFO", "LIFI_TEST"] as const;
 type Tab = typeof TABS[number];
 const TAB_PARAM = "tab";
 const VAULT_PARAM = "vault"; // New: vault selection parameter
@@ -41,7 +40,6 @@ function normalizeTabParam(value: string | null): Tab | null {
   // Back-compat: map old names to the new VAULTINFO tab
   if (v === "SDK" || v === "USERPOSITION") return "VAULTINFO" as Tab;
   if (v === "API" || v === "VAULTINFO") return "VAULTINFO" as Tab;
-  if (v === "ABOUT") return "ABOUT" as Tab;
   if (v === "LIFI_TEST") return "LIFI_TEST" as Tab;
   return null;
 }
@@ -126,7 +124,7 @@ const TestInterface = () => {
 
   useEffect(() => {
     if (activeTab) {
-      const page = activeTab === "VAULTINFO" ? t('tabs.vault') : t('tabs.about');
+      const page = activeTab === "VAULTINFO" ? t('tabs.vault') : 'Test';
       document.title = `${t('brand')} — ${page}`;
     } else {
       document.title = `${t('brand')} — Landing`;
@@ -146,9 +144,7 @@ const TestInterface = () => {
               <LandingPage />
             ) : activeTab === "VAULTINFO" ? (
               <VaultAPIView vaultAddress={vaultAddress} vaultConfig={vaultConfig} />
-            ) : (
-              <AboutView />
-            )}
+            ) : null}
           </div>
         </div>
       </div>

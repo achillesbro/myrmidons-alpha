@@ -20,11 +20,14 @@ import { WithdrawalDialog } from "./withdrawal-dialog";
 import InnerPageHero from "./InnerPageHero";
 import CopyableAddress from "./CopyableAddress";
 import { ApyHistoryChart } from "./apy-history-chart";
+import { SharePriceHistoryChart } from "./share-price-history-chart";
 import { AllocationPieChartAPI } from "./allocation-pie-chart-api";
 import { useVaultDataAPI } from "../hooks/useVaultDataAPI";
 import { GroupedAllocationList } from "./grouped-allocation-list";
 import { MetricCard, InfoTooltip } from "./metric-card";
 import { useMetricsData } from "../hooks/useMetricsData";
+import { useVaultAdapter } from "../hooks/useVaultAdapter";
+import { useOctavAllocations } from "../hooks/useOctavAllocations";
 
 // Simple error boundary to isolate rendering errors in the API View
 import React from "react";
@@ -82,8 +85,14 @@ export function VaultAPIView({
   const VAULT_ADDRESS = (vaultAddress ?? config.vaultAddress) as `0x${string}`;
   const CHAIN_ID = config.chainId;
 
-  // Fetch vault data from Morpho API
+  // Get vault adapter (only for Lagoon vaults, null for Morpho)
+  const vaultAdapter = useVaultAdapter(config);
+
+  // Fetch vault data from Morpho API (only for Morpho vaults)
   const apiData = useVaultDataAPI(VAULT_ADDRESS, CHAIN_ID);
+  
+  // Fetch Octav allocations (only for Lagoon vaults)
+  const octavAllocations = useOctavAllocations(VAULT_ADDRESS);
   
   // Fetch metrics data for sparklines and derived values (always call hooks at top level)
   const metricsData = useMetricsData(VAULT_ADDRESS, CHAIN_ID, apiData.sharePriceUsd);
@@ -140,8 +149,10 @@ export function VaultAPIView({
   const [onchainBalance, setOnchainBalance] = useState<bigint>(0n); // underlying token balance
   const [userShares, setUserShares] = useState<bigint>(0n);
   const [userAssets, setUserAssets] = useState<bigint>(0n);
+  const [claimableShares, setClaimableShares] = useState<bigint>(0n); // For async vaults (settled)
+  const [pendingDepositAssets, setPendingDepositAssets] = useState<bigint>(0n); // For async vaults (unsettled)
   const [depAmount, setDepAmount] = useState<string>("");
-  const [pending, setPending] = useState<"approve" | "deposit" | null>(null);
+  const [pending, setPending] = useState<"approve" | "deposit" | "claim" | "cancel" | null>(null);
   
   // Deposit dialog state
   const [depositDialogOpen, setDepositDialogOpen] = useState(false);
@@ -275,53 +286,81 @@ export function VaultAPIView({
     };
   }, [VAULT_ADDRESS]);
 
+  // Fetch vault state - use adapter for Lagoon, direct calls for Morpho
   useEffect(() => {
     if (!onchainData) {
-      const client = hyperPublicClient;
-      (async () => {
-        try {
-          // Batch with multicall for base vault data
-          const mc = await client.multicall({
-            contracts: [
-              { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "totalAssets", args: [] },
-              { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "totalSupply", args: [] },
-              { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "name", args: [] },
-              { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "symbol", args: [] },
-              { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "asset", args: [] },
-              { address: VAULT_ADDRESS as `0x${string}`, abi: erc20Abi as any, functionName: "decimals", args: [] }, // share decimals (vault token)
-            ],
-          });
-          const assets = mc[0].result as bigint;
-          const supply = mc[1].result as bigint;
-          const name = mc[2].result as string;
-          const symbol = mc[3].result as string;
-          const asset = mc[4].result as `0x${string}`;
-          const shareDecs = mc[5].result as number;
+      if (vaultAdapter) {
+        // Use adapter for Lagoon vaults
+        (async () => {
+          try {
+            const [metadata, state] = await Promise.all([
+              vaultAdapter.getVaultMetadata(),
+              vaultAdapter.readVaultState(),
+            ]);
 
-          const decimals = (await client.readContract({
-            address: asset,
-            abi: erc20Abi,
-            functionName: "decimals",
-          })) as number;
+            setOnchainData({
+              totalAssets: state.totalAssets,
+              totalSupply: state.totalSupply,
+              name: metadata.name,
+              symbol: metadata.symbol,
+              underlyingAddress: config.underlyingAddress,
+              underlyingDecimals: config.underlyingDecimals,
+              shareDecimals: metadata.decimals,
+            });
+          } catch (e) {
+            setOnchainError(e as Error);
+          } finally {
+            setOnchainLoading(false);
+          }
+        })();
+      } else {
+        // Direct contract calls for Morpho vaults
+        const client = hyperPublicClient;
+        (async () => {
+          try {
+            // Batch with multicall for base vault data
+            const mc = await client.multicall({
+              contracts: [
+                { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "totalAssets", args: [] },
+                { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "totalSupply", args: [] },
+                { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "name", args: [] },
+                { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "symbol", args: [] },
+                { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "asset", args: [] },
+                { address: VAULT_ADDRESS as `0x${string}`, abi: erc20Abi as any, functionName: "decimals", args: [] }, // share decimals (vault token)
+              ],
+            });
+            const assets = mc[0].result as bigint;
+            const supply = mc[1].result as bigint;
+            const name = mc[2].result as string;
+            const symbol = mc[3].result as string;
+            const asset = mc[4].result as `0x${string}`;
+            const shareDecs = mc[5].result as number;
 
-          setOnchainData({
-            totalAssets: assets,
-            totalSupply: supply,
-            name,
-            symbol,
-            underlyingAddress: asset,
-            underlyingDecimals: Number(decimals),
-            shareDecimals: Number(shareDecs),
-          });
-        } catch (e) {
-          setOnchainError(e as Error);
-        } finally {
-          setOnchainLoading(false);
-          // Last updated timestamp now handled by metricsData hook
-        }
-      })();
+            const decimals = (await client.readContract({
+              address: asset,
+              abi: erc20Abi,
+              functionName: "decimals",
+            })) as number;
+
+            setOnchainData({
+              totalAssets: assets,
+              totalSupply: supply,
+              name,
+              symbol,
+              underlyingAddress: asset,
+              underlyingDecimals: Number(decimals),
+              shareDecimals: Number(shareDecs),
+            });
+          } catch (e) {
+            setOnchainError(e as Error);
+          } finally {
+            setOnchainLoading(false);
+            // Last updated timestamp now handled by metricsData hook
+          }
+        })();
+      }
     }
-  }, [onchainData, VAULT_ADDRESS]);
+  }, [onchainData, VAULT_ADDRESS, vaultAdapter, config]);
 
   useEffect(() => {
     if (onchainData?.underlyingAddress) {
@@ -340,14 +379,21 @@ export function VaultAPIView({
   // Fast-refresh TVL totals via wallet provider (avoids laggy public RPC)
   const refreshVaultTotalsFast = async () => {
     try {
-      const provider = new BrowserProvider((window as any).ethereum);
-      const signer = await provider.getSigner();
-      const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
-      const [totalA, totalS] = await Promise.all([
-        vaultR.totalAssets() as Promise<bigint>,
-        vaultR.totalSupply() as Promise<bigint>,
-      ]);
-      setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : prev));
+      if (vaultAdapter) {
+        // Use adapter for Lagoon vaults
+        const state = await vaultAdapter.readVaultState();
+        setOnchainData((prev) => (prev ? { ...prev, totalAssets: state.totalAssets, totalSupply: state.totalSupply } : prev));
+      } else {
+        // Use direct contract calls for Morpho vaults
+        const provider = new BrowserProvider((window as any).ethereum);
+        const signer = await provider.getSigner();
+        const vaultR = new Contract(VAULT_ADDRESS, vaultAbi as any, signer);
+        const [totalA, totalS] = await Promise.all([
+          vaultR.totalAssets() as Promise<bigint>,
+          vaultR.totalSupply() as Promise<bigint>,
+        ]);
+        setOnchainData((prev) => (prev ? { ...prev, totalAssets: totalA, totalSupply: totalS } : null));
+      }
       // Last updated timestamp now handled by metricsData hook
     } catch {}
   };
@@ -358,26 +404,52 @@ export function VaultAPIView({
   useEffect(() => {
     const user = clientW.data?.account?.address;
     if (!user || !underlyingAddress) return;
-    const client = hyperPublicClient;
-    (async () => {
-      try {
-        // Batch allowance, balance, shares with multicall
-        const mcu = await client.multicall({
-          contracts: [
-            { address: underlyingAddress, abi: erc20Abi as any, functionName: "allowance", args: [user, VAULT_ADDRESS] },
-            { address: underlyingAddress, abi: erc20Abi as any, functionName: "balanceOf", args: [user] },
-            { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "balanceOf", args: [user] },
-          ],
-        });
-        const bal = mcu[1].result as bigint;
-        const shares = mcu[2].result as bigint;
-        const assets = (await client.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "convertToAssets", args: [shares] })) as bigint;
-        setOnchainBalance(bal);
-        setUserShares(shares);
-        setUserAssets(assets);
-      } catch {}
-    })();
-  }, [clientW.data?.account?.address, underlyingAddress, VAULT_ADDRESS]);
+    
+    if (vaultAdapter) {
+      // Use adapter for Lagoon vaults
+      (async () => {
+        try {
+          const [position, balance] = await Promise.all([
+            vaultAdapter.readUserPosition(user as `0x${string}`),
+            hyperPublicClient.readContract({
+              address: underlyingAddress,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [user],
+            }),
+          ]);
+          setOnchainBalance(balance as bigint);
+          setUserShares(position.walletShares);
+          setUserAssets(position.walletAssets);
+          setClaimableShares(position.claimableShares || 0n);
+          setPendingDepositAssets(position.pendingDepositAssets || 0n);
+        } catch (e) {
+          console.error('Failed to fetch user position:', e);
+        }
+      })();
+    } else {
+      // Direct contract calls for Morpho vaults
+      const client = hyperPublicClient;
+      (async () => {
+        try {
+          // Batch allowance, balance, shares with multicall
+          const mcu = await client.multicall({
+            contracts: [
+              { address: underlyingAddress, abi: erc20Abi as any, functionName: "allowance", args: [user, VAULT_ADDRESS] },
+              { address: underlyingAddress, abi: erc20Abi as any, functionName: "balanceOf", args: [user] },
+              { address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi as any, functionName: "balanceOf", args: [user] },
+            ],
+          });
+          const bal = mcu[1].result as bigint;
+          const shares = mcu[2].result as bigint;
+          const assets = (await client.readContract({ address: VAULT_ADDRESS as `0x${string}`, abi: vaultAbi, functionName: "convertToAssets", args: [shares] })) as bigint;
+          setOnchainBalance(bal);
+          setUserShares(shares);
+          setUserAssets(assets);
+        } catch {}
+      })();
+    }
+  }, [clientW.data?.account?.address, underlyingAddress, VAULT_ADDRESS, vaultAdapter]);
 
   // Approve exactly the amount entered
   const runApproveExact = async (amountWei: bigint) => {
@@ -416,6 +488,88 @@ export function VaultAPIView({
     }
   };
 
+  const handleClaimShares = async () => {
+    try {
+      if (!clientW.data || !vaultAdapter) throw new Error(t("vaultInfo.errors.connectWallet"));
+      if (claimableShares === 0n) throw new Error(t("vaultInfo.errors.noClaimableShares"));
+      
+      setPending("claim");
+      const result = await vaultAdapter.claimShares!(claimableShares, clientW.data.account.address as `0x${string}`);
+      pushToast("info", `Transaction submitted: ${result.hash}`, 7000, `https://hyperevmscan.io/tx/${result.hash}`);
+      
+      // Wait for confirmation
+      const provider = new BrowserProvider((window as any).ethereum);
+      try {
+        const receipt = await provider.waitForTransaction(result.hash, 1, 20_000);
+        if (!receipt) {
+          throw new Error('No receipt received');
+        }
+        const isReverted = receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n);
+        if (isReverted) {
+          throw new Error('Transaction reverted on-chain');
+        }
+      } catch (waitError) {
+        console.error('Transaction failed:', waitError);
+        throw new Error('Transaction failed on-chain');
+      }
+      
+      pushToast("success", t("vaultInfo.errors.claimSuccessful"));
+      setPending(null);
+      
+      // Refresh user position
+      const user = clientW.data.account.address as `0x${string}`;
+      const position = await vaultAdapter.readUserPosition(user);
+      setUserShares(position.walletShares);
+      setUserAssets(position.walletAssets);
+      setClaimableShares(position.claimableShares || 0n);
+      setPendingDepositAssets(position.pendingDepositAssets || 0n);
+    } catch (e) {
+      setPending(null);
+      pushToast("error", friendlyError(e));
+    }
+  };
+
+  const handleCancelDeposit = async () => {
+    try {
+      if (!clientW.data || !vaultAdapter) throw new Error(t("vaultInfo.errors.connectWallet"));
+      if (pendingDepositAssets === 0n) throw new Error(t("vaultInfo.errors.noPendingDeposit"));
+      
+      setPending("cancel");
+      const result = await vaultAdapter.cancelDeposit!(clientW.data.account.address as `0x${string}`);
+      pushToast("info", `Transaction submitted: ${result.hash}`, 7000, `https://hyperevmscan.io/tx/${result.hash}`);
+      
+      // Wait for confirmation
+      const provider = new BrowserProvider((window as any).ethereum);
+      try {
+        const receipt = await provider.waitForTransaction(result.hash, 1, 20_000);
+        if (!receipt) {
+          throw new Error('No receipt received');
+        }
+        const isReverted = receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n);
+        if (isReverted) {
+          throw new Error('Transaction reverted on-chain');
+        }
+      } catch (waitError) {
+        console.error('Transaction failed:', waitError);
+        throw new Error('Transaction failed on-chain');
+      }
+      
+      pushToast("success", t("vaultInfo.errors.cancelSuccessful"));
+      setPending(null);
+      
+      // Refresh user position
+      const user = clientW.data.account.address as `0x${string}`;
+      const position = await vaultAdapter.readUserPosition(user);
+      setUserShares(position.walletShares);
+      setUserAssets(position.walletAssets);
+      setClaimableShares(position.claimableShares || 0n);
+      setPendingDepositAssets(position.pendingDepositAssets || 0n);
+    } catch (e) {
+      setPending(null);
+      pushToast("error", friendlyError(e));
+    }
+  };
+
   const runDeposit = async (overrideAmountWei?: bigint) => {
     try {
       if (!clientW.data) throw new Error(t("vaultInfo.errors.connectWallet"));
@@ -430,7 +584,19 @@ export function VaultAPIView({
       const tx = await vault.deposit(amountWei, clientW.data.account.address);
       pushToast("info", `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
       // Use wallet provider to wait for confirmation — typically faster than public RPCs
-      await provider.waitForTransaction(tx.hash, 1, 20_000).catch(() => null);
+      try {
+        const receipt = await provider.waitForTransaction(tx.hash, 1, 20_000);
+        if (!receipt) {
+          throw new Error('No receipt received');
+        }
+        const isReverted = receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n);
+        if (isReverted) {
+          throw new Error('Transaction reverted on-chain');
+        }
+      } catch (waitError) {
+        console.error('Transaction failed:', waitError);
+        throw new Error('Transaction failed on-chain');
+      }
       pushToast("success", t("vaultInfo.errors.depositSuccessful"));
       setPending(null);
       // Use wallet RPC for freshest reads immediately after confirmation
@@ -643,18 +809,31 @@ export function VaultAPIView({
           title={onchainData.name}
           subtitle={t(`vaultInfo.vaultHeader.description.${config.id}`)}
           badges={[
-            { label: "Powered by Morpho", href: "https://morpho.org/" },
+            { label: config.type === 'lagoon' ? "Powered by Lagoon" : "Powered by Morpho", href: config.type === 'lagoon' ? "https://lagoon.finance/" : "https://morpho.org/" },
             { label: "HyperEVM" },
             { label: "ERC-4626" },
-            { label: "Non-custodial" },
+            { label: config.type === 'lagoon' ? "Async Vault" : "Non-custodial" },
           ]}
         rightSlot={
-          <CopyableAddress
-            address={VAULT_ADDRESS}
-            explorerUrl={`https://hyperevmscan.io/address/${VAULT_ADDRESS}`}
-            label={t("vaultInfo.vaultHeader.address")}
-            loading={onchainLoading}
-          />
+          <div className="flex flex-col items-end gap-2">
+            <CopyableAddress
+              address={VAULT_ADDRESS}
+              explorerUrl={`https://hyperevmscan.io/address/${VAULT_ADDRESS}`}
+              label={t("vaultInfo.vaultHeader.address")}
+              loading={onchainLoading}
+            />
+            {config.id === 'hypairdrop' && (
+              <a
+                href="https://debank.com/profile/0x8Ec77176F71F5ff53B71b01FC492F46Ea4e55A77"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-opacity hover:opacity-80"
+                style={{ background: 'rgba(0,41,91,0.08)', color: 'var(--heading, #00295B)' }}
+              >
+                View on DeBank
+              </a>
+            )}
+          </div>
         }
         />
 
@@ -725,6 +904,53 @@ export function VaultAPIView({
                       </div>
                       <div className="text-lg font-semibold text-[#00295B]">{priceLoading ? <Skeleton className="h-5 w-20"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
                     </div>
+                    {vaultAdapter && (pendingDepositAssets > 0n || claimableShares > 0n) && (
+                      <div className="pt-3 mt-3 border-t" style={{ borderColor: 'var(--border, #E5E2D6)' }}>
+                        {claimableShares > 0n ? (
+                          <>
+                            <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                              {t("vaultInfo.position.claimableShares")}
+                            </div>
+                            <div className="text-lg font-semibold text-[#00295B]">{fmtToken(claimableShares, onchainData.shareDecimals)}</div>
+                            {typeof usdPrice === "number" && (
+                              <div className="text-sm" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+                                {fmtUsdSimple(Number(formatUnits(claimableShares * onchainData.totalAssets / (onchainData.totalSupply || 1n), onchainData.underlyingDecimals)) * usdPrice)}
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleClaimShares()}
+                              disabled={pending === "claim"}
+                              className="w-full px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                              style={{ background: 'var(--muted-brass, #B08D57)', color: '#fff' }}
+                            >
+                              {pending === "claim" ? t("vaultInfo.position.claiming") : t("vaultInfo.position.claim")}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                              {t("vaultInfo.position.requestedDeposit")}
+                            </div>
+                            <div className="text-lg font-semibold text-[#00295B]">{fmtToken(pendingDepositAssets, onchainData.underlyingDecimals)} {config.underlyingSymbol}</div>
+                            {typeof usdPrice === "number" && (
+                              <div className="text-sm" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+                                {fmtUsdSimple(Number(formatUnits(pendingDepositAssets, onchainData.underlyingDecimals)) * usdPrice)}
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleCancelDeposit()}
+                              disabled={pending === "cancel"}
+                              className="w-full px-5 py-3 text-sm font-semibold rounded-2xl border transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                              style={{ borderColor: 'var(--heading, #00295B)', color: 'var(--heading, #00295B)' }}
+                            >
+                              {pending === "cancel" ? t("vaultInfo.position.canceling") : t("vaultInfo.position.cancelDeposit")}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -812,11 +1038,78 @@ export function VaultAPIView({
             
             {/* APY Chart Section - 2/3 width */}
             <div className="lg:col-span-2">
-              <ApyHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} underlyingSymbol={config.underlyingSymbol} />
+              {config.type === 'lagoon' ? (
+                <SharePriceHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} />
+              ) : (
+                <ApyHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} underlyingSymbol={config.underlyingSymbol} />
+              )}
             </div>
           </div>
 
-          {/* Allocations section */}
+          {/* Lagoon allocations section */}
+          {config.type === 'lagoon' && (
+          <div className="space-y-4">
+            {/* Enhanced Allocations with Pie Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Allocations List - 2/3 width */}
+              <div className="lg:col-span-2">
+                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full">
+                  <div className="mb-3">
+                    <h2 className="text-base font-bold text-[#00295B]">
+                      {t("vaultInfo.allocations.title")}
+                    </h2>
+                    <p className="text-sm text-[#101720]/70 mt-1">
+                      {t("vaultInfo.allocations.subtitle")}
+                    </p>
+                  </div>
+                  {octavAllocations.loading ? (
+                    <div className="space-y-1">
+                      {/* Skeleton Rows */}
+                      <div className="space-y-1">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div key={i} className="h-12 bg-[#E1E1D6] rounded animate-pulse"></div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : octavAllocations.allocations.length > 0 ? (
+                    <GroupedAllocationList
+                      groupedItems={[]}
+                      ungroupedItems={octavAllocations.allocations}
+                      totalAssets={onchainData?.totalAssets ?? 0n}
+                    />
+                  ) : (
+                    <p className="text-sm text-[#101720]/70 text-center py-8">
+                      {t("vaultInfo.allocations.empty")}
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Pie Chart - 1/3 width */}
+              <div className="lg:col-span-1">
+                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-96">
+                  {octavAllocations.loading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-pulse">
+                        <div className="w-32 h-32 bg-[#E1E1D6] rounded-full mx-auto mb-4"></div>
+                      </div>
+                    </div>
+                  ) : octavAllocations.allocations.length > 0 ? (
+                    <AllocationPieChartAPI
+                      groupedAllocations={[]}
+                      loading={false}
+                    />
+                  ) : (
+                    <p className="text-sm text-[#101720]/70 text-center py-8">No allocations to display</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          )}
+
+          {/* Morpho allocations section */}
+          {config.type !== 'lagoon' && (
           <div className="space-y-4">
 
             {/* Enhanced Allocations with Pie Chart */}
@@ -916,6 +1209,7 @@ export function VaultAPIView({
               </div>
             </div>
           </div>
+          )}
         </div>
 
         {/* Confirm dialog for approval */}
@@ -975,7 +1269,7 @@ export function VaultAPIView({
                 </div>
               </div>
               <div className="p-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-                <LiFiQuoteTest onClose={handleDialogClose} vaultConfig={config} />
+                <LiFiQuoteTest onClose={handleDialogClose} vaultConfig={config} vaultAdapter={vaultAdapter} />
               </div>
             </div>
           </div>
@@ -1019,6 +1313,7 @@ export function VaultAPIView({
                   shareDecimals={onchainData?.shareDecimals || 18}
                   underlyingDecimals={onchainData?.underlyingDecimals || 6}
                   vaultConfig={config}
+                  vaultAdapter={vaultAdapter}
                 />
               </div>
             </div>

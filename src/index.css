@@ -197,3 +197,38 @@ button:focus-visible {
 .lang-switcher [role="listbox"] li {
   border: none !important;
 }
+
+/* ==== Navigation dropdown button - match anchor tag style exactly ==== */
+.nav-link-dropdown {
+  background: none !important;
+  border: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 0.875rem !important; /* Exactly matches Tailwind text-sm (14px) */
+  font-weight: 500 !important; /* Match anchor tag font-weight from index.css line 31 */
+  line-height: 1.5 !important; /* Match root line-height */
+  letter-spacing: normal !important;
+  cursor: pointer;
+  display: inline-block;
+  text-decoration: none !important;
+  font-family: inherit !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+.nav-link-dropdown:hover {
+  opacity: 0.75 !important;
+  background: none !important;
+  border: none !important;
+}
+.nav-link-dropdown:focus,
+.nav-link-dropdown:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.nav-link-dropdown:active {
+  background: none !important;
+  border: none !important;
+  color: inherit !important;
+}
