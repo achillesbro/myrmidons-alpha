@@ -161,7 +161,6 @@ export function VaultAPIView({
 
   // User state (HyperEVM tx path only)
   const [underlyingAddress, setUnderlyingAddress] = useState<`0x${string}` | null>(null);
-  const [assetDecimals, setAssetDecimals] = useState<number>(18);
   // Approval confirmation dialog state
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [onchainBalance, setOnchainBalance] = useState<bigint>(0n); // underlying token balance
@@ -391,7 +390,6 @@ export function VaultAPIView({
   useEffect(() => {
     if (onchainData?.underlyingAddress) {
       setUnderlyingAddress(onchainData.underlyingAddress);
-      setAssetDecimals(onchainData.underlyingDecimals);
     }
   }, [onchainData?.underlyingAddress, onchainData?.underlyingDecimals]);
 
@@ -477,8 +475,9 @@ export function VaultAPIView({
     }
   }, [clientW.data?.account?.address, underlyingAddress, VAULT_ADDRESS, vaultAdapter]);
 
-  // Approve exactly the amount entered
-  const runApproveExact = async (amountWei: bigint) => {
+  // Approve exactly the amount entered (currently unused, kept for future use)
+  // @ts-expect-error - intentionally unused, kept for future reference
+  const _runApproveExact = async (amountWei: bigint) => {
     try {
       if (!clientW.data) throw new Error("Connect wallet");
       if (!underlyingAddress) throw new Error("Token unknown");
@@ -914,8 +913,6 @@ export function VaultAPIView({
                     <DepositInline
                       vaultConfig={config}
                       vaultAdapter={vaultAdapter}
-                      sharePriceUsd={vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd}
-                      vaultShareSymbol={onchainData?.symbol}
                       onSuccess={refreshPositionData}
                     />
                   ) : (
@@ -924,9 +921,7 @@ export function VaultAPIView({
                       vaultAdapter={vaultAdapter}
                       userShares={userShares}
                       shareDecimals={onchainData?.shareDecimals || 18}
-                      underlyingDecimals={onchainData?.underlyingDecimals || 6}
                       sharePriceUsd={vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd}
-                      vaultShareSymbol={onchainData?.symbol}
                       onSuccess={refreshPositionData}
                     />
                   )}

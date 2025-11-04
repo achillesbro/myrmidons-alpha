@@ -345,7 +345,7 @@ export function groupAllocationsByProtocol(
   });
 
   // Convert protocol map to ProtocolGroupedAllocation objects
-  const groupedItems: ProtocolGroupedAllocation[] = Array.from(protocolMap.entries()).map(([key, protocolData]) => {
+  const groupedItems: ProtocolGroupedAllocation[] = Array.from(protocolMap.values()).map((protocolData) => {
     const { protocolName, protocolKey, markets } = protocolData;
 
     // Calculate aggregated metrics

@@ -29,12 +29,10 @@ interface TokenBalance {
 interface DepositInlineProps {
   vaultConfig?: VaultConfig;
   vaultAdapter?: IVaultAdapter | null;
-  sharePriceUsd?: number | null;
-  vaultShareSymbol?: string;
   onSuccess?: () => void;
 }
 
-export function DepositInline({ vaultConfig, vaultAdapter, sharePriceUsd, vaultShareSymbol, onSuccess }: DepositInlineProps) {
+export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositInlineProps) {
   const config = vaultConfig || DEFAULT_VAULT_CONFIG;
   const VAULT_ADDRESS = config.vaultAddress;
   const UNDERLYING_SYMBOL = config.underlyingSymbol;
@@ -47,7 +45,6 @@ export function DepositInline({ vaultConfig, vaultAdapter, sharePriceUsd, vaultS
   const [executing, setExecuting] = useState(false);
   const [underlyingBalance, setUnderlyingBalance] = useState<TokenBalance | null>(null);
   const [underlyingLoading, setUnderlyingLoading] = useState(false);
-  const [bridgedTokenAmount, setBridgedTokenAmount] = useState<string | null>(null);
   const [transactionSteps, setTransactionSteps] = useState<Array<{
     label: string;
     status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -126,12 +123,10 @@ export function DepositInline({ vaultConfig, vaultAdapter, sharePriceUsd, vaultS
     setSelectedToken(tokenInfo);
     setTokenSelectorOpen(false);
     setAmount('');
-    setBridgedTokenAmount(null);
   };
 
   const handleAmountChange = (value: string) => {
     setAmount(value);
-    setBridgedTokenAmount(null);
   };
 
   const handleMax = () => {
@@ -290,7 +285,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, sharePriceUsd, vaultS
 
         pushToast('info', `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
         const receipt = await provider.waitForTransaction(tx.hash, 1, 20_000);
-        if (!receipt || receipt.status === 0 || receipt.status === 0n) {
+        if (!receipt || receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n)) {
           throw new Error('Transaction failed');
         }
 
@@ -303,7 +298,6 @@ export function DepositInline({ vaultConfig, vaultAdapter, sharePriceUsd, vaultS
         pushToast('success', 'Deposit successful!');
         setAmount('');
         setSelectedToken(null);
-        setBridgedTokenAmount(null);
         await fetchUnderlyingBalance();
         onSuccess?.();
       } else {
@@ -414,10 +408,6 @@ export function DepositInline({ vaultConfig, vaultAdapter, sharePriceUsd, vaultS
           }
         }
 
-        if (estimatedOutputAmount) {
-          setBridgedTokenAmount(estimatedOutputAmount);
-        }
-
         pushToast('success', 'Bridge completed! Depositing to vault...');
 
         // Now deposit the bridged amount
@@ -484,7 +474,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, sharePriceUsd, vaultS
 
         pushToast('info', `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
         const receipt = await provider.waitForTransaction(tx.hash, 1, 20_000);
-        if (!receipt || receipt.status === 0 || receipt.status === 0n) {
+        if (!receipt || receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n)) {
           throw new Error('Transaction failed');
         }
 
@@ -497,7 +487,6 @@ export function DepositInline({ vaultConfig, vaultAdapter, sharePriceUsd, vaultS
         pushToast('success', 'Deposit successful!');
         setAmount('');
         setSelectedToken(null);
-        setBridgedTokenAmount(null);
         await fetchUnderlyingBalance();
         onSuccess?.();
       }
