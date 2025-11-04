@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:vercel": "vercel dev",
     "build": "tsc -b && vite build --emptyOutDir",
     "lint": "eslint .",
     "preview": "vite preview",

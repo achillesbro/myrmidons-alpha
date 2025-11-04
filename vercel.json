@@ -1,15 +1,5 @@
 {
   "buildCommand": "npm run build",
-  "rewrites": [
-    {
-      "source": "/api/cron/update-allocations",
-      "destination": "/api/cron/update-allocations"
-    },
-    {
-      "source": "/api/allocations/:address",
-      "destination": "/api/allocations/[vaultAddress]"
-    }
-  ],
   "crons": [
     {
       "path": "/api/cron/update-allocations",
