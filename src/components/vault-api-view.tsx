@@ -1091,7 +1091,6 @@ export function VaultAPIView({
               {config.type === 'lagoon' ? (
                 <LagoonApyHistoryChart 
                   vaultAddress={VAULT_ADDRESS} 
-                  chainId={CHAIN_ID} 
                   vaultConfig={config}
                 />
               ) : (
