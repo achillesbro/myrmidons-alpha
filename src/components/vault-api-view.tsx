@@ -19,7 +19,7 @@ import { WithdrawInline } from "./withdraw-inline";
 import InnerPageHero from "./InnerPageHero";
 import CopyableAddress from "./CopyableAddress";
 import { ApyHistoryChart } from "./apy-history-chart";
-import { SharePriceHistoryChart } from "./share-price-history-chart";
+import { LagoonApyHistoryChart } from "./lagoon-apy-history-chart";
 import { AllocationPieChartAPI } from "./allocation-pie-chart-api";
 import { useVaultDataAPI } from "../hooks/useVaultDataAPI";
 import { GroupedAllocationList } from "./grouped-allocation-list";
@@ -94,9 +94,6 @@ export function VaultAPIView({
   // Fetch Octav allocations (only for Lagoon vaults)
   // Use vault ID instead of address (curator address is handled by API route)
   const octavAllocations = useOctavAllocations(config.id);
-  
-  // Fetch metrics data for sparklines and derived values (always call hooks at top level)
-  const metricsData = useMetricsData(VAULT_ADDRESS, CHAIN_ID, apiData.sharePriceUsd);
 
   // Reset on address change so we refetch everything cleanly
   useEffect(() => {
@@ -137,6 +134,13 @@ export function VaultAPIView({
   // Lagoon vault share price (on-chain, for vaults not in Morpho API)
   const [lagoonSharePriceUsd, setLagoonSharePriceUsd] = useState<number | null>(null);
   const [lagoonSharePriceLoading, setLagoonSharePriceLoading] = useState<boolean>(false);
+  const [lagoonUnderlyingAssetPriceUsd, setLagoonUnderlyingAssetPriceUsd] = useState<number | null>(null);
+
+  // Fetch metrics data for sparklines and derived values (always call hooks at top level)
+  // For Lagoon vaults, use lagoonSharePriceUsd and lagoonUnderlyingAssetPriceUsd; for Morpho vaults, use apiData
+  const currentSharePriceUsd = vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd;
+  const underlyingAssetPriceUsd = vaultAdapter ? lagoonUnderlyingAssetPriceUsd : apiData.assetPriceUsd;
+  const metricsData = useMetricsData(VAULT_ADDRESS, CHAIN_ID, currentSharePriceUsd, underlyingAssetPriceUsd);
 
   // Performance fee state
   const [feeWad, setFeeWad] = useState<bigint | null>(null);
@@ -281,10 +285,13 @@ export function VaultAPIView({
         if (cancelled) return;
         
         if (assetPriceUsd !== null) {
+          // Store underlying asset price for metrics calculation
+          setLagoonUnderlyingAssetPriceUsd(assetPriceUsd);
           // Calculate share price in USD
           const sharePriceUsd = sharePriceRaw * assetPriceUsd;
           setLagoonSharePriceUsd(sharePriceUsd);
         } else {
+          setLagoonUnderlyingAssetPriceUsd(null);
           setLagoonSharePriceUsd(null);
         }
       } catch (e) {
@@ -843,17 +850,6 @@ export function VaultAPIView({
               label={t("vaultInfo.vaultHeader.address")}
               loading={onchainLoading}
             />
-            {config.id === 'hypairdrop' && (
-              <a
-                href="https://debank.com/profile/0x8Ec77176F71F5ff53B71b01FC492F46Ea4e55A77"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-opacity hover:opacity-80"
-                style={{ background: 'rgba(0,41,91,0.08)', color: 'var(--heading, #00295B)' }}
-              >
-                View on DeBank
-              </a>
-            )}
           </div>
         }
         />
@@ -1032,12 +1028,15 @@ export function VaultAPIView({
                     <button
                       type="button"
                       onClick={() => setActionMode('deposit')}
-                      className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                      className={`flex-[2] px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
                         actionMode === 'deposit'
-                          ? 'bg-[#FFFFF5] shadow-sm'
+                          ? 'shadow-sm'
                           : 'bg-transparent opacity-60 hover:opacity-80'
                       }`}
-                      style={actionMode === 'deposit' ? { color: 'var(--heading, #00295B)' } : { color: 'var(--text, #101720)' }}
+                      style={actionMode === 'deposit' 
+                        ? { background: 'var(--muted-brass, #B08D57)', color: '#fff' } 
+                        : { color: 'var(--text, #101720)' }
+                      }
                     >
                       {t("vaultInfo.actions.deposit")}
                     </button>
@@ -1046,10 +1045,13 @@ export function VaultAPIView({
                       onClick={() => setActionMode('withdraw')}
                       className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
                         actionMode === 'withdraw'
-                          ? 'bg-[#FFFFF5] shadow-sm'
+                          ? 'shadow-sm'
                           : 'bg-transparent opacity-60 hover:opacity-80'
                       }`}
-                      style={actionMode === 'withdraw' ? { color: 'var(--heading, #00295B)' } : { color: 'var(--text, #101720)' }}
+                      style={actionMode === 'withdraw' 
+                        ? { background: 'var(--bg, #FFFFF5)', color: 'var(--heading, #00295B)' } 
+                        : { color: 'var(--text, #101720)' }
+                      }
                     >
                       {t("vaultInfo.actions.withdraw")}
                     </button>
@@ -1087,11 +1089,10 @@ export function VaultAPIView({
             {/* Right column: Chart - 2/3 width */}
             <div className="lg:col-span-2">
               {config.type === 'lagoon' ? (
-                <SharePriceHistoryChart 
+                <LagoonApyHistoryChart 
                   vaultAddress={VAULT_ADDRESS} 
                   chainId={CHAIN_ID} 
-                  underlyingSymbol={config.underlyingSymbol}
-                  underlyingAddress={config.underlyingAddress}
+                  vaultConfig={config}
                 />
               ) : (
                 <ApyHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} underlyingSymbol={config.underlyingSymbol} />
@@ -1109,11 +1110,24 @@ export function VaultAPIView({
                 <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full">
                   <div className="mb-2">
                     <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h2 className="text-base font-bold text-[#00295B]">
-                          {t("vaultInfo.allocations.title")}
-                        </h2>
-                        <p className="text-sm text-[#101720]/70 mt-1">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h2 className="text-base font-bold text-[#00295B]">
+                            {t("vaultInfo.allocations.title")}
+                          </h2>
+                          {config.id === 'hypairdrop' && (
+                            <a
+                              href="https://debank.com/profile/0x8Ec77176F71F5ff53B71b01FC492F46Ea4e55A77"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium transition-opacity hover:opacity-80"
+                              style={{ background: 'rgba(0,41,91,0.08)', color: 'var(--heading, #00295B)' }}
+                            >
+                              View on DeBank
+                            </a>
+                          )}
+                        </div>
+                        <p className="text-sm text-[#101720]/70">
                           {t("vaultInfo.allocations.subtitle")}
                         </p>
                       </div>
@@ -1167,6 +1181,43 @@ export function VaultAPIView({
                   ) : (
                     <p className="text-sm text-[#101720]/70 text-center py-8">No allocations to display</p>
                   )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Lagoon Fees Display */}
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-[#00295B]">
+                      Management Fee
+                    </div>
+                    <div className="text-xs text-[#101720]/70 mt-1">
+                      Annual fee on assets under management
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-semibold text-[#00295B]">
+                      1.00%
+                    </div>
+                  </div>
+                </div>
+                <div className="border-t" style={{ borderColor: 'var(--border, #E5E2D6)' }}></div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-[#00295B]">
+                      Airdrop Performance Fee
+                    </div>
+                    <div className="text-xs text-[#101720]/70 mt-1">
+                      Fee on airdrop rewards earned
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-semibold text-[#00295B]">
+                      10.00%
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

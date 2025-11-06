@@ -27,6 +27,17 @@ function FAQSection() {
 
           <details className="p-4 md:p-5 rounded-2xl shadow-sm bg-white">
             <summary className="cursor-pointer font-semibold" style={{ color: 'var(--obsidian-navy, #00295B)' }}>
+              How are the funds handled for HypAirdrop?
+            </summary>
+            <div className="mt-2 text-sm" style={{ color: 'var(--midnight-blue, #101720)' }}>
+              Funds are secured in a Safe multisig (2-of-3) smart account, preventing any unilateral withdrawals.
+              All activity is fully auditable on-chain and managed through verified addresses only.
+              Curator address: <a href="https://debank.com/profile/0x8Ec77176F71F5ff53B71b01FC492F46Ea4e55A77" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--obsidian-navy, #00295B)' }}>0x8Ec77176F71F5ff53B71b01FC492F46Ea4e55A77</a>.
+            </div>
+          </details>
+
+          <details className="p-4 md:p-5 rounded-2xl shadow-sm bg-white">
+            <summary className="cursor-pointer font-semibold" style={{ color: 'var(--obsidian-navy, #00295B)' }}>
               Are airdrops/points guaranteed?
             </summary>
             <div className="mt-2 text-sm" style={{ color: 'var(--midnight-blue, #101720)' }}>
