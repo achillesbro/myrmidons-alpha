@@ -157,7 +157,6 @@ export function VaultAPIView({
 
   // User state (HyperEVM tx path only)
   const [underlyingAddress, setUnderlyingAddress] = useState<`0x${string}` | null>(null);
-  const [assetDecimals, setAssetDecimals] = useState<number>(18);
   // Approval confirmation dialog state
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [onchainBalance, setOnchainBalance] = useState<bigint>(0n); // underlying token balance
@@ -387,9 +386,8 @@ export function VaultAPIView({
   useEffect(() => {
     if (onchainData?.underlyingAddress) {
       setUnderlyingAddress(onchainData.underlyingAddress);
-      setAssetDecimals(onchainData.underlyingDecimals);
     }
-  }, [onchainData?.underlyingAddress, onchainData?.underlyingDecimals]);
+  }, [onchainData?.underlyingAddress]);
 
   // Update lastUpdated when API data finishes loading
   useEffect(() => {
@@ -474,6 +472,8 @@ export function VaultAPIView({
   }, [clientW.data?.account?.address, underlyingAddress, VAULT_ADDRESS, vaultAdapter]);
 
   // Approve exactly the amount entered
+  // Legacy function - kept for backward compatibility but not used in inline flow
+  // @ts-expect-error - Legacy function, intentionally unused
   const runApproveExact = async (amountWei: bigint) => {
     try {
       if (!clientW.data) throw new Error("Connect wallet");

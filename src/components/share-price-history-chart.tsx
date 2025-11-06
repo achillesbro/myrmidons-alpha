@@ -83,7 +83,7 @@ function calculateStats(data: ChartDataPoint[]) {
   return { avg, min, max };
 }
 
-export function SharePriceHistoryChart({ vaultAddress, chainId, underlyingSymbol, underlyingAddress }: SharePriceHistoryChartProps) {
+export function SharePriceHistoryChart({ vaultAddress, chainId, underlyingAddress }: SharePriceHistoryChartProps) {
   const { data, loading, error, timeRange, setTimeRange } = useLagoonSharePriceHistory(
     vaultAddress, 
     chainId, 

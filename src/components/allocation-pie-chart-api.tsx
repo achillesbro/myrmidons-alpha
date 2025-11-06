@@ -64,7 +64,7 @@ export function AllocationPieChartAPI({
     chartData.push({
       name: item.label,
       value: item.pct,
-      usd: item.usd,
+      usd: item.usd ?? null,
       marketCount: 1,
     });
   });

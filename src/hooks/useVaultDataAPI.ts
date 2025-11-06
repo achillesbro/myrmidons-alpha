@@ -108,7 +108,7 @@ export function useVaultDataAPI(vaultAddress: Address, chainId: number): VaultDa
       };
     }
     
-    return groupMorphoAllocations(allocations, BigInt(totalAssets));
+    return groupMorphoAllocations(allocations);
   }, [allocations, data?.vaultByAddress?.state?.totalAssets, vaultAddress]);
 
   return {

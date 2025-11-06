@@ -427,9 +427,9 @@ export function useVaultAllocationsOptimized(vaultAddress: Address): OptimizedAl
 
   // Group items by family
   const groupingResult: AllocationGroupingResult | null = useMemo(() => {
-    if (!items || totalAssets === null) return null;
-    return groupMorphoAllocations(items, totalAssets);
-  }, [items, totalAssets]);
+    if (!items) return null;
+    return groupMorphoAllocations(items);
+  }, [items]);
 
   const groupedItems: GroupedAllocation[] | null = useMemo(() => {
     return groupingResult?.groupedItems || null;

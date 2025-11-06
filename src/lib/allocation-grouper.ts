@@ -224,8 +224,7 @@ export function groupLagoonAllocations(
  * @returns Grouped allocations with family-based grouping
  */
 export function groupMorphoAllocations(
-  items: AllocationItem[],
-  totalAssets: bigint
+  items: AllocationItem[]
 ): AllocationGroupingResult {
   const familyMap = new Map<string, AllocationItem[]>();
   const ungroupedItems: AllocationItem[] = [];

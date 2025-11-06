@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { formatUnits, parseUnits } from 'viem';
 import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain } from '@wagmi/core';
@@ -8,7 +8,6 @@ import vaultAbi from '../abis/vault.json';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
 import { DEFAULT_VAULT_CONFIG, type VaultConfig } from '../config/vaults.config';
 import type { IVaultAdapter } from '../lib/vault-provider';
-import { getToken } from '@lifi/sdk';
 
 interface WithdrawInlineProps {
   vaultConfig?: VaultConfig;
@@ -26,21 +25,15 @@ export function WithdrawInline({
   vaultAdapter,
   userShares = 0n,
   shareDecimals = 18,
-  underlyingDecimals = 6,
   sharePriceUsd,
-  vaultShareSymbol,
   onSuccess,
 }: WithdrawInlineProps) {
   const config = vaultConfig || DEFAULT_VAULT_CONFIG;
   const VAULT_ADDRESS = config.vaultAddress;
-  const UNDERLYING_SYMBOL = config.underlyingSymbol;
-  const UNDERLYING_ADDRESS = config.underlyingAddress;
 
   const [amount, setAmount] = useState<string>('');
   const [executing, setExecuting] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [underlyingLogoURI, setUnderlyingLogoURI] = useState<string | null>(null);
-  const [underlyingPriceUSD, setUnderlyingPriceUSD] = useState<string | null>(null);
   const [transactionSteps, setTransactionSteps] = useState<Array<{
     label: string;
     status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -58,19 +51,6 @@ export function WithdrawInline({
   const clientW = useWalletClient();
   const wagmiConfig = useConfig();
 
-  // Fetch underlying token logo and price
-  useEffect(() => {
-    const fetchUnderlyingInfo = async () => {
-      try {
-        const underlyingToken = await getToken(CHAIN_IDS.HYPEREVM, UNDERLYING_ADDRESS);
-        setUnderlyingLogoURI(underlyingToken.logoURI || null);
-        setUnderlyingPriceUSD(underlyingToken.priceUSD || null);
-      } catch (error) {
-        console.error(`Failed to fetch ${UNDERLYING_SYMBOL} info:`, error);
-      }
-    };
-    fetchUnderlyingInfo();
-  }, [UNDERLYING_ADDRESS, UNDERLYING_SYMBOL]);
 
   // Calculate USD equivalent for input shares
   const sharesFormatted = formatUnits(userShares, shareDecimals);
