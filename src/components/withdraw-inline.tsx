@@ -123,6 +123,11 @@ export function WithdrawInline({
     setAmount(sharesFormatted);
   };
 
+  const handleHalf = () => {
+    const halfAmount = (parseFloat(sharesFormatted) / 2).toString();
+    setAmount(halfAmount);
+  };
+
   const handleWithdraw = async () => {
     if (!clientW.data?.account?.address) {
       pushToast('error', 'Please connect your wallet');
@@ -234,7 +239,7 @@ export function WithdrawInline({
         <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
           Withdraw
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-baseline gap-2">
           <div className="flex-1">
             <input
               type="number"
@@ -253,28 +258,44 @@ export function WithdrawInline({
               </div>
             )}
           </div>
-          <div className="flex items-center gap-1.5 px-2 py-1.5 text-sm">
-            <img
-              src="/Myrmidons-logo-dark-no-bg.png"
-              alt={config.displayName}
-              className="w-5 h-5 rounded-full"
-              onError={(e) => (e.currentTarget.style.display = 'none')}
-            />
-            <span className="font-semibold">{config.displayName}</span>
+          <div className="flex flex-col items-end gap-1.5">
+            <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-all text-xs font-semibold"
+              style={{ borderColor: 'var(--border, #E5E2D6)', background: 'rgba(229, 226, 214, 0.3)' }}>
+              <img
+                src="/Myrmidons-logo-dark-no-bg.png"
+                alt={config.displayName}
+                className="w-4 h-4 rounded-full"
+                onError={(e) => (e.currentTarget.style.display = 'none')}
+              />
+              <span>{config.displayName}</span>
+            </div>
+            <div className="deposit-balance-controls flex items-center gap-1.5">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+                <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+                <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+                <path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+              </svg>
+              <div className="deposit-balance-text">
+                {parseFloat(sharesFormatted).toFixed(4)} {config.displayName}
+              </div>
+              <button
+                type="button"
+                onClick={handleHalf}
+                className="deposit-action-btn"
+                disabled={!userShares || userShares === 0n || executing}
+              >
+                HALF
+              </button>
+              <button
+                type="button"
+                onClick={handleMax}
+                className="deposit-action-btn"
+                disabled={!userShares || userShares === 0n || executing}
+              >
+                MAX
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center justify-between mt-1">
-          <div className="text-xs" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
-            {sharesFormatted} {config.displayName}
-          </div>
-          <button
-            type="button"
-            onClick={handleMax}
-            className="text-[10px] px-1 py-0.5 rounded bg-gray-100 hover:bg-gray-200 transition-colors"
-            disabled={!userShares || userShares === 0n || executing}
-          >
-            MAX
-          </button>
         </div>
       </div>
 

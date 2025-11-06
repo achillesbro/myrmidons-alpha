@@ -87,28 +87,49 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
         const balanceUSD = tokenInfo.priceUSD
           ? (parseFloat(balanceFormatted) * parseFloat(tokenInfo.priceUSD)).toFixed(2)
           : '0';
-        if (parseFloat(balanceFormatted) > 0) {
-          setUnderlyingBalance({
-            chainId: CHAIN_IDS.HYPEREVM,
-            chainName: 'HyperEVM',
-            tokenSymbol: UNDERLYING_SYMBOL,
-            tokenAddress: UNDERLYING_ADDRESS,
-            balance: amountStr,
-            balanceFormatted,
-            decimals: balance.decimals || UNDERLYING_DECIMALS,
-            logoURI: tokenInfo.logoURI,
-            priceUSD: tokenInfo.priceUSD,
-            balanceUSD,
-          });
-        } else {
-          setUnderlyingBalance(null);
-        }
+        // Always set the balance object, even when balance is 0, to prevent refetch loop
+        setUnderlyingBalance({
+          chainId: CHAIN_IDS.HYPEREVM,
+          chainName: 'HyperEVM',
+          tokenSymbol: UNDERLYING_SYMBOL,
+          tokenAddress: UNDERLYING_ADDRESS,
+          balance: amountStr,
+          balanceFormatted,
+          decimals: balance.decimals || UNDERLYING_DECIMALS,
+          logoURI: tokenInfo.logoURI,
+          priceUSD: tokenInfo.priceUSD,
+          balanceUSD,
+        });
       } else {
-        setUnderlyingBalance(null);
+        // Set balance to 0 when no balances returned
+        setUnderlyingBalance({
+          chainId: CHAIN_IDS.HYPEREVM,
+          chainName: 'HyperEVM',
+          tokenSymbol: UNDERLYING_SYMBOL,
+          tokenAddress: UNDERLYING_ADDRESS,
+          balance: '0',
+          balanceFormatted: '0',
+          decimals: UNDERLYING_DECIMALS,
+          logoURI: tokenInfo?.logoURI,
+          priceUSD: tokenInfo?.priceUSD,
+          balanceUSD: '0',
+        });
       }
     } catch (error) {
       console.error(`Error fetching ${UNDERLYING_SYMBOL} balance:`, error);
-      setUnderlyingBalance(null);
+      // Set balance to 0 on error instead of null to prevent refetch loop
+      setUnderlyingBalance({
+        chainId: CHAIN_IDS.HYPEREVM,
+        chainName: 'HyperEVM',
+        tokenSymbol: UNDERLYING_SYMBOL,
+        tokenAddress: UNDERLYING_ADDRESS,
+        balance: '0',
+        balanceFormatted: '0',
+        decimals: UNDERLYING_DECIMALS,
+        logoURI: undefined,
+        priceUSD: undefined,
+        balanceUSD: '0',
+      });
     } finally {
       setUnderlyingLoading(false);
     }
@@ -134,6 +155,13 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
   const handleMax = () => {
     if (selectedToken) {
       setAmount(selectedToken.balanceFormatted);
+    }
+  };
+
+  const handleHalf = () => {
+    if (selectedToken) {
+      const halfAmount = (parseFloat(selectedToken.balanceFormatted) / 2).toString();
+      setAmount(halfAmount);
     }
   };
 
@@ -528,7 +556,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
         <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
           Deposit
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-baseline gap-2">
           <div className="flex-1">
             <input
               type="number"
@@ -547,47 +575,64 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => setTokenSelectorOpen(true)}
-            className="flex items-center gap-1 px-1 py-0.5 rounded border transition-all text-xs"
-            style={{ borderColor: 'var(--border, #E5E2D6)' }}
-            disabled={executing}
-          >
-            {selectedToken ? (
-              <>
-                {selectedToken.logoURI && (
-                  <img
-                    src={selectedToken.logoURI}
-                    alt={selectedToken.tokenSymbol}
-                    className="w-3 h-3 rounded-full"
-                  />
-                )}
-                <span className="font-semibold">{selectedToken.tokenSymbol}</span>
-                <span className="text-[10px]">▼</span>
-              </>
-            ) : (
-              <>
-                <span className="font-semibold">Select token</span>
-                <span className="text-[10px]">▼</span>
-              </>
-            )}
-          </button>
-        </div>
-        <div className="flex items-center justify-between mt-1">
-          <div className="text-xs" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
-            {selectedToken
-              ? `${parseFloat(selectedToken.balanceFormatted).toFixed(6)} ${selectedToken.tokenSymbol}`
-              : '—'}
+          <div className="flex flex-col items-end gap-1.5">
+            <div
+              onClick={() => !executing && setTokenSelectorOpen(true)}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-all text-xs font-semibold cursor-pointer"
+              style={{ borderColor: 'var(--border, #E5E2D6)', background: 'rgba(229, 226, 214, 0.3)' }}
+            >
+              {selectedToken ? (
+                <>
+                  {selectedToken.logoURI && (
+                    <img
+                      src={selectedToken.logoURI}
+                      alt={selectedToken.tokenSymbol}
+                      className="w-4 h-4 rounded-full"
+                    />
+                  )}
+                  <span>{selectedToken.tokenSymbol}</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
+                </>
+              ) : (
+                <>
+                  <span>Select token</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
+                </>
+              )}
+            </div>
+            <div className="deposit-balance-controls flex items-center gap-1.5">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+                <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+                <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+                <path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+              </svg>
+              <div className="deposit-balance-text">
+                {selectedToken
+                  ? `${parseFloat(selectedToken.balanceFormatted).toFixed(4)} ${selectedToken.tokenSymbol}`
+                  : '—'}
+              </div>
+              <button
+                type="button"
+                onClick={handleHalf}
+                className="deposit-action-btn"
+                disabled={!selectedToken || executing}
+              >
+                HALF
+              </button>
+              <button
+                type="button"
+                onClick={handleMax}
+                className="deposit-action-btn"
+                disabled={!selectedToken || executing}
+              >
+                MAX
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={handleMax}
-            className="text-[10px] px-1 py-0.5 rounded bg-gray-100 hover:bg-gray-200 transition-colors"
-            disabled={!selectedToken || executing}
-          >
-            MAX
-          </button>
         </div>
       </div>
 
