@@ -10,7 +10,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { Address } from "viem";
-import { useLagoonApyHistory, type TimeRange } from "../hooks/useLagoonApyHistory";
+import { useLagoonApyHistory, type TimeRange, type ApyDataPoint } from "../hooks/useLagoonApyHistory";
 import type { VaultConfig } from "../config/vaults.config";
 
 interface LagoonApyHistoryChartProps {
@@ -62,7 +62,7 @@ function filterRange(data: ChartDataPoint[], range: TimeRange): ChartDataPoint[]
   if (!data.length) return [];
   
   const now = Date.now();
-  const ranges = {
+  const ranges: Record<TimeRange, number> = {
     "7D": 7 * 24 * 60 * 60 * 1000,
     "30D": 30 * 24 * 60 * 60 * 1000,
     "90D": 90 * 24 * 60 * 60 * 1000,
@@ -70,7 +70,7 @@ function filterRange(data: ChartDataPoint[], range: TimeRange): ChartDataPoint[]
   };
   
   const cutoff = now - ranges[range];
-  return data.filter(point => point.timestamp >= cutoff);
+  return data.filter((point: ChartDataPoint) => point.timestamp >= cutoff);
 }
 
 function decimate(data: ChartDataPoint[], maxPoints = 300): ChartDataPoint[] {
@@ -119,7 +119,7 @@ export function LagoonApyHistoryChart({ vaultAddress, vaultConfig }: LagoonApyHi
   const chartData = useMemo<ChartDataPoint[]>(() => {
     if (!apyData.length) return [];
     
-    return apyData.map((point) => ({
+    return apyData.map((point: ApyDataPoint) => ({
       date: new Date(point.x * 1000).toISOString().split('T')[0],
       apy: point.y,
       timestamp: point.x * 1000,
