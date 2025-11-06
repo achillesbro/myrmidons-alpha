@@ -1,0 +1,4 @@
+# This file is not used by codegen - it's for reference only
+# The Lagoon subgraph uses a different schema than Morpho
+# We'll use direct fetch instead of Apollo/codegen for Lagoon queries
+
