@@ -26,7 +26,8 @@ export interface MetricsData {
 export function useMetricsData(
   vaultAddress: Address,
   chainId: number,
-  sharePriceUsd: number | null
+  sharePriceUsd: number | null,
+  underlyingAssetPriceUsd: number | null
 ): MetricsData {
   // Fetch 30D APY data for range calculation and share price sparkline
   const { netApyData: apy30dData } = useVaultApyChartAPI(vaultAddress, chainId, "30D");
@@ -57,9 +58,12 @@ export function useMetricsData(
       ? apy7dValues.reduce((sum, val) => sum + val, 0) / apy7dValues.length
       : null;
     
-    // Since inception return (share price - 1) * 100
-    const sinceInceptionReturn = sharePriceUsd !== null
-      ? (sharePriceUsd - 1) * 100
+    // Since inception return: (currentSharePriceInUnderlying - 1) * 100
+    // At inception, 1 share = 1 underlying token, so initial share price = 1 (in underlying terms)
+    // Current share price in underlying terms = sharePriceUsd / underlyingAssetPriceUsd
+    // Return = (currentSharePriceInUnderlying - 1) * 100
+    const sinceInceptionReturn = sharePriceUsd !== null && underlyingAssetPriceUsd !== null && underlyingAssetPriceUsd > 0
+      ? ((sharePriceUsd / underlyingAssetPriceUsd) - 1) * 100
       : null;
     
     // Last updated timestamp
@@ -79,7 +83,7 @@ export function useMetricsData(
       sinceInceptionReturn,
       lastUpdated,
     };
-  }, [apy30dData, apy7dData, sharePriceUsd]);
+  }, [apy30dData, apy7dData, sharePriceUsd, underlyingAssetPriceUsd]);
   
   return metrics;
 }
