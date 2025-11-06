@@ -42,14 +42,20 @@ const MEGA_FAMILIES = {
 
 export interface AllocationItem {
   id: `0x${string}`;
-  assets: bigint;
+  assets: bigint; // For compatibility with existing code (calculated from balance)
   label: string;
   pct: number;
   usd?: number | null;
   supplyApy?: number | null;
   logo?: string | null;
-  protocol?: string; // Protocol name (e.g., "Hyperlend", "Felix Protocol")
-  protocolKey?: string; // Protocol key from Octav (e.g., "hyperlend", "felix")
+  // Octav-specific fields (optional, for HypAirdrop vaults)
+  balanceString?: string; // Original readable balance from Octav (e.g., "1083.17083")
+  originalSymbol?: string; // Original symbol from Octav (e.g., "usd₮0", not uppercased)
+  protocolKey?: string; // Protocol key from Octav (e.g., "wallet", "hyperbeat")
+  protocolName?: string; // Protocol display name (e.g., "Wallet", "Hyperbeat")
+  protocolLogo?: string | null; // Protocol logo URL
+  chainKey?: string; // Chain key (e.g., "hyperevm")
+  positionType?: string; // Position type (e.g., "WALLET", "YIELD")
 }
 
 export interface GroupedAllocation {
@@ -75,31 +81,149 @@ export interface AllocationGroupingResult {
   totalUngroupedAssets: bigint;
 }
 
-export interface ProtocolGroupedAllocation {
-  protocolName: string;
-  protocolKey: string;
-  protocolLogo: string | null;
-  totalAssets: bigint;
-  totalUsd: number | null;
-  weightedApy: number;
-  marketCount: number;
-  markets: AllocationItem[];
-  percentage: number;
-  isExpanded?: boolean;
-}
+/**
+ * Group allocations for Lagoon vaults (like HypAirdrop) by protocol (wallet, hyperbeat, etc.)
+ * Creates a "Liquidity" group for idle tokens (wallet protocol)
+ * 
+ * @param items - Allocation items from Octav API
+ * @returns Grouped allocations with protocol-based grouping
+ */
+export function groupLagoonAllocations(
+  items: AllocationItem[]
+): AllocationGroupingResult {
+  // Separate idle tokens (wallet protocol) from protocol tokens
+  const liquidityItems: AllocationItem[] = [];
+  const protocolItems: AllocationItem[] = [];
+  
+  console.log(`[GroupAllocationsByProtocol] Processing ${items.length} items`);
+  
+  items.forEach((item) => {
+    // Check if it's from wallet protocol (idle tokens)
+    // Also include items without protocolKey or with 'unknown' protocolKey as liquidity
+    const isWallet = item.protocolKey === 'wallet' || 
+                     item.positionType === 'WALLET' || 
+                     !item.protocolKey || 
+                     item.protocolKey === 'unknown';
+    
+    if (isWallet) {
+      liquidityItems.push(item);
+      console.log(`[GroupAllocationsByProtocol] Item ${item.label} (protocolKey: ${item.protocolKey}, positionType: ${item.positionType}) -> Liquidity`);
+    } else {
+      protocolItems.push(item);
+      console.log(`[GroupAllocationsByProtocol] Item ${item.label} (protocolKey: ${item.protocolKey}, protocolName: ${item.protocolName}) -> Protocol`);
+    }
+  });
+  
+  console.log(`[GroupAllocationsByProtocol] Liquidity items: ${liquidityItems.length}, Protocol items: ${protocolItems.length}`);
 
-export interface ProtocolAllocationGroupingResult {
-  groupedItems: ProtocolGroupedAllocation[];
-  ungroupedItems: AllocationItem[];
-  totalGroupedAssets: bigint;
-  totalUngroupedAssets: bigint;
+  // Group protocol items by protocol
+  const protocolMap = new Map<string, AllocationItem[]>();
+  
+  protocolItems.forEach((item) => {
+    // Should not reach here if protocolKey is missing, but double-check
+    const protocolKey = item.protocolKey;
+    if (!protocolKey || protocolKey === 'unknown') {
+      // Fallback: add to liquidity if somehow missing
+      liquidityItems.push(item);
+      return;
+    }
+    if (!protocolMap.has(protocolKey)) {
+      protocolMap.set(protocolKey, []);
+    }
+    protocolMap.get(protocolKey)!.push(item);
+  });
+
+  // Calculate total USD for percentage calculations
+  const totalPortfolioUsd = items.reduce((sum, item) => sum + (item.usd || 0), 0);
+
+  // Create grouped items
+  const groupedItems: GroupedAllocation[] = [];
+
+  // Add Liquidity group if there are idle items (always create this group for wallet tokens)
+  if (liquidityItems.length > 0) {
+    const totalLiquidityUsd = liquidityItems.reduce((sum, item) => sum + (item.usd || 0), 0);
+    const totalLiquidityAssets = liquidityItems.reduce((sum, item) => sum + item.assets, 0n);
+    const liquidityPercentage = totalPortfolioUsd > 0 ? (totalLiquidityUsd / totalPortfolioUsd) * 100 : 0;
+
+    console.log(`[GroupAllocationsByProtocol] Creating Liquidity group with ${liquidityItems.length} items, total USD: $${totalLiquidityUsd}`);
+
+    groupedItems.push({
+      familyLabel: 'Liquidity',
+      familyLogo: '', // No logo for liquidity group (empty string)
+      description: '', // No description
+      descriptionKey: '',
+      totalAssets: totalLiquidityAssets,
+      totalUsd: totalLiquidityUsd > 0 ? totalLiquidityUsd : null,
+      weightedApy: 0, // No APY for idle tokens
+      marketCount: liquidityItems.length,
+      markets: liquidityItems,
+      percentage: liquidityPercentage,
+      isExpanded: false,
+    });
+  } else {
+    console.warn(`[GroupAllocationsByProtocol] No liquidity items found, but expected wallet tokens`);
+  }
+
+  // Add protocol groups (only if protocolMap has items after filtering)
+  protocolMap.forEach((protocolAssets, protocolKey) => {
+    // Skip if protocolKey is missing or 'unknown' (should have been caught earlier, but double-check)
+    if (!protocolKey || protocolKey === 'unknown') {
+      console.warn(`[GroupAllocationsByProtocol] Skipping invalid protocol key: ${protocolKey}`);
+      return;
+    }
+    
+    const firstItem = protocolAssets[0];
+    const protocolName = firstItem.protocolName || protocolKey;
+    const protocolLogo = firstItem.protocolLogo || null;
+    
+    const totalProtocolUsd = protocolAssets.reduce((sum, item) => sum + (item.usd || 0), 0);
+    const totalProtocolAssets = protocolAssets.reduce((sum, item) => sum + item.assets, 0n);
+    const protocolPercentage = totalPortfolioUsd > 0 ? (totalProtocolUsd / totalPortfolioUsd) * 100 : 0;
+
+    groupedItems.push({
+      familyLabel: protocolName,
+      familyLogo: protocolLogo || '/assets/default-protocol.png', // Use protocol logo or default
+      description: '', // No description
+      descriptionKey: '',
+      totalAssets: totalProtocolAssets,
+      totalUsd: totalProtocolUsd > 0 ? totalProtocolUsd : null,
+      weightedApy: 0, // Octav doesn't provide APY
+      marketCount: protocolAssets.length,
+      markets: protocolAssets,
+      percentage: protocolPercentage,
+      isExpanded: false,
+    });
+  });
+
+  // Sort by USD value (descending)
+  groupedItems.sort((a, b) => {
+    if (a.totalUsd != null && b.totalUsd != null) return b.totalUsd - a.totalUsd;
+    if (a.totalUsd != null) return -1;
+    if (b.totalUsd != null) return 1;
+    return b.totalAssets > a.totalAssets ? 1 : -1;
+  });
+
+  // Calculate totals
+  const totalGroupedAssets = groupedItems.reduce((sum, group) => sum + group.totalAssets, 0n);
+  const totalUngroupedAssets = 0n; // All items are grouped by protocol
+
+  return {
+    groupedItems,
+    ungroupedItems: [], // All items are grouped
+    totalGroupedAssets,
+    totalUngroupedAssets,
+  };
 }
 
 /**
- * Groups allocation items by token family using TOKEN_GROUPS configuration
- * Now supports mega-families for higher-level grouping
+ * Groups allocations for Morpho vaults by token families (HYPE, Stables, BTC, etc.)
+ * Uses TOKEN_GROUPS configuration and supports mega-families for higher-level grouping
+ * 
+ * @param items - Allocation items from Morpho GraphQL API
+ * @param totalAssets - Total assets in the vault (for percentage calculations)
+ * @returns Grouped allocations with family-based grouping
  */
-export function groupAllocationsByFamily(
+export function groupMorphoAllocations(
   items: AllocationItem[],
   totalAssets: bigint
 ): AllocationGroupingResult {
@@ -154,7 +278,11 @@ export function groupAllocationsByFamily(
     // Calculate aggregated metrics
     const totalFamilyAssets = allMarkets.reduce((sum, market) => sum + market.assets, 0n);
     const totalFamilyUsd = allMarkets.reduce((sum, market) => sum + (market.usd || 0), 0);
-    const percentage = totalAssets > 0n ? Number((totalFamilyAssets * 10000n) / totalAssets) / 100 : 0;
+    
+    // Calculate percentage based on USD value (not raw asset balance) for accurate representation
+    // Sum all USD values from all items (grouped + ungrouped) to get total portfolio value
+    const totalPortfolioUsd = items.reduce((sum, item) => sum + (item.usd || 0), 0);
+    const percentage = totalPortfolioUsd > 0 ? (totalFamilyUsd / totalPortfolioUsd) * 100 : 0;
 
     // Calculate weighted average APY
     const weightedApy = calculateWeightedApy(allMarkets, totalFamilyAssets);
@@ -305,97 +433,4 @@ export function expandAllGroups(groupedItems: GroupedAllocation[]): GroupedAlloc
  */
 export function collapseAllGroups(groupedItems: GroupedAllocation[]): GroupedAllocation[] {
   return groupedItems.map(group => ({ ...group, isExpanded: false }));
-}
-
-/**
- * Groups allocation items by protocol (for HypAirdrop vault)
- * Uses protocol information from AllocationItem to group by protocol name
- */
-export function groupAllocationsByProtocol(
-  items: AllocationItem[],
-  totalAssets: bigint
-): ProtocolAllocationGroupingResult {
-  const protocolMap = new Map<string, {
-    protocolName: string;
-    protocolKey: string;
-    protocolLogo: string | null;
-    markets: AllocationItem[];
-  }>();
-  const ungroupedItems: AllocationItem[] = [];
-  
-  // Group items by protocol
-  items.forEach(item => {
-    if (item.protocol && item.protocolKey) {
-      const key = item.protocolKey.toLowerCase();
-      if (!protocolMap.has(key)) {
-        protocolMap.set(key, {
-          protocolName: item.protocol,
-          protocolKey: item.protocolKey,
-          protocolLogo: null, // Will be set from first item if available
-          markets: [],
-        });
-      }
-      const protocolGroup = protocolMap.get(key)!;
-      protocolGroup.markets.push(item);
-      // Use logo from first item if available (protocol logos not in AllocationItem yet)
-    } else {
-      // Item without protocol info, keep as ungrouped
-      ungroupedItems.push(item);
-    }
-  });
-
-  // Convert protocol map to ProtocolGroupedAllocation objects
-  const groupedItems: ProtocolGroupedAllocation[] = Array.from(protocolMap.values()).map((protocolData) => {
-    const { protocolName, protocolKey, markets } = protocolData;
-
-    // Calculate aggregated metrics
-    const totalProtocolAssets = markets.reduce((sum, market) => sum + market.assets, 0n);
-    const totalProtocolUsd = markets.reduce((sum, market) => sum + (market.usd || 0), 0);
-    const percentage = totalAssets > 0n ? Number((totalProtocolAssets * 10000n) / totalAssets) / 100 : 0;
-
-    // Calculate weighted average APY
-    const weightedApy = calculateWeightedApy(markets, totalProtocolAssets);
-
-    // Try to get protocol logo from first market's logo (if protocol-specific logo exists)
-    // For now, use null - can be enhanced later with protocol logo mapping
-    const protocolLogo = null;
-
-    return {
-      protocolName,
-      protocolKey,
-      protocolLogo,
-      totalAssets: totalProtocolAssets,
-      totalUsd: totalProtocolUsd > 0 ? totalProtocolUsd : null,
-      weightedApy,
-      marketCount: markets.length,
-      markets: markets.sort((a, b) => {
-        // Sort markets within protocol by USD value, then by assets
-        if (a.usd != null && b.usd != null) return b.usd - a.usd;
-        if (a.usd != null) return -1;
-        if (b.usd != null) return 1;
-        return b.assets > a.assets ? 1 : b.assets < a.assets ? -1 : 0;
-      }),
-      percentage,
-      isExpanded: false,
-    };
-  });
-
-  // Sort grouped items by total USD value, then by total assets
-  groupedItems.sort((a, b) => {
-    if (a.totalUsd != null && b.totalUsd != null) return b.totalUsd - a.totalUsd;
-    if (a.totalUsd != null) return -1;
-    if (b.totalUsd != null) return 1;
-    return b.totalAssets > a.totalAssets ? 1 : b.totalAssets < a.totalAssets ? -1 : 0;
-  });
-
-  // Calculate totals
-  const totalGroupedAssets = groupedItems.reduce((sum, group) => sum + group.totalAssets, 0n);
-  const totalUngroupedAssets = ungroupedItems.reduce((sum, item) => sum + item.assets, 0n);
-
-  return {
-    groupedItems,
-    ungroupedItems,
-    totalGroupedAssets,
-    totalUngroupedAssets,
-  };
 }

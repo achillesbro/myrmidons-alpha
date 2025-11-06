@@ -45,6 +45,9 @@ export type VaultConfig = {
   chainId: number;               // Chain ID (999 for HyperEVM)
   chainName: string;             // Human-readable chain name
   
+  // Optional: Curator address for Octav portfolio API (Lagoon vaults only)
+  curatorAddress?: `0x${string}`; // Address to fetch allocations from Octav
+  
   // UI/Translations
   objectiveKey: string;          // i18n key for vault objective
   tagsKey: string;               // i18n key for vault tags
@@ -111,6 +114,7 @@ export const VAULT_CONFIGS: Record<string, VaultConfig> = {
     underlyingDecimals: 6,
     chainId: 999,
     chainName: 'HyperEVM',
+    curatorAddress: '0x8Ec77176F71F5ff53B71b01FC492F46Ea4e55A77', // Curator address for Octav API
     objectiveKey: 'landing.vaults.hypairdrop.objective',
     tagsKey: 'landing.vaults.hypairdrop.tags',
     links: {

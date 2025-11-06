@@ -166,7 +166,7 @@ export function ApyHistoryChart({ vaultAddress, chainId, underlyingSymbol = 'USD
           <h3 className="text-lg font-semibold text-[#00295B]">APY History</h3>
           <div className="h-8 w-32 bg-[#E1E1D6] rounded-lg animate-pulse"></div>
         </div>
-        <div className="w-full h-[240px] bg-[#E1E1D6] rounded animate-pulse"></div>
+        <div className="w-full h-[400px] bg-[#E1E1D6] rounded animate-pulse"></div>
       </div>
     );
   }
@@ -252,7 +252,7 @@ export function ApyHistoryChart({ vaultAddress, chainId, underlyingSymbol = 'USD
 
       {/* Chart */}
       <div className="mb-3">
-        <ResponsiveContainer width="100%" height={240}>
+        <ResponsiveContainer width="100%" height={400}>
           <AreaChart 
             data={sliced} 
             margin={{ top: 8, right: 12, left: 0, bottom: 0 }}

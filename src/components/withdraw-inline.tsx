@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatUnits, parseUnits } from 'viem';
 import { useWalletClient, useConfig } from 'wagmi';
 import { switchChain } from '@wagmi/core';
@@ -8,13 +8,16 @@ import vaultAbi from '../abis/vault.json';
 import { Toasts, type Toast, type ToastKind } from './vault-shared';
 import { DEFAULT_VAULT_CONFIG, type VaultConfig } from '../config/vaults.config';
 import type { IVaultAdapter } from '../lib/vault-provider';
+import { getToken } from '@lifi/sdk';
 
 interface WithdrawInlineProps {
   vaultConfig?: VaultConfig;
   vaultAdapter?: IVaultAdapter | null;
   userShares?: bigint;
   shareDecimals?: number;
+  underlyingDecimals?: number;
   sharePriceUsd?: number | null;
+  vaultShareSymbol?: string;
   onSuccess?: () => void;
 }
 
@@ -23,15 +26,21 @@ export function WithdrawInline({
   vaultAdapter,
   userShares = 0n,
   shareDecimals = 18,
+  underlyingDecimals = 6,
   sharePriceUsd,
+  vaultShareSymbol,
   onSuccess,
 }: WithdrawInlineProps) {
   const config = vaultConfig || DEFAULT_VAULT_CONFIG;
   const VAULT_ADDRESS = config.vaultAddress;
+  const UNDERLYING_SYMBOL = config.underlyingSymbol;
+  const UNDERLYING_ADDRESS = config.underlyingAddress;
 
   const [amount, setAmount] = useState<string>('');
   const [executing, setExecuting] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [underlyingLogoURI, setUnderlyingLogoURI] = useState<string | null>(null);
+  const [underlyingPriceUSD, setUnderlyingPriceUSD] = useState<string | null>(null);
   const [transactionSteps, setTransactionSteps] = useState<Array<{
     label: string;
     status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -48,6 +57,20 @@ export function WithdrawInline({
 
   const clientW = useWalletClient();
   const wagmiConfig = useConfig();
+
+  // Fetch underlying token logo and price
+  useEffect(() => {
+    const fetchUnderlyingInfo = async () => {
+      try {
+        const underlyingToken = await getToken(CHAIN_IDS.HYPEREVM, UNDERLYING_ADDRESS);
+        setUnderlyingLogoURI(underlyingToken.logoURI || null);
+        setUnderlyingPriceUSD(underlyingToken.priceUSD || null);
+      } catch (error) {
+        console.error(`Failed to fetch ${UNDERLYING_SYMBOL} info:`, error);
+      }
+    };
+    fetchUnderlyingInfo();
+  }, [UNDERLYING_ADDRESS, UNDERLYING_SYMBOL]);
 
   // Calculate USD equivalent for input shares
   const sharesFormatted = formatUnits(userShares, shareDecimals);
@@ -74,7 +97,7 @@ export function WithdrawInline({
     if (transactionSteps.length === 0) return null;
 
     return (
-      <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-[#E5E2D6]">
+      <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-[#E5E2D6]">
         <h4 className="text-sm font-semibold mb-3" style={{ color: 'var(--heading, #00295B)' }}>Transaction Progress</h4>
         <div className="space-y-2">
           {transactionSteps.map((step, index) => (
@@ -225,13 +248,13 @@ export function WithdrawInline({
     userShares > 0n;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Withdraw Section */}
-      <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
-        <div className="text-xs mb-2" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+      <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-2">
+        <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
           Withdraw
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="flex-1">
             <input
               type="number"
@@ -240,17 +263,17 @@ export function WithdrawInline({
               placeholder="0.0"
               step="0.000001"
               min="0"
-              className="w-full text-2xl font-semibold bg-transparent border-none outline-none"
+              className="w-full text-xl font-semibold bg-transparent border-none outline-none"
               style={{ color: 'var(--heading, #00295B)' }}
               disabled={executing}
             />
             {inputAmountUSD && (
-              <div className="text-xs mt-1" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
                 ${inputAmountUSD} USD
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 px-3 py-2">
+          <div className="flex items-center gap-1.5 px-2 py-1.5 text-sm">
             <img
               src="/Myrmidons-logo-dark-no-bg.png"
               alt={config.displayName}
@@ -260,14 +283,14 @@ export function WithdrawInline({
             <span className="font-semibold">{config.displayName}</span>
           </div>
         </div>
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center justify-between mt-1">
           <div className="text-xs" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
             {sharesFormatted} {config.displayName}
           </div>
           <button
             type="button"
             onClick={handleMax}
-            className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="text-[10px] px-1 py-0.5 rounded bg-gray-100 hover:bg-gray-200 transition-colors"
             disabled={!userShares || userShares === 0n || executing}
           >
             MAX
@@ -283,7 +306,7 @@ export function WithdrawInline({
         type="button"
         onClick={handleWithdraw}
         disabled={!canWithdraw}
-        className="w-full py-3 px-4 text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed border"
+        className="w-full py-2 px-3 text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed border"
         style={{ borderColor: 'var(--heading, #00295B)', color: 'var(--heading, #00295B)' }}
       >
         {executing ? 'Processing...' : amount ? 'Withdraw' : 'Enter an amount'}

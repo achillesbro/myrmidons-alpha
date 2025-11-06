@@ -83,7 +83,7 @@ function calculateStats(data: ChartDataPoint[]) {
   return { avg, min, max };
 }
 
-export function SharePriceHistoryChart({ vaultAddress, chainId, underlyingAddress }: SharePriceHistoryChartProps) {
+export function SharePriceHistoryChart({ vaultAddress, chainId, underlyingSymbol, underlyingAddress }: SharePriceHistoryChartProps) {
   const { data, loading, error, timeRange, setTimeRange } = useLagoonSharePriceHistory(
     vaultAddress, 
     chainId, 
@@ -118,7 +118,7 @@ export function SharePriceHistoryChart({ vaultAddress, chainId, underlyingAddres
           <h3 className="text-lg font-semibold text-[#00295B]">Price per Share</h3>
           <div className="h-8 w-32 bg-[#E1E1D6] rounded-lg animate-pulse"></div>
         </div>
-        <div className="w-full h-[240px] bg-[#E1E1D6] rounded animate-pulse"></div>
+        <div className="w-full h-[400px] bg-[#E1E1D6] rounded animate-pulse"></div>
       </div>
     );
   }
@@ -194,7 +194,7 @@ export function SharePriceHistoryChart({ vaultAddress, chainId, underlyingAddres
       )}
 
       {/* Chart */}
-      <ResponsiveContainer width="100%" height={240}>
+      <ResponsiveContainer width="100%" height={400}>
         <AreaChart data={sliced} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
           <defs>
             <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">

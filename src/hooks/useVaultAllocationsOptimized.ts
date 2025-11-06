@@ -6,7 +6,7 @@ import { MARKET_LABELS } from "../constants/hyper";
 import { TOKEN_METADATA } from "../constants/hyper";
 import { globalContractReader, type BatchCall } from "../lib/contract-batcher";
 import { globalPriceOptimizer } from "../lib/price-optimizer";
-import { groupAllocationsByFamily, type GroupedAllocation, type AllocationGroupingResult } from "../lib/allocation-grouper";
+import { groupMorphoAllocations, type GroupedAllocation, type AllocationGroupingResult } from "../lib/allocation-grouper";
 
 const vaultAbi = [
   { type: "function", name: "totalAssets", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
@@ -428,7 +428,7 @@ export function useVaultAllocationsOptimized(vaultAddress: Address): OptimizedAl
   // Group items by family
   const groupingResult: AllocationGroupingResult | null = useMemo(() => {
     if (!items || totalAssets === null) return null;
-    return groupAllocationsByFamily(items, totalAssets);
+    return groupMorphoAllocations(items, totalAssets);
   }, [items, totalAssets]);
 
   const groupedItems: GroupedAllocation[] | null = useMemo(() => {

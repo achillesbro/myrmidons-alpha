@@ -16,7 +16,7 @@ export default function InnerPageHero({
   rightSlot,
 }: InnerPageHeroProps) {
   return (
-    <section className="relative w-full py-10 md:py-12" style={{ background: 'var(--bg, #FFFFF5)' }}>
+    <section className="relative w-full py-4 md:py-6" style={{ background: 'var(--bg, #FFFFF5)' }}>
       {/* Background image with low opacity - only if enabled */}
       {showEngraving && (
         <>
@@ -48,7 +48,7 @@ export default function InnerPageHero({
       )}
 
       <div className="relative max-w-6xl mx-auto px-4 z-20">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2">
           <div className="flex-1">
             <h1
               className="text-2xl md:text-4xl font-semibold leading-tight"
@@ -59,7 +59,7 @@ export default function InnerPageHero({
 
             {subtitle && (
               <p
-                className="mt-3 text-base md:text-lg max-w-[60ch]"
+                className="mt-2 text-sm md:text-base max-w-[60ch]"
                 style={{ color: 'var(--text, #101720)' }}
               >
                 {subtitle}
@@ -68,7 +68,7 @@ export default function InnerPageHero({
 
             {/* Badge row */}
             {badges.length > 0 && (
-              <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
                 {badges.map((badge, index) => (
                   badge.href ? (
                     <a

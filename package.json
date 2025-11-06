@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:vercel": "vercel dev",
     "build": "tsc -b && vite build --emptyOutDir",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -55,6 +54,7 @@
     "@graphql-codegen/typescript-react-apollo": "^4.3.2",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
+    "@vercel/node": "^5.5.4",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "dotenv": "^17.2.3",

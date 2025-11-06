@@ -29,10 +29,12 @@ interface TokenBalance {
 interface DepositInlineProps {
   vaultConfig?: VaultConfig;
   vaultAdapter?: IVaultAdapter | null;
+  sharePriceUsd?: number | null;
+  vaultShareSymbol?: string;
   onSuccess?: () => void;
 }
 
-export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositInlineProps) {
+export function DepositInline({ vaultConfig, vaultAdapter, sharePriceUsd, vaultShareSymbol, onSuccess }: DepositInlineProps) {
   const config = vaultConfig || DEFAULT_VAULT_CONFIG;
   const VAULT_ADDRESS = config.vaultAddress;
   const UNDERLYING_SYMBOL = config.underlyingSymbol;
@@ -45,6 +47,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
   const [executing, setExecuting] = useState(false);
   const [underlyingBalance, setUnderlyingBalance] = useState<TokenBalance | null>(null);
   const [underlyingLoading, setUnderlyingLoading] = useState(false);
+  const [bridgedTokenAmount, setBridgedTokenAmount] = useState<string | null>(null);
   const [transactionSteps, setTransactionSteps] = useState<Array<{
     label: string;
     status: 'pending' | 'processing' | 'completed' | 'failed';
@@ -123,10 +126,12 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
     setSelectedToken(tokenInfo);
     setTokenSelectorOpen(false);
     setAmount('');
+    setBridgedTokenAmount(null);
   };
 
   const handleAmountChange = (value: string) => {
     setAmount(value);
+    setBridgedTokenAmount(null);
   };
 
   const handleMax = () => {
@@ -159,7 +164,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
     if (transactionSteps.length === 0) return null;
 
     return (
-      <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-[#E5E2D6]">
+      <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-[#E5E2D6]">
         <h4 className="text-sm font-semibold mb-3" style={{ color: 'var(--heading, #00295B)' }}>Transaction Progress</h4>
         <div className="space-y-2">
           {transactionSteps.map((step, index) => (
@@ -285,7 +290,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
 
         pushToast('info', `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
         const receipt = await provider.waitForTransaction(tx.hash, 1, 20_000);
-        if (!receipt || receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n)) {
+        if (!receipt || receipt.status === 0 || receipt.status === 0n) {
           throw new Error('Transaction failed');
         }
 
@@ -298,6 +303,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
         pushToast('success', 'Deposit successful!');
         setAmount('');
         setSelectedToken(null);
+        setBridgedTokenAmount(null);
         await fetchUnderlyingBalance();
         onSuccess?.();
       } else {
@@ -408,6 +414,10 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
           }
         }
 
+        if (estimatedOutputAmount) {
+          setBridgedTokenAmount(estimatedOutputAmount);
+        }
+
         pushToast('success', 'Bridge completed! Depositing to vault...');
 
         // Now deposit the bridged amount
@@ -474,7 +484,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
 
         pushToast('info', `Transaction submitted: ${tx.hash}`, 7000, `https://hyperevmscan.io/tx/${tx.hash}`);
         const receipt = await provider.waitForTransaction(tx.hash, 1, 20_000);
-        if (!receipt || receipt.status === null || receipt.status === 0 || (typeof receipt.status === 'bigint' && receipt.status === 0n)) {
+        if (!receipt || receipt.status === 0 || receipt.status === 0n) {
           throw new Error('Transaction failed');
         }
 
@@ -487,6 +497,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
         pushToast('success', 'Deposit successful!');
         setAmount('');
         setSelectedToken(null);
+        setBridgedTokenAmount(null);
         await fetchUnderlyingBalance();
         onSuccess?.();
       }
@@ -518,13 +529,13 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
     !executing;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Deposit Section */}
-      <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-4">
-        <div className="text-xs mb-2" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+      <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-2">
+        <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
           Deposit
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="flex-1">
             <input
               type="number"
@@ -533,12 +544,12 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
               placeholder="0.0"
               step="0.000001"
               min="0"
-              className="w-full text-2xl font-semibold bg-transparent border-none outline-none"
+              className="w-full text-xl font-semibold bg-transparent border-none outline-none"
               style={{ color: 'var(--heading, #00295B)' }}
               disabled={executing}
             />
             {inputAmountUSD && (
-              <div className="text-xs mt-1" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
                 ${inputAmountUSD} USD
               </div>
             )}
@@ -546,7 +557,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
           <button
             type="button"
             onClick={() => setTokenSelectorOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-all"
+            className="flex items-center gap-1 px-1 py-0.5 rounded border transition-all text-xs"
             style={{ borderColor: 'var(--border, #E5E2D6)' }}
             disabled={executing}
           >
@@ -556,21 +567,21 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
                   <img
                     src={selectedToken.logoURI}
                     alt={selectedToken.tokenSymbol}
-                    className="w-5 h-5 rounded-full"
+                    className="w-3 h-3 rounded-full"
                   />
                 )}
                 <span className="font-semibold">{selectedToken.tokenSymbol}</span>
-                <span className="text-xs">▼</span>
+                <span className="text-[10px]">▼</span>
               </>
             ) : (
               <>
                 <span className="font-semibold">Select token</span>
-                <span className="text-xs">▼</span>
+                <span className="text-[10px]">▼</span>
               </>
             )}
           </button>
         </div>
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center justify-between mt-1">
           <div className="text-xs" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
             {selectedToken
               ? `${parseFloat(selectedToken.balanceFormatted).toFixed(6)} ${selectedToken.tokenSymbol}`
@@ -579,7 +590,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
           <button
             type="button"
             onClick={handleMax}
-            className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="text-[10px] px-1 py-0.5 rounded bg-gray-100 hover:bg-gray-200 transition-colors"
             disabled={!selectedToken || executing}
           >
             MAX
@@ -595,7 +606,7 @@ export function DepositInline({ vaultConfig, vaultAdapter, onSuccess }: DepositI
         type="button"
         onClick={handleDeposit}
         disabled={!canDeposit}
-        className="w-full py-3 px-4 text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full py-2 px-3 text-sm font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{ background: 'var(--muted-brass, #B08D57)', color: '#fff' }}
       >
         {executing ? 'Processing...' : selectedToken ? `Deposit ${selectedToken.tokenSymbol}` : 'Enter an amount'}

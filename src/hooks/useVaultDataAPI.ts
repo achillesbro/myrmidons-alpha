@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { Address } from "viem";
 import { useGetVaultDataQuery } from "../graphql/__generated__/GetVaultData.query.generated";
 import type { AllocationItem } from "../lib/allocation-grouper";
-import { groupAllocationsByFamily, type GroupedAllocation, type AllocationGroupingResult } from "../lib/allocation-grouper";
+import { groupMorphoAllocations, type GroupedAllocation, type AllocationGroupingResult } from "../lib/allocation-grouper";
 
 export interface VaultDataAPI {
   // APY metrics
@@ -108,7 +108,7 @@ export function useVaultDataAPI(vaultAddress: Address, chainId: number): VaultDa
       };
     }
     
-    return groupAllocationsByFamily(allocations, BigInt(totalAssets));
+    return groupMorphoAllocations(allocations, BigInt(totalAssets));
   }, [allocations, data?.vaultByAddress?.state?.totalAssets, vaultAddress]);
 
   return {

@@ -27,7 +27,7 @@ import { MetricCard, InfoTooltip } from "./metric-card";
 import { useMetricsData } from "../hooks/useMetricsData";
 import { useVaultAdapter } from "../hooks/useVaultAdapter";
 import { useOctavAllocations } from "../hooks/useOctavAllocations";
-import { groupAllocationsByFamily, groupAllocationsByProtocol } from "../lib/allocation-grouper";
+import { groupLagoonAllocations } from "../lib/allocation-grouper";
 
 // Simple error boundary to isolate rendering errors in the API View
 import React from "react";
@@ -92,7 +92,8 @@ export function VaultAPIView({
   const apiData = useVaultDataAPI(VAULT_ADDRESS, CHAIN_ID);
   
   // Fetch Octav allocations (only for Lagoon vaults)
-  const octavAllocations = useOctavAllocations(VAULT_ADDRESS);
+  // Use vault ID instead of address (curator address is handled by API route)
+  const octavAllocations = useOctavAllocations(config.id);
   
   // Fetch metrics data for sparklines and derived values (always call hooks at top level)
   const metricsData = useMetricsData(VAULT_ADDRESS, CHAIN_ID, apiData.sharePriceUsd);
@@ -121,19 +122,14 @@ export function VaultAPIView({
   const [onchainLoading, setOnchainLoading] = useState(true);
   const [onchainError, setOnchainError] = useState<Error | null>(null);
 
-  // Group Octav allocations for Lagoon vaults
-  // For HypAirdrop, group by protocol; for other Lagoon vaults, use token family grouping
+  // Group Octav allocations for Lagoon vaults by protocol (not token families)
   const octavGroupedAllocations = useMemo(() => {
-    if (!octavAllocations.allocations.length || !onchainData?.totalAssets) {
+    if (!octavAllocations.allocations.length) {
       return { groupedItems: [], ungroupedItems: [], totalGroupedAssets: 0n, totalUngroupedAssets: 0n };
     }
-    // Use protocol grouping for HypAirdrop, token family for others
-    if (config.id === 'hypairdrop') {
-      return groupAllocationsByProtocol(octavAllocations.allocations, onchainData.totalAssets);
-    } else {
-      return groupAllocationsByFamily(octavAllocations.allocations, onchainData.totalAssets);
-    }
-  }, [octavAllocations.allocations, onchainData?.totalAssets, config.id]);
+    // Use protocol-based grouping for HypAirdrop (creates "Liquidity" group for wallet tokens)
+    return groupLagoonAllocations(octavAllocations.allocations);
+  }, [octavAllocations.allocations]);
 
   const [usdPrice, setUsdPrice] = useState<number | null>(null);
   const [priceLoading, setPriceLoading] = useState<boolean>(true);
@@ -161,6 +157,7 @@ export function VaultAPIView({
 
   // User state (HyperEVM tx path only)
   const [underlyingAddress, setUnderlyingAddress] = useState<`0x${string}` | null>(null);
+  const [assetDecimals, setAssetDecimals] = useState<number>(18);
   // Approval confirmation dialog state
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [onchainBalance, setOnchainBalance] = useState<bigint>(0n); // underlying token balance
@@ -390,6 +387,7 @@ export function VaultAPIView({
   useEffect(() => {
     if (onchainData?.underlyingAddress) {
       setUnderlyingAddress(onchainData.underlyingAddress);
+      setAssetDecimals(onchainData.underlyingDecimals);
     }
   }, [onchainData?.underlyingAddress, onchainData?.underlyingDecimals]);
 
@@ -475,9 +473,8 @@ export function VaultAPIView({
     }
   }, [clientW.data?.account?.address, underlyingAddress, VAULT_ADDRESS, vaultAdapter]);
 
-  // Approve exactly the amount entered (currently unused, kept for future use)
-  // @ts-expect-error - intentionally unused, kept for future reference
-  const _runApproveExact = async (amountWei: bigint) => {
+  // Approve exactly the amount entered
+  const runApproveExact = async (amountWei: bigint) => {
     try {
       if (!clientW.data) throw new Error("Connect wallet");
       if (!underlyingAddress) throw new Error("Token unknown");
@@ -826,7 +823,7 @@ export function VaultAPIView({
 
     return (
       <ErrorBoundary>
-        <div className="space-y-6">
+        <div className="space-y-3">
 
         {/* Hero Section */}
         <InnerPageHero
@@ -861,82 +858,93 @@ export function VaultAPIView({
         }
         />
 
-        {/* Vault Info on top, Actions (2/3) & Current Position (1/3) below, then Metrics, Allocations */}
+        {/* Vault Info on top, then Key Metrics row, then Deposit/Position + Chart row */}
         <div className="space-y-4">
           
-          {/* Middle section: Actions (8/12) and Current Position (4/12) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Actions section - takes 8/12 of the grid */}
-            <div className="lg:col-span-8">
-              <ChainVaultGuard
-                requiredChainId={999}
-                requiredChainName="HyperEVM"
-                vaultAddress={VAULT_ADDRESS as `0x${string}`}
-                allowedVaultsByChain={ALLOWED_VAULTS}
-                warnOnly={false}
-              >
-                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 h-full flex flex-col">
-                  <h3 className="text-lg font-semibold text-[#00295B] mb-4">
-                    {t("vaultInfo.actions.title")}
-                  </h3>
-                  
-                  {/* Deposit/Withdraw Toggle */}
-                  <div className="flex gap-2 mb-4 p-1 bg-gray-100 rounded-lg" style={{ background: 'rgba(0,41,91,0.05)' }}>
-                    <button
-                      type="button"
-                      onClick={() => setActionMode('deposit')}
-                      className={`flex-1 px-4 py-2 text-sm font-semibold rounded-md transition-all ${
-                        actionMode === 'deposit'
-                          ? 'bg-[#FFFFF5] shadow-sm'
-                          : 'bg-transparent opacity-60 hover:opacity-80'
-                      }`}
-                      style={actionMode === 'deposit' ? { color: 'var(--heading, #00295B)' } : { color: 'var(--text, #101720)' }}
-                    >
-                      {t("vaultInfo.actions.deposit")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActionMode('withdraw')}
-                      className={`flex-1 px-4 py-2 text-sm font-semibold rounded-md transition-all ${
-                        actionMode === 'withdraw'
-                          ? 'bg-[#FFFFF5] shadow-sm'
-                          : 'bg-transparent opacity-60 hover:opacity-80'
-                      }`}
-                      style={actionMode === 'withdraw' ? { color: 'var(--heading, #00295B)' } : { color: 'var(--text, #101720)' }}
-                    >
-                      {t("vaultInfo.actions.withdraw")}
-                    </button>
-                  </div>
-
-                  {/* Action Content */}
-                  {actionMode === 'deposit' ? (
-                    <DepositInline
-                      vaultConfig={config}
-                      vaultAdapter={vaultAdapter}
-                      onSuccess={refreshPositionData}
-                    />
-                  ) : (
-                    <WithdrawInline
-                      vaultConfig={config}
-                      vaultAdapter={vaultAdapter}
-                      userShares={userShares}
-                      shareDecimals={onchainData?.shareDecimals || 18}
-                      sharePriceUsd={vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd}
-                      onSuccess={refreshPositionData}
-                    />
-                  )}
-                  
-                  <p className="text-xs text-center mt-4" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
-                    {t(`vaultInfo.actions.depositDescription.${config.id}`)}
-                  </p>
-                </div>
-              </ChainVaultGuard>
+          {/* First row: Key Metrics as small horizontal sections */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* TVL */}
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
+              <MetricCard
+                num={priceLoading || tvlUsd === undefined ? "—" : 
+                  tvlUsd >= 1000000 ? `$${(tvlUsd / 1000000).toFixed(2)}M` :
+                  tvlUsd >= 1000 ? `$${(tvlUsd / 1000).toFixed(1)}K` :
+                  `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                }
+                sub="TVL"
+              />
             </div>
             
-            {/* Current Position section - takes 4/12 of the grid */}
-            <div className="lg:col-span-4">
-              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 h-full flex flex-col">
-                <h3 className="text-lg font-semibold text-[#00295B] mb-4">
+            {/* Current APY */}
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
+              <MetricCard
+                num={apiData.loading || apiData.instantApy === null ? "—" :
+                  `${(apiData.instantApy * 100).toFixed(2)}%`
+                }
+                sub={
+                  <span>
+                    Current APY
+                    <InfoTooltip label="Annualized from latest net rate; variable" />
+                  </span>
+                }
+                delta={metricsData.apy7dAvg !== null ? 
+                  `7D avg ${(metricsData.apy7dAvg * 100).toFixed(2)}%` : undefined
+                }
+                sparkline={metricsData.apySparkline.length > 0 ? metricsData.apySparkline : undefined}
+              />
+            </div>
+            
+            {/* Share Price */}
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
+              <MetricCard
+                num={
+                  vaultAdapter 
+                    ? (lagoonSharePriceLoading || priceLoading || lagoonSharePriceUsd === null ? "—" :
+                        `$${lagoonSharePriceUsd.toFixed(4)}`)
+                    : (apiData.loading || priceLoading || apiData.sharePriceUsd === null ? "—" :
+                        `$${apiData.sharePriceUsd.toFixed(4)}`)
+                }
+                sub={
+                  <span>
+                    Share Price
+                    <InfoTooltip label="Vault assets per share (ERC-4626)" />
+                  </span>
+                }
+              />
+            </div>
+            
+            {/* Since Inception */}
+            <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <MetricCard
+                    num={metricsData.sinceInceptionReturn !== null ?
+                      `${metricsData.sinceInceptionReturn >= 0 ? '+' : ''}${metricsData.sinceInceptionReturn.toFixed(2)}%` :
+                      "—"
+                    }
+                    sub="Since Inception"
+                    deltaType={
+                      metricsData.sinceInceptionReturn !== null ?
+                        metricsData.sinceInceptionReturn >= 0 ? "positive" : "negative" :
+                        "neutral"
+                    }
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 text-xs ml-2" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                  <span>Live</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Second row: Left (1/3) Current Position + Deposit/Withdraw, Right (2/3) Chart */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {/* Left column: Current Position on top, Deposit/Withdraw below */}
+            <div className="lg:col-span-1 space-y-3">
+              {/* Current Position */}
+              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
+                <h3 className="text-sm font-semibold text-[#00295B] mb-2">
                   {t("vaultInfo.position.title")}
                 </h3>
                 {!clientW.data?.account ? (
@@ -944,18 +952,20 @@ export function VaultAPIView({
                     {t("vaultInfo.position.connectToView")}
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <div>
-                      <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
-                        {t("vaultInfo.position.shares")}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs mb-0.5" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                          {t("vaultInfo.position.shares")}
+                        </div>
+                        <div className="text-2xl font-bold text-[#00295B]" style={{ fontFeatureSettings: '"tnum"' }}>{fmtToken(userShares, onchainData.shareDecimals)}</div>
                       </div>
-                      <div className="text-lg font-semibold text-[#00295B]">{fmtToken(userShares, onchainData.shareDecimals)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs mb-1" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
-                        {t("vaultInfo.position.usdValue")}
+                      <div>
+                        <div className="text-xs mb-0.5" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                          {t("vaultInfo.position.usdValue")}
+                        </div>
+                        <div className="text-2xl font-bold text-[#00295B]" style={{ fontFeatureSettings: '"tnum"' }}>{priceLoading ? <Skeleton className="h-7 w-20"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
                       </div>
-                      <div className="text-lg font-semibold text-[#00295B]">{priceLoading ? <Skeleton className="h-5 w-20"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
                     </div>
                     {vaultAdapter && (pendingDepositAssets > 0n || claimableShares > 0n) && (
                       <div className="pt-3 mt-3 border-t" style={{ borderColor: 'var(--border, #E5E2D6)' }}>
@@ -1007,93 +1017,74 @@ export function VaultAPIView({
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-          
-          {/* Bottom section: Key Metrics (1/3) and APY History (2/3) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Key Metrics Section - 1/3 width */}
-            <div className="lg:col-span-1">
-              <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-5 h-full flex flex-col">
-                {/* Header with live indicator */}
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-lg font-semibold text-[#00295B]">
-                    {t("vaultInfo.metrics.title")}
-                  </h2>
-                  <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                    <span>Live · {metricsData.lastUpdated} UTC</span>
+              
+              {/* Deposit/Withdraw */}
+              <ChainVaultGuard
+                requiredChainId={999}
+                requiredChainName="HyperEVM"
+                vaultAddress={VAULT_ADDRESS as `0x${string}`}
+                allowedVaultsByChain={ALLOWED_VAULTS}
+                warnOnly={false}
+              >
+                <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 flex flex-col">
+                  {/* Deposit/Withdraw Toggle */}
+                  <div className="flex gap-2 mb-2 p-1 bg-gray-100 rounded-lg" style={{ background: 'rgba(0,41,91,0.05)' }}>
+                    <button
+                      type="button"
+                      onClick={() => setActionMode('deposit')}
+                      className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                        actionMode === 'deposit'
+                          ? 'bg-[#FFFFF5] shadow-sm'
+                          : 'bg-transparent opacity-60 hover:opacity-80'
+                      }`}
+                      style={actionMode === 'deposit' ? { color: 'var(--heading, #00295B)' } : { color: 'var(--text, #101720)' }}
+                    >
+                      {t("vaultInfo.actions.deposit")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActionMode('withdraw')}
+                      className={`flex-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                        actionMode === 'withdraw'
+                          ? 'bg-[#FFFFF5] shadow-sm'
+                          : 'bg-transparent opacity-60 hover:opacity-80'
+                      }`}
+                      style={actionMode === 'withdraw' ? { color: 'var(--heading, #00295B)' } : { color: 'var(--text, #101720)' }}
+                    >
+                      {t("vaultInfo.actions.withdraw")}
+                    </button>
                   </div>
+
+                  {/* Action Content */}
+                  {actionMode === 'deposit' ? (
+                    <DepositInline
+                      vaultConfig={config}
+                      vaultAdapter={vaultAdapter}
+                      sharePriceUsd={vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd}
+                      vaultShareSymbol={onchainData?.symbol}
+                      onSuccess={refreshPositionData}
+                    />
+                  ) : (
+                    <WithdrawInline
+                      vaultConfig={config}
+                      vaultAdapter={vaultAdapter}
+                      userShares={userShares}
+                      shareDecimals={onchainData?.shareDecimals || 18}
+                      underlyingDecimals={onchainData?.underlyingDecimals || 6}
+                      sharePriceUsd={vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd}
+                      vaultShareSymbol={onchainData?.symbol}
+                      onSuccess={refreshPositionData}
+                    />
+                  )}
+                  
+                  <p className="text-xs text-center mt-2" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                    {t(`vaultInfo.actions.depositDescription.${config.id}`)}
+                  </p>
                 </div>
-
-                {/* 2x2 Metrics Grid - centered */}
-                <div className="flex-1 flex items-center">
-                  <div className="w-full space-y-6">
-                    {/* Row 1: TVL and Current APY with sparkline */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <MetricCard
-                        num={priceLoading || tvlUsd === undefined ? "—" : 
-                          tvlUsd >= 1000000 ? `$${(tvlUsd / 1000000).toFixed(2)}M` :
-                          tvlUsd >= 1000 ? `$${(tvlUsd / 1000).toFixed(1)}K` :
-                          `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                        }
-                        sub="TVL"
-                      />
-                      
-                      <MetricCard
-                        num={apiData.loading || apiData.instantApy === null ? "—" :
-                          `${(apiData.instantApy * 100).toFixed(2)}%`
-                        }
-                        sub={
-                          <span>
-                            Current APY
-                            <InfoTooltip label="Annualized from latest net rate; variable" />
-                          </span>
-                        }
-                        delta={metricsData.apy7dAvg !== null ? 
-                          `7D avg ${(metricsData.apy7dAvg * 100).toFixed(2)}%` : undefined
-                        }
-                        sparkline={metricsData.apySparkline.length > 0 ? metricsData.apySparkline : undefined}
-                      />
-                    </div>
-
-                    {/* Row 2: Share Price and Since Inception */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <MetricCard
-                        num={
-                          vaultAdapter 
-                            ? (lagoonSharePriceLoading || priceLoading || lagoonSharePriceUsd === null ? "—" :
-                                `$${lagoonSharePriceUsd.toFixed(4)}`)
-                            : (apiData.loading || priceLoading || apiData.sharePriceUsd === null ? "—" :
-                                `$${apiData.sharePriceUsd.toFixed(4)}`)
-                        }
-                        sub={
-                          <span>
-                            Share Price
-                            <InfoTooltip label="Vault assets per share (ERC-4626)" />
-                          </span>
-                        }
-                      />
-
-                      <MetricCard
-                        num={metricsData.sinceInceptionReturn !== null ?
-                          `${metricsData.sinceInceptionReturn >= 0 ? '+' : ''}${metricsData.sinceInceptionReturn.toFixed(2)}%` :
-                          "—"
-                        }
-                        sub="Since Inception"
-                        deltaType={
-                          metricsData.sinceInceptionReturn !== null ?
-                            metricsData.sinceInceptionReturn >= 0 ? "positive" : "negative" :
-                            "neutral"
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              </ChainVaultGuard>
             </div>
             
-            {/* APY Chart Section - 2/3 width */}
+            {/* Right column: Chart - 2/3 width */}
             <div className="lg:col-span-2">
               {config.type === 'lagoon' ? (
                 <SharePriceHistoryChart 
@@ -1112,12 +1103,12 @@ export function VaultAPIView({
           {config.type === 'lagoon' && (
           <div className="space-y-4">
             {/* Enhanced Allocations with Pie Chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               {/* Allocations List - 2/3 width */}
               <div className="lg:col-span-2">
                 <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full">
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="mb-2">
+                    <div className="flex items-start justify-between gap-4">
                       <div>
                         <h2 className="text-base font-bold text-[#00295B]">
                           {t("vaultInfo.allocations.title")}
@@ -1126,16 +1117,10 @@ export function VaultAPIView({
                           {t("vaultInfo.allocations.subtitle")}
                         </p>
                       </div>
-                      {octavAllocations.lastUpdated && (
+                      {octavAllocations.timestamp && (
                         <div className="text-xs text-[#101720]/60 whitespace-nowrap">
-                          Last updated: {new Date(octavAllocations.lastUpdated).toLocaleString('en-GB', { 
-                            day: '2-digit', 
-                            month: 'short', 
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            timeZone: 'UTC',
-                            timeZoneName: 'short'
-                          })}
+                          Last updated:<br />
+                          {new Date(octavAllocations.timestamp).toLocaleString()}
                         </div>
                       )}
                     </div>
@@ -1154,7 +1139,7 @@ export function VaultAPIView({
                       groupedItems={octavGroupedAllocations.groupedItems}
                       ungroupedItems={octavGroupedAllocations.ungroupedItems}
                       totalAssets={onchainData?.totalAssets ?? 0n}
-                      isProtocolGrouping={config.id === 'hypairdrop'}
+                      isHypAirdrop={true}
                     />
                   ) : (
                     <p className="text-sm text-[#101720]/70 text-center py-8">
@@ -1176,8 +1161,8 @@ export function VaultAPIView({
                   ) : octavAllocations.allocations.length > 0 ? (
                     <AllocationPieChartAPI
                       groupedAllocations={octavGroupedAllocations.groupedItems}
+                      ungroupedAllocations={octavGroupedAllocations.ungroupedItems}
                       loading={false}
-                      isProtocolGrouping={config.id === 'hypairdrop'}
                     />
                   ) : (
                     <p className="text-sm text-[#101720]/70 text-center py-8">No allocations to display</p>
@@ -1193,11 +1178,11 @@ export function VaultAPIView({
           <div className="space-y-4">
 
             {/* Enhanced Allocations with Pie Chart */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               {/* Allocations List - 2/3 width */}
               <div className="lg:col-span-2">
                 <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3 h-full">
-                  <div className="mb-3">
+                  <div className="mb-2">
                     <h2 className="text-base font-bold text-[#00295B]">
                       {t("vaultInfo.allocations.title")}
                     </h2>

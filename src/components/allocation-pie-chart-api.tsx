@@ -1,10 +1,10 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
-import type { GroupedAllocation, ProtocolGroupedAllocation } from "../lib/allocation-grouper";
+import type { GroupedAllocation, AllocationItem } from "../lib/allocation-grouper";
 
 interface AllocationPieChartAPIProps {
-  groupedAllocations: GroupedAllocation[] | ProtocolGroupedAllocation[];
+  groupedAllocations: GroupedAllocation[];
+  ungroupedAllocations?: AllocationItem[];
   loading?: boolean;
-  isProtocolGrouping?: boolean;
 }
 
 const COLORS = [
@@ -18,7 +18,11 @@ const COLORS = [
   "#3D5A6B", // Dark slate
 ];
 
-export function AllocationPieChartAPI({ groupedAllocations, loading = false, isProtocolGrouping = false }: AllocationPieChartAPIProps) {
+export function AllocationPieChartAPI({ 
+  groupedAllocations, 
+  ungroupedAllocations = [],
+  loading = false 
+}: AllocationPieChartAPIProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
@@ -37,27 +41,41 @@ export function AllocationPieChartAPI({ groupedAllocations, loading = false, isP
     );
   }
 
-  if (groupedAllocations.length === 0) {
+  // Combine grouped and ungrouped items for the chart
+  const chartData: Array<{
+    name: string;
+    value: number;
+    usd: number | null;
+    marketCount: number;
+  }> = [];
+
+  // Add grouped allocations
+  groupedAllocations.forEach((group) => {
+    chartData.push({
+      name: group.familyLabel,
+      value: group.percentage,
+      usd: group.totalUsd,
+      marketCount: group.marketCount,
+    });
+  });
+
+  // Add ungrouped allocations as individual items
+  ungroupedAllocations.forEach((item) => {
+    chartData.push({
+      name: item.label,
+      value: item.pct,
+      usd: item.usd,
+      marketCount: 1,
+    });
+  });
+
+  if (chartData.length === 0) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
         <p className="text-sm text-[#101720]/70">No allocations to display</p>
       </div>
     );
   }
-
-  const chartData = groupedAllocations.map((group) => {
-    const name = isProtocolGrouping && 'protocolName' in group
-      ? group.protocolName
-      : 'familyLabel' in group
-        ? group.familyLabel
-        : '';
-    return {
-      name,
-      value: group.percentage,
-      usd: group.totalUsd,
-      marketCount: group.marketCount,
-    };
-  });
 
   const renderCustomLabel = (props: any) => {
     const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props;

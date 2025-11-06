@@ -69,10 +69,15 @@ npm install
 ### Development
 
 ```bash
-# Start the development server
+# Start the development server (Vite)
 npm run dev
 
 # The app will be available at http://localhost:5173
+
+# Note: API routes (/api/*) are Vercel serverless functions
+# For local testing of API routes, use Vercel CLI:
+# npx vercel dev
+# This will run both the frontend and API routes locally
 ```
 
 ### Build
