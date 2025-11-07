@@ -233,6 +233,41 @@ button:focus-visible {
   color: inherit !important;
 }
 
+/* ==== Table header sort buttons - match nav-link-dropdown style ==== */
+.table-header-sort {
+  background: none !important;
+  border: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  line-height: inherit !important;
+  letter-spacing: normal !important;
+  cursor: pointer;
+  display: inline-flex !important;
+  text-decoration: none !important;
+  font-family: inherit !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+.table-header-sort:hover {
+  opacity: 0.75 !important;
+  background: none !important;
+  border: none !important;
+}
+.table-header-sort:focus,
+.table-header-sort:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.table-header-sort:active {
+  background: none !important;
+  border: none !important;
+  color: inherit !important;
+}
+
 /* ==== Deposit/Withdraw Inline Balance Controls ==== */
 .deposit-balance-controls {
   display: flex;

@@ -25,11 +25,12 @@ import { SiteFooter } from "./components/site-footer";
 import LandingPage from "./components/landing/LandingPage";
 import SiteHeader from "./components/layout/SiteHeader";
 import { OctavTestPage } from "./pages/octav-test";
+import { PortfolioPage } from "./pages/portfolio";
 import { useTranslation } from 'react-i18next'
 import i18n from "./i18n";
 import { DEFAULT_VAULT_CONFIG, getVaultConfigById, type VaultConfig } from "./config/vaults.config";
 
-const TABS = ["VAULTINFO", "LIFI_TEST", "OCTAV_TEST"] as const;
+const TABS = ["VAULTINFO", "LIFI_TEST", "OCTAV_TEST", "PORTFOLIO"] as const;
 type Tab = typeof TABS[number];
 const TAB_PARAM = "tab";
 const VAULT_PARAM = "vault"; // New: vault selection parameter
@@ -43,6 +44,7 @@ function normalizeTabParam(value: string | null): Tab | null {
   if (v === "API" || v === "VAULTINFO") return "VAULTINFO" as Tab;
   if (v === "LIFI_TEST") return "LIFI_TEST" as Tab;
   if (v === "OCTAV_TEST") return "OCTAV_TEST" as Tab;
+  if (v === "PORTFOLIO") return "PORTFOLIO" as Tab;
   return null;
 }
 
@@ -126,7 +128,7 @@ const TestInterface = () => {
 
   useEffect(() => {
     if (activeTab) {
-      const page = activeTab === "VAULTINFO" ? t('tabs.vault') : activeTab === "OCTAV_TEST" ? 'Octav Test' : 'Test';
+      const page = activeTab === "VAULTINFO" ? t('tabs.vault') : activeTab === "OCTAV_TEST" ? 'Octav Test' : activeTab === "PORTFOLIO" ? 'Portfolio' : 'Test';
       document.title = `${t('brand')} — ${page}`;
     } else {
       document.title = `${t('brand')} — Landing`;
@@ -148,6 +150,8 @@ const TestInterface = () => {
               <VaultAPIView vaultAddress={vaultAddress} vaultConfig={vaultConfig} />
             ) : activeTab === "OCTAV_TEST" ? (
               <OctavTestPage />
+            ) : activeTab === "PORTFOLIO" ? (
+              <PortfolioPage />
             ) : null}
           </div>
         </div>

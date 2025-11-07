@@ -243,3 +243,4 @@ export function computeInterpolatedApr(
   return Number(formatUnits(aprBigInt, DECIMALS));
 }
 
+
