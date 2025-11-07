@@ -6,8 +6,6 @@ interface AllocationPanelProps {
 }
 
 export function AllocationPanel({ positions }: AllocationPanelProps) {
-  const totalValue = positions.reduce((sum, p) => sum + p.valueUsd, 0);
-
   if (positions.length === 0) {
     return (
       <div className="rounded-2xl shadow-sm bg-white border border-black/5 p-6">
