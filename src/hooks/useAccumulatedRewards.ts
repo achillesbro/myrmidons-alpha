@@ -8,7 +8,6 @@ import {
   fetchVaultTotalPoints,
   fetchEcosystemPoints,
   type ProtocolReward,
-  type EcosystemPointsEntry,
 } from '../lib/points-data';
 
 interface UseAccumulatedRewardsResult {
