@@ -120,9 +120,27 @@ export async function fetchOctavPortfolio(
 
     const data = await response.json();
     
+    // Log raw response type for debugging
+    console.log(`[Octav] Raw response type:`, {
+      isArray: Array.isArray(data),
+      type: typeof data,
+      keys: !Array.isArray(data) && typeof data === 'object' ? Object.keys(data) : null,
+    });
+    
     // Octav returns an array of portfolio objects
     if (!Array.isArray(data)) {
       console.warn('[Octav] Expected array response, got:', typeof data);
+      // If it's a single object, wrap it in an array for compatibility
+      if (typeof data === 'object' && data !== null) {
+        console.log('[Octav] Wrapping single object response in array');
+        const wrappedData = [data];
+        const portfolio = wrappedData.find((p: any) => 
+          p.address?.toLowerCase() === curatorAddress.toLowerCase()
+        );
+        if (portfolio) {
+          return [portfolio as OctavPortfolioResponse];
+        }
+      }
       return [];
     }
 
@@ -138,15 +156,32 @@ export async function fetchOctavPortfolio(
       return [];
     }
 
-    // Log portfolio structure for debugging
+    // Enhanced portfolio structure logging
+    const protocolKeys = portfolio.assetByProtocols ? Object.keys(portfolio.assetByProtocols) : [];
+    const protocolDetails = protocolKeys.map(key => {
+      const proto = portfolio.assetByProtocols[key];
+      return {
+        key,
+        name: proto.name,
+        hasImgSmall: !!proto.imgSmall,
+        hasImgLarge: !!proto.imgLarge,
+        hasChains: !!proto.chains,
+        chainKeys: proto.chains ? Object.keys(proto.chains) : [],
+        hasDirectAssets: !!proto.assets,
+        directAssetCount: proto.assets ? proto.assets.length : 0,
+      };
+    });
+
     console.log(`[Octav] Portfolio structure:`, {
+      address: portfolio.address,
       hasAssetByProtocols: !!portfolio.assetByProtocols,
-      protocolCount: portfolio.assetByProtocols ? Object.keys(portfolio.assetByProtocols).length : 0,
+      protocolCount: protocolKeys.length,
       hasChains: !!portfolio.chains,
       chainCount: portfolio.chains ? Object.keys(portfolio.chains).length : 0,
       cashBalance: portfolio.cashBalance,
       networth: portfolio.networth,
-      protocolKeys: portfolio.assetByProtocols ? Object.keys(portfolio.assetByProtocols) : [],
+      protocolKeys,
+      protocolDetails,
     });
 
     return [portfolio];

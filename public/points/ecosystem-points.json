@@ -1,19 +1,13 @@
 [
   {
-    "protocolKey": "hyperlend",
-    "protocolName": "Hyperlend",
-    "points": 10000,
+    "protocolKey": "test",
+    "protocolName": "Test",
+    "points": 1000,
     "tag": null
   },
   {
-    "protocolKey": "hypurrfi",
-    "protocolName": "Hypurrfi",
-    "points": 100,
-    "tag": null
-  },
-  {
-    "protocolKey": "hyperswap",
-    "protocolName": "Hyperswap",
+    "protocolKey": "test2",
+    "protocolName": "Test2",
     "points": null,
     "tag": "AIRDROPPED"
   }
