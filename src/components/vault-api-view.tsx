@@ -28,6 +28,7 @@ import { useMetricsData } from "../hooks/useMetricsData";
 import { useVaultAdapter } from "../hooks/useVaultAdapter";
 import { useOctavAllocations } from "../hooks/useOctavAllocations";
 import { groupLagoonAllocations } from "../lib/allocation-grouper";
+import { AccumulatedRewards } from "./accumulated-rewards";
 
 // Simple error boundary to isolate rendering errors in the API View
 import React from "react";
@@ -1075,6 +1076,16 @@ export function VaultAPIView({
                   </p>
                 </div>
               </ChainVaultGuard>
+
+              {/* Accumulated Rewards Section - Only for HypAirdrop */}
+              {config.id === 'hypairdrop' && (
+                <AccumulatedRewards
+                  walletAddress={clientW.data?.account?.address}
+                  vaultAddress={VAULT_ADDRESS}
+                  allocations={octavAllocations.allocations}
+                  loading={octavAllocations.loading}
+                />
+              )}
             </div>
             
             {/* Right column: Chart - 2/3 width */}

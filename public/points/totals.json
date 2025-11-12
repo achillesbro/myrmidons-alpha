@@ -1,0 +1,14 @@
+[
+  {
+    "chainId": "999",
+    "vault": "0x66894de1ca1e08aaffbe70809512d57d725e30fd",
+    "wallet": "0xa1ddd3455a909b6c3efab5ddc0c2706895104a0e",
+    "points": 797947.273135103
+  },
+  {
+    "chainId": "999",
+    "vault": "0x66894de1ca1e08aaffbe70809512d57d725e30fd",
+    "wallet": "0xaf0a038327432d0e9895e9ae4d5e2fdf2bd24cfb",
+    "points": 7049.4199865902
+  }
+]
