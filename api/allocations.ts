@@ -23,6 +23,10 @@ export default async function handler(
     // Set CORS headers if needed
     response.setHeader('Access-Control-Allow-Origin', '*');
     response.setHeader('Access-Control-Allow-Methods', 'GET');
+    // Prevent browser caching - always fetch fresh data from Redis
+    response.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.setHeader('Pragma', 'no-cache');
+    response.setHeader('Expires', '0');
     
     // Only allow GET requests
     if (request.method !== 'GET') {
@@ -92,10 +96,11 @@ export default async function handler(
     // Check cache age
     const cacheAge = Date.now() - cached.timestamp;
     const cacheAgeHours = cacheAge / (1000 * 60 * 60);
+    const cacheAgeMinutes = cacheAge / (1000 * 60);
     const isStale = cacheAgeHours > 24;
 
     console.log(
-      `[API] Returning cached data (age: ${cacheAgeHours.toFixed(2)} hours, stale: ${isStale})`
+      `[API] Returning cached data (age: ${cacheAgeMinutes.toFixed(1)} minutes / ${cacheAgeHours.toFixed(2)} hours, stale: ${isStale}, timestamp: ${cached.timestamp} (${new Date(cached.timestamp).toISOString()}))`
     );
 
     // Serialize BigInt values to strings for JSON response

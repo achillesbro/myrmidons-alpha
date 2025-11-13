@@ -29,10 +29,12 @@ export function useOctavAllocations(vaultId: string): OctavAllocationsData {
         console.log(`[useOctavAllocations] Fetching allocations for vault: ${vaultId}`);
 
         // Fetch from cached API endpoint (using query parameter)
-        const response = await fetch(`/api/allocations?vaultId=${encodeURIComponent(vaultId)}`, {
+        // Add cache-busting timestamp to ensure fresh data
+        const response = await fetch(`/api/allocations?vaultId=${encodeURIComponent(vaultId)}&_t=${Date.now()}`, {
           headers: {
             'Content-Type': 'application/json',
           },
+          cache: 'no-store', // Prevent browser caching
         });
 
         if (!response.ok) {

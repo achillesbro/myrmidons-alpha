@@ -71,10 +71,12 @@ export async function getCachedAllocations(
   try {
     const redis = getRedisClient();
     const key = getCacheKey(vaultId, curatorAddress);
+    console.log(`[Redis] Fetching cache with key: ${key}`);
     const cached = await redis.get<CachedAllocationData>(key);
     
     if (cached) {
-      console.log(`[Redis] Cache hit for vault ${vaultId} (curator: ${curatorAddress})`);
+      const cacheAge = Date.now() - cached.timestamp;
+      console.log(`[Redis] Cache hit for vault ${vaultId} (curator: ${curatorAddress}), key: ${key}, age: ${(cacheAge / 1000 / 60).toFixed(1)} minutes, timestamp: ${cached.timestamp} (${new Date(cached.timestamp).toISOString()})`);
       
       // Deserialize BigInt values from strings
       const deserializedAllocations = deserializeAllocations(cached.allocations);
@@ -85,7 +87,7 @@ export async function getCachedAllocations(
       };
     }
     
-    console.log(`[Redis] Cache miss for vault ${vaultId} (curator: ${curatorAddress})`);
+    console.log(`[Redis] Cache miss for vault ${vaultId} (curator: ${curatorAddress}), key: ${key}`);
     return null;
   } catch (error) {
     console.error('[Redis] Error fetching from cache:', error);
@@ -124,14 +126,17 @@ export async function setCachedAllocations(
     // Serialize BigInt values to strings for JSON storage
     const serializedAllocations = serializeAllocations(allocations);
     
+    const timestamp = Date.now();
     const data: CachedAllocationData = {
       allocations: serializedAllocations,
-      timestamp: Date.now(),
+      timestamp,
     };
     
+    // setex overwrites existing key - this ensures fresh data replaces old cache
+    console.log(`[Redis] Setting cache with key: ${key}`);
     await redis.setex(key, ttlSeconds, data);
     console.log(
-      `[Redis] Cached allocations for vault ${vaultId} (curator: ${curatorAddress}), TTL: ${ttlSeconds}s`
+      `[Redis] ✅ Cached allocations for vault ${vaultId} (curator: ${curatorAddress}), key: ${key}, TTL: ${ttlSeconds}s, timestamp: ${timestamp} (${new Date(timestamp).toISOString()})`
     );
   } catch (error) {
     console.error('[Redis] Error setting cache:', error);
