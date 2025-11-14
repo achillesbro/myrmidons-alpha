@@ -1,6 +1,10 @@
 // api/cron/update-allocations.ts
 // Vercel serverless function for daily cron job to update Octav allocations cache
 
+// Force dynamic execution - prevents Vercel from caching the function response
+// This ensures the cron job runs every time it's triggered
+export const dynamic = 'force-dynamic';
+
 import { fetchOctavPortfolio } from '../lib/octav.js';
 import { setCachedAllocations } from '../lib/redis.js';
 import { transformOctavPortfolioToAllocations } from '../lib/transform.js';
