@@ -25,6 +25,7 @@ import { useVaultDataAPI } from "../hooks/useVaultDataAPI";
 import { GroupedAllocationList } from "./grouped-allocation-list";
 import { MetricCard, InfoTooltip } from "./metric-card";
 import { useMetricsData } from "../hooks/useMetricsData";
+import { useLagoonApyHistory } from "../hooks/useLagoonApyHistory";
 import { useVaultAdapter } from "../hooks/useVaultAdapter";
 import { useOctavAllocations } from "../hooks/useOctavAllocations";
 import { groupLagoonAllocations } from "../lib/allocation-grouper";
@@ -125,8 +126,10 @@ export function VaultAPIView({
     if (!octavAllocations.allocations.length) {
       return { groupedItems: [], ungroupedItems: [], totalGroupedAssets: 0n, totalUngroupedAssets: 0n };
     }
+    // Filter out dust allocations with less than 1% share
+    const filteredAllocations = octavAllocations.allocations.filter(alloc => alloc.pct >= 1);
     // Use protocol-based grouping for HypAirdrop (creates "Liquidity" group for wallet tokens)
-    return groupLagoonAllocations(octavAllocations.allocations);
+    return groupLagoonAllocations(filteredAllocations);
   }, [octavAllocations.allocations]);
 
   const [usdPrice, setUsdPrice] = useState<number | null>(null);
@@ -136,6 +139,14 @@ export function VaultAPIView({
   const [lagoonSharePriceUsd, setLagoonSharePriceUsd] = useState<number | null>(null);
   const [lagoonSharePriceLoading, setLagoonSharePriceLoading] = useState<boolean>(false);
   const [lagoonUnderlyingAssetPriceUsd, setLagoonUnderlyingAssetPriceUsd] = useState<number | null>(null);
+
+  // Fetch Lagoon performance data (TVL, since inception, APY) for Lagoon vaults
+  const lagoonPerformance = useLagoonApyHistory(
+    VAULT_ADDRESS,
+    config,
+    "30D",
+    { enabled: config.type === "lagoon" }
+  );
 
   // Fetch metrics data for sparklines and derived values (always call hooks at top level)
   // For Lagoon vaults, use lagoonSharePriceUsd and lagoonUnderlyingAssetPriceUsd; for Morpho vaults, use apiData
@@ -815,8 +826,16 @@ export function VaultAPIView({
     return <p>Error loading on-chain vault: {onchainError.message}</p>;
   }
   if (onchainData) {
-    // Use API data for TVL and metrics, fallback to onchain if needed
-    const tvlUsd = apiData.totalAssetsUsd ?? (typeof usdPrice === "number" ? Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals)) * usdPrice : undefined);
+    // Calculate TVL from Octav allocations for HypAirdrop (more accurate, not dependent on NAV updates)
+    // For other vaults, use API data or onchain data
+    const octavTvlUsd = config.id === 'hypairdrop' && octavAllocations.allocations.length > 0
+      ? octavAllocations.allocations.reduce((sum, alloc) => sum + (alloc.usd || 0), 0)
+      : undefined;
+    
+    // Use Octav TVL for HypAirdrop, otherwise use API data or onchain fallback
+    const tvlUsd = config.id === 'hypairdrop' 
+      ? (octavTvlUsd ?? apiData.totalAssetsUsd ?? (typeof usdPrice === "number" ? Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals)) * usdPrice : undefined))
+      : (apiData.totalAssetsUsd ?? (typeof usdPrice === "number" ? Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals)) * usdPrice : undefined));
 
     const userUsd = typeof usdPrice === "number" ? Number(formatUnits(userAssets, onchainData.underlyingDecimals)) * usdPrice : undefined;
 
@@ -854,10 +873,16 @@ export function VaultAPIView({
             {/* TVL */}
             <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
               <MetricCard
-                num={priceLoading || tvlUsd === undefined ? "—" : 
-                  tvlUsd >= 1000000 ? `$${(tvlUsd / 1000000).toFixed(2)}M` :
-                  tvlUsd >= 1000 ? `$${(tvlUsd / 1000).toFixed(1)}K` :
-                  `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                num={
+                  config.id === 'hypairdrop' && octavAllocations.loading
+                    ? "—"
+                    : priceLoading || tvlUsd === undefined
+                    ? "—"
+                    : tvlUsd >= 1000000
+                    ? `$${(tvlUsd / 1000000).toFixed(2)}M`
+                    : tvlUsd >= 1000
+                    ? `$${(tvlUsd / 1000).toFixed(1)}K`
+                    : `$${tvlUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                 }
                 sub="TVL"
               />
@@ -866,8 +891,14 @@ export function VaultAPIView({
             {/* Current APY */}
             <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
               <MetricCard
-                num={apiData.loading || apiData.instantApy === null ? "—" :
-                  `${(apiData.instantApy * 100).toFixed(2)}%`
+                num={
+                  config.type === "lagoon"
+                    ? lagoonPerformance.loading || lagoonPerformance.latestNetApr === null
+                      ? "—"
+                      : `${lagoonPerformance.latestNetApr.toFixed(2)}%`
+                    : apiData.loading || apiData.instantApy === null
+                    ? "—"
+                    : `${(apiData.instantApy * 100).toFixed(2)}%`
                 }
                 sub={
                   <span>
@@ -875,8 +906,12 @@ export function VaultAPIView({
                     <InfoTooltip label="Annualized from latest net rate; variable" />
                   </span>
                 }
-                delta={metricsData.apy7dAvg !== null ? 
-                  `7D avg ${(metricsData.apy7dAvg * 100).toFixed(2)}%` : undefined
+                delta={
+                  config.type === "lagoon"
+                    ? undefined
+                    : metricsData.apy7dAvg !== null
+                    ? `7D avg ${(metricsData.apy7dAvg * 100).toFixed(2)}%`
+                    : undefined
                 }
                 sparkline={metricsData.apySparkline.length > 0 ? metricsData.apySparkline : undefined}
               />
@@ -1091,10 +1126,7 @@ export function VaultAPIView({
             {/* Right column: Chart - 2/3 width */}
             <div className="lg:col-span-2">
               {config.type === 'lagoon' ? (
-                <LagoonApyHistoryChart 
-                  vaultAddress={VAULT_ADDRESS} 
-                  vaultConfig={config}
-                />
+                <LagoonApyHistoryChart history={lagoonPerformance} />
               ) : (
                 <ApyHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} underlyingSymbol={config.underlyingSymbol} />
               )}
@@ -1200,7 +1232,7 @@ export function VaultAPIView({
                   </div>
                   <div className="text-right">
                     <div className="text-lg font-semibold text-[#00295B]">
-                      1.00%
+                      0.00%
                     </div>
                   </div>
                 </div>
