@@ -12,11 +12,18 @@ import {
 } from "recharts";
 import {
   type LagoonApyHistoryData,
+  type SinceInceptionDataPoint,
   type TimeRange,
+  type TvlDataPoint,
 } from "../hooks/useLagoonApyHistory";
 
+type LagoonChartHistory = LagoonApyHistoryData & {
+  tvlData: TvlDataPoint[];
+  sinceInceptionData: SinceInceptionDataPoint[];
+};
+
 interface LagoonApyHistoryChartProps {
-  history: LagoonApyHistoryData;
+  history: LagoonChartHistory;
 }
 
 interface ChartDataPoint {
@@ -121,7 +128,7 @@ export function LagoonApyHistoryChart({ history }: LagoonApyHistoryChartProps) {
   } = history;
 
   const tvlChartData = useMemo<ChartDataPoint[]>(() => {
-    return tvlData.map((point) => ({
+    return tvlData.map((point: TvlDataPoint) => ({
       date: new Date(point.x * 1000).toISOString().split("T")[0],
       value: point.y,
       timestamp: point.x * 1000,
@@ -129,7 +136,7 @@ export function LagoonApyHistoryChart({ history }: LagoonApyHistoryChartProps) {
   }, [tvlData]);
 
   const sinceChartData = useMemo<ChartDataPoint[]>(() => {
-    return sinceInceptionData.map((point) => ({
+    return sinceInceptionData.map((point: SinceInceptionDataPoint) => ({
       date: new Date(point.x * 1000).toISOString().split("T")[0],
       value: point.y,
       timestamp: point.x * 1000,

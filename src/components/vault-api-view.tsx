@@ -25,7 +25,14 @@ import { useVaultDataAPI } from "../hooks/useVaultDataAPI";
 import { GroupedAllocationList } from "./grouped-allocation-list";
 import { MetricCard, InfoTooltip } from "./metric-card";
 import { useMetricsData } from "../hooks/useMetricsData";
-import { useLagoonApyHistory } from "../hooks/useLagoonApyHistory";
+import {
+  useLagoonApyHistory,
+  type LagoonApyHistoryData,
+  type LagoonApyHistoryOptions,
+  type SinceInceptionDataPoint,
+  type TimeRange,
+  type TvlDataPoint,
+} from "../hooks/useLagoonApyHistory";
 import { useVaultAdapter } from "../hooks/useVaultAdapter";
 import { useOctavAllocations } from "../hooks/useOctavAllocations";
 import { groupLagoonAllocations } from "../lib/allocation-grouper";
@@ -62,6 +69,20 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 import { getUsdt0Usd } from "../lib/prices"; // Generic price fetcher (name is legacy)
 import { ChainVaultGuard } from "./ChainVaultGuard";
 import { getVaultAddressesByChain, getVaultConfigByAddress, DEFAULT_VAULT_CONFIG, type VaultConfig } from "../config/vaults.config";
+
+type LagoonPerformanceHistory = LagoonApyHistoryData & {
+  tvlData: TvlDataPoint[];
+  sinceInceptionData: SinceInceptionDataPoint[];
+};
+
+type UseLagoonApyHistoryFn = (
+  vaultAddress: `0x${string}`,
+  vaultConfig: VaultConfig,
+  initialRange?: TimeRange,
+  options?: LagoonApyHistoryOptions
+) => LagoonPerformanceHistory;
+
+const useLagoonApyHistoryWithOptions = useLagoonApyHistory as UseLagoonApyHistoryFn;
 
 // Dynamically build allowed vaults from config
 const ALLOWED_VAULTS: Record<number, readonly `0x${string}`[]> = {
@@ -141,7 +162,7 @@ export function VaultAPIView({
   const [lagoonUnderlyingAssetPriceUsd, setLagoonUnderlyingAssetPriceUsd] = useState<number | null>(null);
 
   // Fetch Lagoon performance data (TVL, since inception, APY) for Lagoon vaults
-  const lagoonPerformance = useLagoonApyHistory(
+  const lagoonPerformance = useLagoonApyHistoryWithOptions(
     VAULT_ADDRESS,
     config,
     "30D",

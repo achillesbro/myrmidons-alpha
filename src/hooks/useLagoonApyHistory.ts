@@ -2,7 +2,8 @@
 // Hook to fetch and compute APR history for Lagoon vaults using PeriodSummaries
 
 import { useState, useEffect, useMemo } from "react";
-import type { Address } from "viem";
+import { formatUnits, type Address } from "viem";
+import { VaultUtils } from "@lagoon-protocol/v0-core";
 import {
   computeSinglePeriodNetApr,
   type PeriodSummary,
@@ -16,8 +17,23 @@ export interface ApyDataPoint {
   y: number; // APR as decimal (e.g. 0.045 for 4.5%)
 }
 
+export interface TvlDataPoint {
+  x: number;
+  y: number;
+}
+
+export interface SinceInceptionDataPoint {
+  x: number;
+  y: number; // percent delta since inception
+  sharePrice: number; // underlying per share
+}
+
 export interface LagoonApyHistoryData {
   apyData: ApyDataPoint[];
+  tvlData: TvlDataPoint[];
+  sinceInceptionData: SinceInceptionDataPoint[];
+  latestNetApr: number | null;
+  latestSinceInception: number | null;
   loading: boolean;
   error: string | null;
   timeRange: TimeRange;
@@ -86,11 +102,17 @@ async function fetchPeriodSummaries(
   return result.data?.periodSummaries || [];
 }
 
+export interface LagoonApyHistoryOptions {
+  enabled?: boolean;
+}
+
 export function useLagoonApyHistory(
   vaultAddress: Address,
   vaultConfig: VaultConfig,
-  initialRange: TimeRange = "30D"
+  initialRange: TimeRange = "30D",
+  options: LagoonApyHistoryOptions = {}
 ): LagoonApyHistoryData {
+  const enabled = options.enabled ?? true;
   const [timeRange, setTimeRange] = useState<TimeRange>(initialRange);
   const [periodSummaries, setPeriodSummaries] = useState<PeriodSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -113,6 +135,13 @@ export function useLagoonApyHistory(
 
   // Fetch period summaries
   useEffect(() => {
+    if (!enabled) {
+      setPeriodSummaries([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     let cancelled = false;
 
     async function fetchData() {
@@ -145,58 +174,130 @@ export function useLagoonApyHistory(
     return () => {
       cancelled = true;
     };
-  }, [vaultAddress, timeRangeConfig.startTimestamp, timeRangeConfig.endTimestamp]);
+  }, [enabled, vaultAddress, timeRangeConfig.startTimestamp, timeRangeConfig.endTimestamp]);
 
-  // Compute APR data points
-  const apyData = useMemo<ApyDataPoint[]>(() => {
-    if (periodSummaries.length === 0) {
-      return [];
+  // Compute derived datasets
+  const {
+    apyData,
+    tvlData,
+    sinceInceptionData,
+    latestNetApr,
+    latestSinceInception,
+  } = useMemo(() => {
+    if (!enabled || periodSummaries.length === 0) {
+      return {
+        apyData: [],
+        tvlData: [],
+        sinceInceptionData: [],
+        latestNetApr: null,
+        latestSinceInception: null,
+      };
     }
 
-    // Get vault decimals from config (default to 18 for Lagoon vaults)
-    const vaultDecimals = 18; // Lagoon vaults typically use 18 decimals
+    const vaultDecimals = 18;
     const assetDecimals = vaultConfig.underlyingDecimals;
+    const decimalsOffset = vaultDecimals - assetDecimals;
+    const oneShare = 10n ** BigInt(vaultDecimals);
 
-    const dataPoints: ApyDataPoint[] = [];
+    const apyPoints: ApyDataPoint[] = [];
+    const tvlPoints: TvlDataPoint[] = [];
+    const inceptionPoints: SinceInceptionDataPoint[] = [];
 
-    // For each period, compute the single-period Net APR
-    // We'll show the APR for each period at both start and end timestamps for continuity
+    let lastApr: number | null = null;
+    let lastSinceInception: number | null = null;
+
     for (const period of periodSummaries) {
-      const periodStartTimestamp = Number(period.blockTimestamp);
-      const periodEndTimestamp = periodStartTimestamp + Number(period.duration);
+      const startTimestamp = Number(period.blockTimestamp);
+      const durationSeconds = Number(period.duration);
+      const endTimestamp = startTimestamp + durationSeconds;
 
-      // Compute Net APR for this specific period
-      const apr = computeSinglePeriodNetApr(period, vaultDecimals, assetDecimals);
+      // TVL points (convert total assets to decimal)
+      const assetsStart = Number(
+        formatUnits(BigInt(period.totalAssetsAtStart), assetDecimals),
+      );
+      const assetsEnd = Number(
+        formatUnits(BigInt(period.totalAssetsAtEnd), assetDecimals),
+      );
+      tvlPoints.push({ x: startTimestamp, y: assetsStart });
+      tvlPoints.push({ x: endTimestamp, y: assetsEnd });
 
-      // Add point at start of period
-      dataPoints.push({
-        x: periodStartTimestamp,
-        y: apr,
-      });
+      const supplyStart = BigInt(period.totalSupplyAtStart);
+      const netSupplyEnd = BigInt(period.netTotalSupplyAtEnd);
+      const canComputeSharePrice =
+        supplyStart > 0n && netSupplyEnd > 0n && assetsStart >= 0 && assetsEnd >= 0;
 
-      // Add point at end of period (same APR value for step-like visualization)
-      dataPoints.push({
-        x: periodEndTimestamp,
-        y: apr,
-      });
-    }
+      if (durationSeconds > 0 && canComputeSharePrice) {
+        // APR points (skip zero-duration or zero-supply periods)
+        const apr = computeSinglePeriodNetApr(
+          period,
+          vaultDecimals,
+          assetDecimals,
+        );
+        apyPoints.push({ x: startTimestamp, y: apr });
+        apyPoints.push({ x: endTimestamp, y: apr });
+        lastApr = apr;
+      }
 
-    // Sort by timestamp
-    dataPoints.sort((a, b) => a.x - b.x);
+      if (canComputeSharePrice) {
+        // Since inception (share price evolution)
+        const ppsAtStart = VaultUtils.convertToAssets(oneShare, {
+          decimalsOffset,
+          totalAssets: BigInt(period.totalAssetsAtStart),
+          totalSupply: supplyStart,
+        });
+        const netPpsAtEnd = VaultUtils.convertToAssets(oneShare, {
+          decimalsOffset,
+          totalAssets: BigInt(period.totalAssetsAtEnd),
+          totalSupply: netSupplyEnd,
+        });
 
-    // Remove duplicates (if any periods are adjacent)
-    const uniquePoints: ApyDataPoint[] = [];
-    for (let i = 0; i < dataPoints.length; i++) {
-      if (i === 0 || dataPoints[i].x !== dataPoints[i - 1].x) {
-        uniquePoints.push(dataPoints[i]);
+        const sharePriceStart = Number(formatUnits(ppsAtStart, assetDecimals));
+        const sharePriceEnd = Number(formatUnits(netPpsAtEnd, assetDecimals));
+        const sinceInceptionStart = (sharePriceStart - 1) * 100;
+        const sinceInceptionEnd = (sharePriceEnd - 1) * 100;
+
+        inceptionPoints.push({
+          x: startTimestamp,
+          y: sinceInceptionStart,
+          sharePrice: sharePriceStart,
+        });
+        inceptionPoints.push({
+          x: endTimestamp,
+          y: sinceInceptionEnd,
+          sharePrice: sharePriceEnd,
+        });
+        lastSinceInception = sinceInceptionEnd;
       }
     }
 
-    return uniquePoints;
-  }, [periodSummaries, vaultConfig.underlyingDecimals]);
+    const dedupe = <T extends { x: number }>(points: T[]) => {
+      points.sort((a, b) => a.x - b.x);
+      const unique: T[] = [];
+      for (let i = 0; i < points.length; i++) {
+        if (i === 0 || points[i].x !== points[i - 1].x) {
+          unique.push(points[i]);
+        } else {
+          unique[unique.length - 1] = points[i];
+        }
+      }
+      return unique;
+    };
+
+    return {
+      apyData: dedupe(apyPoints),
+      tvlData: dedupe(tvlPoints),
+      sinceInceptionData: dedupe(inceptionPoints),
+      latestNetApr: lastApr,
+      latestSinceInception: lastSinceInception,
+    };
+  }, [enabled, periodSummaries, vaultConfig.underlyingDecimals]);
 
   return {
     apyData,
+    tvlData,
+    sinceInceptionData,
+    latestNetApr,
+    latestSinceInception,
     loading,
     error,
     timeRange,
