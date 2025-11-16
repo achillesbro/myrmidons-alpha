@@ -128,16 +128,18 @@ src/
 ## Key Components
 
 ### Pages
-- **Landing Page** - Vault overview and value propositions
-- **Vault Info** - Detailed vault metrics, allocations, deposit/withdraw
-- **About** - Project information, strategy, FAQ, and risks
+- **Landing Page** – Vault overview and value propositions
+- **Vault Info** – `VaultAPIView` with live metrics, allocations, LiFi-enabled deposits, and withdrawals
+- **Portfolio Dashboard** – Snapshot of user positions across supported vaults
+- **Octav Inspector** – Internal allocations tester for Octav data pipelines
 
 ### Shared Components
-- `InnerPageHero` - Reusable hero section with badges
-- `MetricCard` - Standardized metric display with tooltips
-- `CopyableAddress` - Address display with copy and explorer link
-- `AllocationPieChart` - Visual allocation breakdown
-- `GroupedAllocationList` - Detailed allocation table
+- `InnerPageHero` – Reusable hero section with badges
+- `MetricCard` – Standardized metric display with tooltips (primary implementation lives in `metric-card.tsx`)
+- `CopyableAddress` – Address display with copy and explorer link
+- `AllocationPieChart` – Visual allocation breakdown
+- `GroupedAllocationList` – Detailed allocation table
+- `DepositInline` / `WithdrawInline` – Primary entry points for interacting with vaults
 
 ## Configuration
 
@@ -190,6 +192,7 @@ To add a new language:
 - **Efficient data fetching** with SWR and TanStack Query
 - **Code splitting** via React Router
 - **Asset optimization** for images
+- **Lean codebase** – Legacy LiFi test UIs, share price charts, and unused dialogs have been removed to keep bundles lightweight
 
 ## Contributing
 
@@ -219,7 +222,7 @@ MIT License - see LICENSE file for details
 
 For questions or issues:
 - Email: contact@myrmidons-strategies.com
-- Check the About page in the app for more information
+- Review the in-app FAQ section on the landing page for more information
 
 ---
 

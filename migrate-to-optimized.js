@@ -13,7 +13,6 @@ console.log('🚀 Starting migration to optimized hooks...\n');
 // Files to check and potentially update
 const filesToCheck = [
   'src/components/vault-api-view.tsx',
-  'src/components/lifi-quote-test.tsx',
   'src/components/lifi-balance-fetcher.tsx',
 ];
 

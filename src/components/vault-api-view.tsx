@@ -853,12 +853,50 @@ export function VaultAPIView({
       ? octavAllocations.allocations.reduce((sum, alloc) => sum + (alloc.usd || 0), 0)
       : undefined;
     
-    // Use Octav TVL for HypAirdrop, otherwise use API data or onchain fallback
-    const tvlUsd = config.id === 'hypairdrop' 
-      ? (octavTvlUsd ?? apiData.totalAssetsUsd ?? (typeof usdPrice === "number" ? Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals)) * usdPrice : undefined))
-      : (apiData.totalAssetsUsd ?? (typeof usdPrice === "number" ? Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals)) * usdPrice : undefined));
+    const latestLagoonTvlUsd =
+      config.type === "lagoon" && lagoonPerformance.tvlData.length > 0
+        ? lagoonPerformance.tvlData[lagoonPerformance.tvlData.length - 1].y
+        : null;
+
+    // Prefer chart TVL for Lagoon (matches NAV history); otherwise fall back to Octav/API/on-chain
+    const tvlUsd =
+      config.type === "lagoon"
+        ? latestLagoonTvlUsd ??
+          (config.id === "hypairdrop"
+            ? octavTvlUsd
+            : null) ??
+          apiData.totalAssetsUsd ??
+          (typeof usdPrice === "number"
+            ? Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals)) * usdPrice
+            : undefined)
+        : apiData.totalAssetsUsd ??
+          (typeof usdPrice === "number"
+            ? Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals)) * usdPrice
+            : undefined);
 
     const userUsd = typeof usdPrice === "number" ? Number(formatUnits(userAssets, onchainData.underlyingDecimals)) * usdPrice : undefined;
+    const lagoonAvgNetApr =
+      config.type === "lagoon"
+        ? lagoonPerformance.avgNetApr7d ?? lagoonPerformance.latestNetApr
+        : null;
+    const lagoonLatestNetApr =
+      config.type === "lagoon" ? lagoonPerformance.latestNetApr : null;
+    const morpho7dAvgApr =
+      config.type !== "lagoon" && metricsData.apy7dAvg !== null
+        ? metricsData.apy7dAvg * 100
+        : null;
+    const morphoInstantApr =
+      config.type !== "lagoon" && apiData.instantApy !== null
+        ? apiData.instantApy * 100
+        : null;
+    const displayedApr =
+      config.type === "lagoon" ? lagoonAvgNetApr : morpho7dAvgApr ?? morphoInstantApr;
+    const aprLabel =
+      config.type === "lagoon"
+        ? "7D Trailing APR"
+        : morpho7dAvgApr !== null
+        ? "7D APR"
+        : "Instant APR";
 
     return (
       <ErrorBoundary>
@@ -914,24 +952,36 @@ export function VaultAPIView({
               <MetricCard
                 num={
                   config.type === "lagoon"
-                    ? lagoonPerformance.loading || lagoonPerformance.latestNetApr === null
+                    ? lagoonPerformance.loading || displayedApr === null
                       ? "—"
-                      : `${lagoonPerformance.latestNetApr.toFixed(2)}%`
-                    : apiData.loading || apiData.instantApy === null
+                      : `${displayedApr.toFixed(2)}%`
+                    : apiData.loading && displayedApr === null
                     ? "—"
-                    : `${(apiData.instantApy * 100).toFixed(2)}%`
+                    : displayedApr === null
+                    ? "—"
+                    : `${displayedApr.toFixed(2)}%`
                 }
                 sub={
                   <span>
-                    Current APY
-                    <InfoTooltip label="Annualized from latest net rate; variable" />
+                    {aprLabel}
+                    <InfoTooltip
+                      label={
+                        config.type === "lagoon"
+                          ? "Trailing 7-day average of net APR; Instant APR reflects the most recent period."
+                          : morpho7dAvgApr !== null
+                          ? "7-day APR derived from Morpho historical data."
+                          : "Instant APR from the latest Morpho rate."
+                      }
+                    />
                   </span>
                 }
                 delta={
                   config.type === "lagoon"
-                    ? undefined
-                    : metricsData.apy7dAvg !== null
-                    ? `7D avg ${(metricsData.apy7dAvg * 100).toFixed(2)}%`
+                    ? lagoonLatestNetApr !== null
+                      ? `Instant APR ${lagoonLatestNetApr.toFixed(2)}%`
+                      : undefined
+                    : morphoInstantApr !== null
+                    ? `Instant APR ${morphoInstantApr.toFixed(2)}%`
                     : undefined
                 }
                 sparkline={metricsData.apySparkline.length > 0 ? metricsData.apySparkline : undefined}

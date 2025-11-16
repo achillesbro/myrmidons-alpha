@@ -6,6 +6,7 @@ import { formatUnits, type Address } from "viem";
 import { VaultUtils } from "@lagoon-protocol/v0-core";
 import {
   computeSinglePeriodNetApr,
+  computeInterpolatedApr,
   type PeriodSummary,
 } from "../lib/lagoon-apr-calculator";
 import type { VaultConfig } from "../config/vaults.config";
@@ -34,6 +35,7 @@ export interface LagoonApyHistoryData {
   sinceInceptionData: SinceInceptionDataPoint[];
   latestNetApr: number | null;
   latestSinceInception: number | null;
+  avgNetApr7d: number | null;
   loading: boolean;
   error: string | null;
   timeRange: TimeRange;
@@ -183,6 +185,7 @@ export function useLagoonApyHistory(
     sinceInceptionData,
     latestNetApr,
     latestSinceInception,
+    avgNetApr7d,
   } = useMemo(() => {
     if (!enabled || periodSummaries.length === 0) {
       return {
@@ -191,6 +194,7 @@ export function useLagoonApyHistory(
         sinceInceptionData: [],
         latestNetApr: null,
         latestSinceInception: null,
+        avgNetApr7d: null,
       };
     }
 
@@ -283,12 +287,22 @@ export function useLagoonApyHistory(
       return unique;
     };
 
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const sevenDaysAgo = nowSeconds - 7 * 24 * 60 * 60;
+
     return {
       apyData: dedupe(apyPoints),
       tvlData: dedupe(tvlPoints),
       sinceInceptionData: dedupe(inceptionPoints),
       latestNetApr: lastApr,
       latestSinceInception: lastSinceInception,
+      avgNetApr7d: computeInterpolatedApr(
+        periodSummaries,
+        sevenDaysAgo,
+        nowSeconds,
+        vaultDecimals,
+        assetDecimals
+      ),
     };
   }, [enabled, periodSummaries, vaultConfig.underlyingDecimals]);
 
@@ -298,6 +312,7 @@ export function useLagoonApyHistory(
     sinceInceptionData,
     latestNetApr,
     latestSinceInception,
+    avgNetApr7d,
     loading,
     error,
     timeRange,

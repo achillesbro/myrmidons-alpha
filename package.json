@@ -44,7 +44,6 @@
     "recharts": "^3.2.1",
     "swr": "^2.3.6",
     "viem": "^2.33.1",
-    "vitest": "^3.0.5",
     "wagmi": "^2.14.11"
   },
   "devDependencies": {

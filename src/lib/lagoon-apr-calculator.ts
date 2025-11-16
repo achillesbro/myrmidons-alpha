@@ -127,10 +127,14 @@ export function getPriceReferenceAtTimestamp(
     (a, b) => Number(a.blockTimestamp) - Number(b.blockTimestamp)
   );
 
-  // Find the period that contains or is closest to the target timestamp
-  let summary = sorted.find(
-    (p) => Number(p.blockTimestamp) <= timestamp
-  );
+  // Find the most recent period that starts on or before the target timestamp
+  let summary: PeriodSummary | undefined;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (Number(sorted[i].blockTimestamp) <= timestamp) {
+      summary = sorted[i];
+      break;
+    }
+  }
 
   if (!summary) {
     // If no summary before timestamp, use the oldest summary
@@ -202,9 +206,9 @@ export function computeInterpolatedApr(
   endTimestamp: number,
   vaultDecimals: number,
   assetDecimals: number
-): number {
+): number | null {
   if (summaries.length === 0) {
-    return 0;
+    return null;
   }
 
   const startPriceRef = getPriceReferenceAtTimestamp(
@@ -221,19 +225,19 @@ export function computeInterpolatedApr(
   );
 
   if (!startPriceRef || !endPriceRef) {
-    return 0;
+    return null;
   }
 
   const duration = endTimestamp - startTimestamp;
   if (duration <= 0) {
-    return 0;
+    return null;
   }
 
   const startPps = startPriceRef.pricePerShare;
   const endPps = endPriceRef.pricePerShare;
 
   if (startPps === 0n) {
-    return 0;
+    return null;
   }
 
   const gain = endPps - startPps;
