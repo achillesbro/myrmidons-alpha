@@ -326,3 +326,156 @@ button:focus-visible {
   outline: none !important;
   box-shadow: none !important;
 }
+
+/* ==== Wallet Capsule Styles (Header Only) ==== */
+@layer components {
+  /* Main wallet capsule container */
+  .wallet-capsule {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem; /* 8px */
+    border-radius: 8px; /* Match other buttons */
+    border: 1px solid var(--border-muted);
+    padding: 0.375rem 0.75rem; /* py-1.5 px-3 */
+    font-size: 0.75rem; /* text-xs */
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    background-color: var(--bg);
+    color: var(--text);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s ease;
+  }
+
+  .wallet-capsule:hover {
+    border-color: var(--border);
+  }
+
+  /* Separator between capsule items */
+  .wallet-separator {
+    height: 1rem; /* h-4 */
+    width: 1px;
+    background-color: var(--border-muted);
+    opacity: 0.6;
+  }
+
+  /* Individual chips within the capsule */
+  .wallet-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem; /* gap-1 */
+    border-radius: 6px;
+    padding: 0.125rem 0.5rem; /* py-0.5 px-2 */
+    font-size: 0.7rem; /* slightly smaller than xs */
+    font-weight: 400;
+    background-color: transparent;
+    color: var(--text);
+    transition: background-color 0.15s ease;
+  }
+
+  /* Network chip */
+  .wallet-chip--network {
+    background-color: rgba(229, 226, 214, 0.4); /* --border-muted with opacity */
+    padding: 0.125rem 0.625rem;
+  }
+
+  /* Balance chip */
+  .wallet-chip--balance {
+    background-color: transparent;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-feature-settings: "tnum";
+  }
+
+  .wallet-chip--balance .balance-symbol {
+    opacity: 0.7;
+    margin-left: 0.125rem;
+  }
+
+  /* Address chip */
+  .wallet-chip--address {
+    background-color: transparent;
+    font-weight: 500;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  }
+
+  .wallet-chip--address:hover {
+    background-color: rgba(229, 226, 214, 0.25);
+  }
+
+  /* Override RainbowKit button styles within the capsule */
+  .wallet-capsule button,
+  .wallet-capsule [role="button"] {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    height: auto !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    font-family: inherit !important;
+    color: inherit !important;
+    transition: none !important;
+  }
+
+  .wallet-capsule button:hover,
+  .wallet-capsule [role="button"]:hover {
+    background: transparent !important;
+    border: none !important;
+    opacity: 0.85;
+  }
+
+  .wallet-capsule button:focus,
+  .wallet-capsule button:focus-visible,
+  .wallet-capsule [role="button"]:focus,
+  .wallet-capsule [role="button"]:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  .wallet-capsule button:active,
+  .wallet-capsule [role="button"]:active {
+    background: transparent !important;
+    border: none !important;
+    color: inherit !important;
+  }
+
+  /* Network icon styling */
+  .wallet-network-icon {
+    width: 0.875rem; /* 14px */
+    height: 0.875rem;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  /* Avatar/ENS avatar styling */
+  .wallet-avatar {
+    width: 1rem; /* 16px */
+    height: 1rem;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  /* Connect wallet state */
+  .wallet-connect-btn {
+    color: var(--text);
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+
+  .wallet-connect-btn:hover {
+    opacity: 0.75;
+  }
+
+  /* Responsive: hide balance on smaller screens */
+  @media (max-width: 768px) {
+    .wallet-chip--balance {
+      display: none;
+    }
+    
+    .wallet-capsule {
+      padding: 0.375rem 0.625rem; /* Slightly less padding on mobile */
+    }
+  }
+}

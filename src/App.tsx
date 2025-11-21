@@ -165,7 +165,7 @@ const TestInterface = () => {
 // Configuration for your app (Wagmi, RainbowKit, React Query, etc.)
 const config = getDefaultConfig({
   appName: i18n.t('brand'),
-  projectId: "841b6ddde2826ce0acf2d1b1f81f8582",
+  projectId: "93ed4363c5138487bd3a8c6d76002a91",
   chains: [
     mainnet,
     arbitrum, 

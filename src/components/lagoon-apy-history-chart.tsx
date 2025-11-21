@@ -24,6 +24,7 @@ type LagoonChartHistory = LagoonApyHistoryData & {
 
 interface LagoonApyHistoryChartProps {
   history: LagoonChartHistory;
+  hideInception?: boolean;
 }
 
 interface ChartDataPoint {
@@ -39,7 +40,7 @@ interface CombinedTooltipProps {
   label?: string | number;
 }
 
-function CombinedTooltip({ active, payload, label }: CombinedTooltipProps) {
+function CombinedTooltip({ active, payload, label, hideInception }: CombinedTooltipProps & { hideInception?: boolean }) {
   if (!active || !payload || payload.length === 0) return null;
 
   const sinceEntry = payload.find((p) => p.dataKey === "since");
@@ -50,13 +51,13 @@ function CombinedTooltip({ active, payload, label }: CombinedTooltipProps) {
       <div className="text-sm font-medium text-[#00295B]">
         {formatShortDate(label || "")}
       </div>
-      {sinceEntry && sinceEntry.value != null && (
+      {!hideInception && sinceEntry && sinceEntry.value != null && (
         <div className="text-xs text-[#101720] flex items-center gap-2">
           <span className="inline-flex h-2 w-2 rounded-full bg-[#8C7D57]"></span>
           <span>Since inception {formatPercent(sinceEntry.value as number)}</span>
         </div>
       )}
-      {sinceEntry?.payload?.sharePrice && (
+      {!hideInception && sinceEntry?.payload?.sharePrice && (
         <div className="text-xs text-[#101720]/70 ml-4">
           Share price {sinceEntry.payload.sharePrice.toFixed(4)} ×
         </div>
@@ -117,7 +118,7 @@ function formatPercent(value: number): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
-export function LagoonApyHistoryChart({ history }: LagoonApyHistoryChartProps) {
+export function LagoonApyHistoryChart({ history, hideInception = false }: LagoonApyHistoryChartProps) {
   const {
     loading,
     error,
@@ -240,7 +241,7 @@ export function LagoonApyHistoryChart({ history }: LagoonApyHistoryChartProps) {
         <div>
           <h3 className="text-lg font-semibold text-[#00295B]">Performance</h3>
           <p className="text-xs text-[#101720]/70">
-            Tracking both TVL and cumulative yield
+            {hideInception ? "Tracking TVL over time" : "Tracking both TVL and cumulative yield"}
           </p>
         </div>
         <select
@@ -281,44 +282,50 @@ export function LagoonApyHistoryChart({ history }: LagoonApyHistoryChartProps) {
               tickFormatter={formatShortDate}
               style={{ fontSize: "11px", fill: "rgba(20, 23, 38, 0.55)" }}
             />
+            {!hideInception && (
+              <YAxis
+                yAxisId="left"
+                tickLine={false}
+                axisLine={false}
+                width={52}
+                tickFormatter={(v) => `${v.toFixed(0)}%`}
+                style={{ fontSize: "11px", fill: "rgba(20, 23, 38, 0.55)" }}
+              />
+            )}
             <YAxis
-              yAxisId="left"
-              tickLine={false}
-              axisLine={false}
-              width={52}
-              tickFormatter={(v) => `${v.toFixed(0)}%`}
-              style={{ fontSize: "11px", fill: "rgba(20, 23, 38, 0.55)" }}
-            />
-            <YAxis
-              yAxisId="right"
-              orientation="right"
+              yAxisId={hideInception ? "left" : "right"}
+              orientation={hideInception ? "left" : "right"}
               tickLine={false}
               axisLine={false}
               width={60}
               tickFormatter={formatUsd}
               style={{ fontSize: "11px", fill: "rgba(20, 23, 38, 0.55)" }}
             />
-            <ReferenceLine
-              y={0}
-              yAxisId="left"
-              stroke="rgba(20, 23, 38, 0.3)"
-              strokeDasharray="4 4"
-            />
-            <Tooltip content={<CombinedTooltip />} />
-            <Area
-              yAxisId="left"
-              type="monotone"
-              dataKey="since"
-              name="Since inception"
-              stroke="#8C7D57"
-              strokeWidth={2}
-              fill="url(#siFill)"
-              dot={false}
-              activeDot={{ r: 3, fill: "#8C7D57" }}
-              connectNulls
-            />
+            {!hideInception && (
+              <ReferenceLine
+                y={0}
+                yAxisId="left"
+                stroke="rgba(20, 23, 38, 0.3)"
+                strokeDasharray="4 4"
+              />
+            )}
+            <Tooltip content={<CombinedTooltip hideInception={hideInception} />} />
+            {!hideInception && (
+              <Area
+                yAxisId="left"
+                type="monotone"
+                dataKey="since"
+                name="Since inception"
+                stroke="#8C7D57"
+                strokeWidth={2}
+                fill="url(#siFill)"
+                dot={false}
+                activeDot={{ r: 3, fill: "#8C7D57" }}
+                connectNulls
+              />
+            )}
             <Line
-              yAxisId="right"
+              yAxisId={hideInception ? "left" : "right"}
               type="monotone"
               dataKey="tvl"
               name="TVL"

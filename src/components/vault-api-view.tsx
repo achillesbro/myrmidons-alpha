@@ -874,7 +874,13 @@ export function VaultAPIView({
             ? Number(formatUnits(onchainData.totalAssets, onchainData.underlyingDecimals)) * usdPrice
             : undefined);
 
-    const userUsd = typeof usdPrice === "number" ? Number(formatUnits(userAssets, onchainData.underlyingDecimals)) * usdPrice : undefined;
+    // For HypAirdrop, calculate user USD value using live TVL from octavAllocations (more accurate than stale share price)
+    // For other vaults, use the standard calculation based on convertToAssets
+    const userUsd = config.id === 'hypairdrop' && octavTvlUsd && onchainData?.totalSupply && onchainData.totalSupply > 0n
+      ? (Number(formatUnits(userShares, onchainData.shareDecimals)) / Number(formatUnits(onchainData.totalSupply, onchainData.shareDecimals))) * octavTvlUsd
+      : typeof usdPrice === "number" 
+      ? Number(formatUnits(userAssets, onchainData.underlyingDecimals)) * usdPrice 
+      : undefined;
     const lagoonAvgNetApr =
       config.type === "lagoon"
         ? lagoonPerformance.avgNetApr7d ?? lagoonPerformance.latestNetApr
@@ -897,6 +903,26 @@ export function VaultAPIView({
         : morpho7dAvgApr !== null
         ? "7D APR"
         : "Instant APR";
+
+    // Calculate number of positions for HypAirdrop (grouped + ungrouped allocations)
+    const numberOfPositions = config.id === 'hypairdrop'
+      ? octavGroupedAllocations.groupedItems.length + octavGroupedAllocations.ungroupedItems.length
+      : 0;
+
+    // Calculate idle/working capital ratio for HypAirdrop
+    // Find the "Liquidity" group which contains idle tokens (wallet protocol)
+    const liquidityGroup = config.id === 'hypairdrop'
+      ? octavGroupedAllocations.groupedItems.find(group => group.familyLabel === 'Liquidity')
+      : null;
+    const idleUsd = liquidityGroup?.totalUsd || 0;
+    const totalUsd = config.id === 'hypairdrop' && octavTvlUsd ? octavTvlUsd : 0;
+    const workingUsd = totalUsd - idleUsd;
+    const idlePercentage = totalUsd > 0 ? (idleUsd / totalUsd) * 100 : 100;
+
+    // Calculate live share price for HypAirdrop using latest TVL (more accurate than stale settlement price)
+    const liveSharePriceUsd = config.id === 'hypairdrop' && octavTvlUsd && onchainData?.totalSupply && onchainData.totalSupply > 0n
+      ? octavTvlUsd / Number(formatUnits(onchainData.totalSupply, onchainData.shareDecimals))
+      : null;
 
     return (
       <ErrorBoundary>
@@ -924,6 +950,25 @@ export function VaultAPIView({
         }
         />
 
+        {/* Data refresh notice for HypAirdrop */}
+        {config.id === 'hypairdrop' && (
+          <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg px-3 py-2">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>All USD prices (TVL, share price, allocations, positions) are updated daily around 00:00 UTC</span>
+              </div>
+              {octavAllocations.timestamp && (
+                <div className="text-xs whitespace-nowrap" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+                  Last updated: {new Date(octavAllocations.timestamp).toLocaleString()}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Vault Info on top, then Key Metrics row, then Deposit/Position + Chart row */}
         <div className="space-y-4">
           
@@ -947,52 +992,69 @@ export function VaultAPIView({
               />
             </div>
             
-            {/* Current APY */}
+            {/* Current APY / Number of Positions */}
             <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
-              <MetricCard
-                num={
-                  config.type === "lagoon"
-                    ? lagoonPerformance.loading || displayedApr === null
+              {config.id === 'hypairdrop' ? (
+                <MetricCard
+                  num={octavAllocations.loading ? "—" : numberOfPositions.toString()}
+                  sub={
+                    <span>
+                      Number of Positions
+                      <InfoTooltip
+                        label="Total number of positions held by the vault across protocols and idle liquidity."
+                      />
+                    </span>
+                  }
+                />
+              ) : (
+                <MetricCard
+                  num={
+                    config.type === "lagoon"
+                      ? lagoonPerformance.loading || displayedApr === null
+                        ? "—"
+                        : `${displayedApr.toFixed(2)}%`
+                      : apiData.loading && displayedApr === null
+                      ? "—"
+                      : displayedApr === null
                       ? "—"
                       : `${displayedApr.toFixed(2)}%`
-                    : apiData.loading && displayedApr === null
-                    ? "—"
-                    : displayedApr === null
-                    ? "—"
-                    : `${displayedApr.toFixed(2)}%`
-                }
-                sub={
-                  <span>
-                    {aprLabel}
-                    <InfoTooltip
-                      label={
-                        config.type === "lagoon"
-                          ? "Trailing 7-day average of net APR; Instant APR reflects the most recent period."
-                          : morpho7dAvgApr !== null
-                          ? "7-day APR derived from Morpho historical data."
-                          : "Instant APR from the latest Morpho rate."
-                      }
-                    />
-                  </span>
-                }
-                delta={
-                  config.type === "lagoon"
-                    ? lagoonLatestNetApr !== null
-                      ? `Instant APR ${lagoonLatestNetApr.toFixed(2)}%`
+                  }
+                  sub={
+                    <span>
+                      {aprLabel}
+                      <InfoTooltip
+                        label={
+                          config.type === "lagoon"
+                            ? "Trailing 7-day average of net APR; Instant APR reflects the most recent period."
+                            : morpho7dAvgApr !== null
+                            ? "7-day APR derived from Morpho historical data."
+                            : "Instant APR from the latest Morpho rate."
+                        }
+                      />
+                    </span>
+                  }
+                  delta={
+                    config.type === "lagoon"
+                      ? lagoonLatestNetApr !== null
+                        ? `Instant APR ${lagoonLatestNetApr.toFixed(2)}%`
+                        : undefined
+                      : morphoInstantApr !== null
+                      ? `Instant APR ${morphoInstantApr.toFixed(2)}%`
                       : undefined
-                    : morphoInstantApr !== null
-                    ? `Instant APR ${morphoInstantApr.toFixed(2)}%`
-                    : undefined
-                }
-                sparkline={metricsData.apySparkline.length > 0 ? metricsData.apySparkline : undefined}
-              />
+                  }
+                  sparkline={metricsData.apySparkline.length > 0 ? metricsData.apySparkline : undefined}
+                />
+              )}
             </div>
             
             {/* Share Price */}
             <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
               <MetricCard
                 num={
-                  vaultAdapter 
+                  config.id === 'hypairdrop'
+                    ? (octavAllocations.loading || liveSharePriceUsd === null ? "—" :
+                        `$${liveSharePriceUsd.toFixed(4)}`)
+                    : vaultAdapter 
                     ? (lagoonSharePriceLoading || priceLoading || lagoonSharePriceUsd === null ? "—" :
                         `$${lagoonSharePriceUsd.toFixed(4)}`)
                     : (apiData.loading || priceLoading || apiData.sharePriceUsd === null ? "—" :
@@ -1007,27 +1069,49 @@ export function VaultAPIView({
               />
             </div>
             
-            {/* Since Inception */}
+            {/* Since Inception / Capital Allocation */}
             <div className="bg-[#FFFFF5] border border-[#E5E2D6] rounded-lg p-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <MetricCard
-                    num={metricsData.sinceInceptionReturn !== null ?
-                      `${metricsData.sinceInceptionReturn >= 0 ? '+' : ''}${metricsData.sinceInceptionReturn.toFixed(2)}%` :
-                      "—"
-                    }
-                    sub="Since Inception"
-                    deltaType={
-                      metricsData.sinceInceptionReturn !== null ?
-                        metricsData.sinceInceptionReturn >= 0 ? "positive" : "negative" :
-                        "neutral"
-                    }
-                  />
+                  {config.id === 'hypairdrop' ? (
+                    <MetricCard
+                      num={
+                        octavAllocations.loading 
+                          ? "—" 
+                          : workingUsd > 0 
+                          ? `${idlePercentage.toFixed(0)}% / ${(100 - idlePercentage).toFixed(0)}%`
+                          : "100% / 0%"
+                      }
+                      sub={
+                        <span>
+                          Idle / Working Capital
+                          <InfoTooltip
+                            label="Ratio of idle liquidity to working capital deployed in protocols."
+                          />
+                        </span>
+                      }
+                    />
+                  ) : (
+                    <MetricCard
+                      num={metricsData.sinceInceptionReturn !== null ?
+                        `${metricsData.sinceInceptionReturn >= 0 ? '+' : ''}${metricsData.sinceInceptionReturn.toFixed(2)}%` :
+                        "—"
+                      }
+                      sub="Since Inception"
+                      deltaType={
+                        metricsData.sinceInceptionReturn !== null ?
+                          metricsData.sinceInceptionReturn >= 0 ? "positive" : "negative" :
+                          "neutral"
+                      }
+                    />
+                  )}
                 </div>
-                <div className="flex items-center gap-1.5 text-xs ml-2" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                  <span>Live</span>
-                </div>
+                {config.id !== 'hypairdrop' && (
+                  <div className="flex items-center gap-1.5 text-xs ml-2" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                    <span>Live</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1058,7 +1142,13 @@ export function VaultAPIView({
                         <div className="text-xs mb-0.5" style={{ color: 'var(--text, #101720)', opacity: 0.7 }}>
                           {t("vaultInfo.position.usdValue")}
                         </div>
-                        <div className="text-2xl font-bold text-[#00295B]" style={{ fontFeatureSettings: '"tnum"' }}>{priceLoading ? <Skeleton className="h-7 w-20"/> : (userUsd != null ? fmtUsdSimple(userUsd) : "—")}</div>
+                        <div className="text-2xl font-bold text-[#00295B]" style={{ fontFeatureSettings: '"tnum"' }}>
+                          {(config.id === 'hypairdrop' ? octavAllocations.loading : priceLoading) ? (
+                            <Skeleton className="h-7 w-20"/>
+                          ) : (
+                            userUsd != null ? fmtUsdSimple(userUsd) : "—"
+                          )}
+                        </div>
                       </div>
                     </div>
                     {vaultAdapter && (pendingDepositAssets > 0n || claimableShares > 0n) && (
@@ -1069,11 +1159,15 @@ export function VaultAPIView({
                               {t("vaultInfo.position.claimableShares")}
                             </div>
                             <div className="text-lg font-semibold text-[#00295B]">{fmtToken(claimableShares, onchainData.shareDecimals)}</div>
-                            {typeof usdPrice === "number" && (
+                            {(config.id === 'hypairdrop' && octavTvlUsd && onchainData?.totalSupply && onchainData.totalSupply > 0n) ? (
+                              <div className="text-sm" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
+                                {fmtUsdSimple((Number(formatUnits(claimableShares, onchainData.shareDecimals)) / Number(formatUnits(onchainData.totalSupply, onchainData.shareDecimals))) * octavTvlUsd)}
+                              </div>
+                            ) : typeof usdPrice === "number" ? (
                               <div className="text-sm" style={{ color: 'var(--text, #101720)', opacity: 0.6 }}>
                                 {fmtUsdSimple(Number(formatUnits(claimableShares * onchainData.totalAssets / (onchainData.totalSupply || 1n), onchainData.underlyingDecimals)) * usdPrice)}
                               </div>
-                            )}
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => handleClaimShares()}
@@ -1160,7 +1254,10 @@ export function VaultAPIView({
                     <DepositInline
                       vaultConfig={config}
                       vaultAdapter={vaultAdapter}
-                      sharePriceUsd={vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd}
+                      sharePriceUsd={
+                        config.id === 'hypairdrop' ? liveSharePriceUsd :
+                        vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd
+                      }
                       vaultShareSymbol={onchainData?.symbol}
                       onSuccess={refreshPositionData}
                     />
@@ -1171,7 +1268,10 @@ export function VaultAPIView({
                       userShares={userShares}
                       shareDecimals={onchainData?.shareDecimals || 18}
                       underlyingDecimals={onchainData?.underlyingDecimals || 6}
-                      sharePriceUsd={vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd}
+                      sharePriceUsd={
+                        config.id === 'hypairdrop' ? liveSharePriceUsd :
+                        vaultAdapter ? lagoonSharePriceUsd : apiData.sharePriceUsd
+                      }
                       vaultShareSymbol={onchainData?.symbol}
                       onSuccess={refreshPositionData}
                     />
@@ -1197,7 +1297,7 @@ export function VaultAPIView({
             {/* Right column: Chart - 2/3 width */}
             <div className="lg:col-span-2">
               {config.type === 'lagoon' ? (
-                <LagoonApyHistoryChart history={lagoonPerformance} />
+                <LagoonApyHistoryChart history={lagoonPerformance} hideInception={config.id === 'hypairdrop'} />
               ) : (
                 <ApyHistoryChart vaultAddress={VAULT_ADDRESS} chainId={CHAIN_ID} underlyingSymbol={config.underlyingSymbol} />
               )}
@@ -1235,12 +1335,6 @@ export function VaultAPIView({
                           {t("vaultInfo.allocations.subtitle")}
                         </p>
                       </div>
-                      {octavAllocations.timestamp && (
-                        <div className="text-xs text-[#101720]/60 whitespace-nowrap">
-                          Last updated:<br />
-                          {new Date(octavAllocations.timestamp).toLocaleString()}
-                        </div>
-                      )}
                     </div>
                   </div>
                   {octavAllocations.loading ? (

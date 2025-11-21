@@ -308,7 +308,7 @@
       "description": {
         "usdt0": "MYRMIDONS USDT0 provides non-directional yield: funds are lent across pre-screened Morpho markets on HyperEVM to earn interest without taking directional exposure to volatile assets.",
         "whype": "MYRMIDONS WHYPE enables you to earn yield on WHYPE, the native gas token of HyperEVM. WHYPE is the core settlement asset for applications built on Hyperliquid's ecosystem, combining utility with yield generation.",
-        "hypairdrop": "HypAirdrop prioritizes points farming across Hyperliquid dApps that integrate Core + EVM. Deposits and withdrawals are async with epoch-based settlement. Airdrops and points are not guaranteed."
+        "hypairdrop": "HypAirdrop farms HyperEVM airdrops across curated dApps. Deposits and withdrawals are async and settle by epoch. The focus is points and future yield, not short-term price action."
       }
     },
     "metrics": {
